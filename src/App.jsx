@@ -3,7 +3,7 @@ import {
   Users, CalendarCheck, Shield, History, UserPlus, Plus, Trash2, 
   Shuffle, Check, ArrowLeft, ArrowRight, LogOut, LayoutGrid, 
   PlusCircle, Loader2, Gamepad2, Globe, Calendar, User, Camera, Save,
-  ShieldCheck, Crown, ShieldAlert, Settings
+  ShieldCheck, Crown, ShieldAlert, Settings, Copy, Share2, Star, Trophy
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, collection, addDoc, doc, updateDoc, 
-  onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc 
+  onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion 
 } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
@@ -181,26 +181,32 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [players, setPlayers] = useState([]);
   const [matches, setMatches] = useState([]);
   const [nextGame, setNextGame] = useState(null);
+  const [isCopied, setIsCopied] = useState(false);
   
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
   const [newPlayerName, setNewPlayerName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Equipas
+  // Equipas & Votação
   const [selectedIds, setSelectedIds] = useState([]);
   const [teamA, setTeamA] = useState([]);
   const [teamB, setTeamB] = useState([]);
   const [isGenerated, setIsGenerated] = useState(false);
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
+  
+  // Estado para Votação MVP
+  const [votingMatchId, setVotingMatchId] = useState(null);
+  const [mvpSelectedId, setMvpSelectedId] = useState("");
 
-  const groupRef = (col) => collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'groups', group.id, col);
-  const groupDoc = (col, id) => doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'groups', group.id, col, id);
+  // NOVA ESTRUTURA: Grupos são partilhados (raiz da DB)
+  const groupRef = (col) => collection(db, 'artifacts', APP_ID, 'groups', group.id, col);
+  const groupDoc = (col, id) => doc(db, 'artifacts', APP_ID, 'groups', group.id, col, id);
 
-  // Verificar se o utilizador atual é o OWNER do grupo
   const isOwner = group.ownerId === currentUser.uid;
 
   useEffect(() => {
+    // Escutar dados do grupo público
     const unsubP = onSnapshot(groupRef('players'), s => setPlayers(s.docs.map(d => ({id: d.id, ...d.data()}))));
     const qMatches = query(groupRef('matches'), orderBy('createdAt', 'desc'));
     const unsubM = onSnapshot(qMatches, s => setMatches(s.docs.map(d => ({id: d.id, ...d.data()}))));
@@ -209,11 +215,18 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       else setNextGame({ date: new Date().toISOString(), responses: {} });
     });
     return () => { unsubP(); unsubM(); unsubG(); };
-  }, [group.id, currentUser.uid]); 
+  }, [group.id]); 
 
   const showToast = (msg, type='success') => {
     setToast({show: true, msg, type});
     setTimeout(() => setToast({show: false, msg: '', type: 'success'}), 3000);
+  };
+
+  const copyInviteCode = () => {
+    navigator.clipboard.writeText(group.id);
+    setIsCopied(true);
+    showToast("Código copiado! Partilha com amigos.");
+    setTimeout(() => setIsCopied(false), 2000);
   };
 
   const toggleSchedule = async (status) => {
@@ -227,8 +240,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     if(!newPlayerName.trim()) return;
     await addDoc(groupRef('players'), {
       name: newPlayerName,
-      stats: { games: 0, wins: 0, draws: 0, losses: 0 },
-      isAdmin: false, // Por defeito não é admin
+      stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
+      isAdmin: false, 
       rating: 3,
       createdAt: serverTimestamp()
     });
@@ -242,9 +255,10 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
     await addDoc(groupRef('players'), {
       name: currentUser.displayName || "Eu",
-      uid: currentUser.uid, // Link para o user real
-      stats: { games: 0, wins: 0, draws: 0, losses: 0 },
-      isAdmin: isOwner, // Se for Owner, entra logo como Admin
+      uid: currentUser.uid, 
+      stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
+      isAdmin: isOwner, 
+      photoUrl: currentUser.photoURL,
       rating: 3,
       createdAt: serverTimestamp()
     });
@@ -256,9 +270,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
 
   const deleteThisGroup = async () => {
-    if(window.confirm("ATENÇÃO: Isto apagará o grupo e todos os jogadores/jogos para sempre. Continuar?")) {
-      await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'groups', group.id));
-      onBack(); // Voltar à lista
+    if(window.confirm("ATENÇÃO: Isto apagará o grupo para TODOS. Continuar?")) {
+      await deleteDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id));
+      onBack(); 
     }
   };
 
@@ -283,6 +297,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     await addDoc(groupRef('matches'), {
       date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB),
       teamA: teamA.map(p => ({id: p.id, name: p.name})), teamB: teamB.map(p => ({id: p.id, name: p.name})),
+      mvpVotes: {}, // Inicializa objeto de votos
       createdAt: serverTimestamp()
     });
     const winner = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw');
@@ -300,6 +315,40 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     showToast("Jogo guardado!");
   };
 
+  // --- LÓGICA DE VOTAÇÃO MVP ---
+  const submitMvpVote = async (match) => {
+    if(!mvpSelectedId) return showToast("Escolhe um jogador", "error");
+    
+    // Regista o voto
+    const newVotes = { ...match.mvpVotes, [currentUser.uid]: mvpSelectedId };
+    await updateDoc(groupDoc('matches', match.id), { mvpVotes: newVotes });
+    
+    // Verificar se todos votaram (ou se queremos fechar a votação automaticamente)
+    // Aqui simplificamos: Cada voto conta.
+    
+    // (Opcional) Verificar MVP Vencedor em tempo real
+    // Mas para simplificar, apenas guardamos o voto e o UI calcula o vencedor visualmente
+    setVotingMatchId(null);
+    setMvpSelectedId("");
+    showToast("Voto registado!");
+  };
+
+  const getMatchMVP = (match) => {
+    if (!match.mvpVotes || Object.keys(match.mvpVotes).length === 0) return null;
+    const counts = {};
+    Object.values(match.mvpVotes).forEach(pid => counts[pid] = (counts[pid] || 0) + 1);
+    
+    // Encontrar ID com mais votos
+    let maxVotes = 0;
+    let winnerId = null;
+    Object.entries(counts).forEach(([pid, count]) => {
+      if (count > maxVotes) { maxVotes = count; winnerId = pid; }
+    });
+    
+    const player = players.find(p => p.id === winnerId);
+    return player ? { ...player, votes: maxVotes } : null;
+  };
+
   const toggleSelection = (pid) => {
     if (selectedIds.includes(pid)) setSelectedIds(selectedIds.filter(id => id !== pid));
     else setSelectedIds([...selectedIds, pid]);
@@ -307,6 +356,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   return (
     <div className="h-screen flex flex-col bg-slate-900 animate-in fade-in duration-300 relative">
+      {/* HEADER GRUPO */}
       <div className="bg-slate-800 p-4 border-b border-slate-700 flex items-center justify-between sticky top-0 z-20 shadow-md">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="p-2 hover:bg-slate-700 rounded-full transition-colors text-slate-300"><ArrowLeft size={20} /></button>
@@ -316,7 +366,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             </h2>
             <div className="flex items-center gap-2">
                {isOwner && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/30 flex items-center gap-1"><Crown size={10}/> Dono</span>}
-               <p className="text-xs text-slate-400">{players.length} Jogadores</p>
+               <button onClick={copyInviteCode} className="text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded flex items-center gap-1 transition-colors">
+                  {isCopied ? <Check size={10} className="text-emerald-400"/> : <Copy size={10}/>} {isCopied ? "Copiado!" : "Convidar"}
+               </button>
             </div>
           </div>
         </div>
@@ -329,6 +381,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       )}
 
       <div className="flex-1 overflow-y-auto p-4 pb-28 no-scrollbar">
+        {/* AGENDA */}
         {activeTab === 'schedule' && (
           <div className="space-y-6 max-w-md mx-auto">
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center shadow-lg">
@@ -357,13 +410,14 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
+        {/* PLANTEL */}
         {activeTab === 'players' && (
           <div className="space-y-4 max-w-md mx-auto">
             {!players.find(p => p.uid === currentUser.uid) && (
-              <div onClick={joinAsPlayer} className="bg-emerald-900/30 border border-emerald-500/50 p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-emerald-900/50 transition-colors mb-4">
+              <div onClick={joinAsPlayer} className="bg-emerald-900/30 border border-emerald-500/50 p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-emerald-900/50 transition-colors mb-4 animate-pulse">
                 <div className="flex items-center gap-3">
                   <div className="bg-emerald-600 p-2 rounded-full text-white"><UserPlus size={16}/></div>
-                  <div><div className="font-bold text-emerald-400 text-sm">Entrar no Plantel</div><div className="text-[10px] text-emerald-200">Adiciona-te como jogador</div></div>
+                  <div><div className="font-bold text-emerald-400 text-sm">Entrar no Plantel</div><div className="text-[10px] text-emerald-200">Adiciona-te como jogador para te convocarem</div></div>
                 </div>
                 <Plus size={16} className="text-emerald-400"/>
               </div>
@@ -381,8 +435,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               {players.map(p => (
                 <div key={p.id} className={`bg-slate-800/50 p-3 rounded-lg border flex items-center justify-between transition-colors ${p.isAdmin ? 'border-yellow-500/30' : 'border-slate-700 hover:border-slate-600'}`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border relative ${p.isAdmin ? 'bg-yellow-900/20 border-yellow-500 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>
-                      {p.name.substring(0,2).toUpperCase()}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border relative overflow-hidden ${p.isAdmin ? 'bg-yellow-900/20 border-yellow-500 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>
+                      {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
                       {p.isAdmin && <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-0.5"><Crown size={6} className="text-black"/></div>}
                     </div>
                     <div>
@@ -405,11 +459,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                   </div>
                 </div>
               ))}
-              {players.length === 0 && <div className="text-center text-slate-500 text-sm py-4 italic">Adiciona jogadores para começar.</div>}
             </div>
           </div>
         )}
 
+        {/* CONVOCATÓRIA */}
         {activeTab === 'team' && (
           <div className="space-y-6 max-w-md mx-auto">
             {!isGenerated ? (
@@ -451,33 +505,65 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
+        {/* HISTÓRICO & VOTAÇÃO */}
         {activeTab === 'history' && (
           <div className="space-y-4 max-w-md mx-auto">
             {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
-            {matches.map(m => (
-              <div key={m.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm hover:border-slate-600 transition-colors">
-                <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider">{new Date(m.date).toLocaleDateString()}</div>
-                <div className="flex items-center justify-between p-4">
-                  <div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div><div className="text-[10px] text-slate-500 truncate mt-1">Branco</div></div>
-                  <div className="text-slate-600 text-sm font-light">X</div>
-                  <div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div><div className="text-[10px] text-slate-500 truncate mt-1">Preto</div></div>
+            {matches.map(m => {
+              const mvp = getMatchMVP(m);
+              return (
+                <div key={m.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm hover:border-slate-600 transition-colors">
+                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider">{new Date(m.date).toLocaleDateString()}</div>
+                  <div className="flex items-center justify-between p-4">
+                    <div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div><div className="text-[10px] text-slate-500 truncate mt-1">Branco</div></div>
+                    <div className="text-slate-600 text-sm font-light">X</div>
+                    <div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div><div className="text-[10px] text-slate-500 truncate mt-1">Preto</div></div>
+                  </div>
+                  
+                  {/* SECÇÃO MVP */}
+                  <div className="bg-slate-900/30 p-2 border-t border-slate-700/50">
+                     {mvp ? (
+                        <div className="flex items-center justify-center gap-2 text-yellow-500">
+                           <Trophy size={14} className="fill-yellow-500" />
+                           <span className="text-xs font-bold text-yellow-200">MVP: {mvp.name} ({mvp.votes})</span>
+                        </div>
+                     ) : (
+                        votingMatchId === m.id ? (
+                           <div className="flex gap-2 animate-in fade-in">
+                              <select 
+                                value={mvpSelectedId} 
+                                onChange={(e) => setMvpSelectedId(e.target.value)}
+                                className="flex-1 bg-slate-900 border border-slate-600 rounded text-xs p-1.5 text-white outline-none"
+                              >
+                                 <option value="">Quem foi o Craque?</option>
+                                 {[...(m.teamA || []), ...(m.teamB || [])].map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                 ))}
+                              </select>
+                              <button onClick={() => submitMvpVote(m)} className="bg-yellow-600 text-white px-3 rounded text-xs font-bold">Votar</button>
+                           </div>
+                        ) : (
+                           !m.mvpVotes?.[currentUser.uid] && (
+                              <button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1">
+                                 <Star size={12} /> Votar Melhor em Campo
+                              </button>
+                           )
+                        )
+                     )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        {/* --- NOVO SEPARADOR: DEFINIÇÕES --- */}
+        {/* DEFINIÇÕES */}
         {activeTab === 'settings' && isOwner && (
           <div className="space-y-6 max-w-md mx-auto">
              <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4">
-               <div className="flex items-center gap-2 text-red-500 font-bold mb-2">
-                 <ShieldAlert size={20} /> Zona de Perigo
-               </div>
-               <p className="text-sm text-red-300">Apagar este grupo irá remover permanentemente todo o histórico de jogos, plantel e agenda. Esta ação não pode ser desfeita.</p>
-               <button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2">
-                 <Trash2 size={18} /> Apagar Grupo Definitivamente
-               </button>
+               <div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div>
+               <p className="text-sm text-red-300">Apagar este grupo irá remover permanentemente todo o histórico de jogos, plantel e agenda.</p>
+               <button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo Definitivamente</button>
              </div>
           </div>
         )}
@@ -501,28 +587,51 @@ const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState('groups');
   const [groups, setGroups] = useState([]);
   const [newGroup, setNewGroup] = useState('');
+  const [joinCode, setJoinCode] = useState('');
   const [selectedGroup, setSelectedGroup] = useState(null);
+  const [msg, setMsg] = useState('');
 
+  // NOVA LÓGICA: Buscar grupos onde o utilizador está na lista de 'members'
   useEffect(() => {
-    const q = query(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'groups'), orderBy('createdAt', 'desc'));
+    // Nota: Como estamos a mudar a estrutura, isto só vai buscar os grupos novos criados com esta lógica
+    const q = query(collection(db, 'artifacts', APP_ID, 'groups'), where('members', 'array-contains', user.uid));
     return onSnapshot(q, s => setGroups(s.docs.map(d => ({id: d.id, ...d.data()}))));
   }, [user]);
 
   const createGroup = async (e) => {
     e.preventDefault();
     if(!newGroup.trim()) return;
-    await addDoc(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'groups'), {
+    await addDoc(collection(db, 'artifacts', APP_ID, 'groups'), {
       name: newGroup,
-      ownerId: user.uid, // Regista quem criou o grupo
+      ownerId: user.uid,
+      members: [user.uid], // Adicionar criador aos membros automaticamente
       createdAt: serverTimestamp()
     });
     setNewGroup('');
   };
 
-  const deleteGroup = async (e, id) => {
-    e.stopPropagation();
-    if(window.confirm("Eliminar grupo e TODOS os dados associados?")) {
-      await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'groups', id));
+  const joinGroup = async (e) => {
+    e.preventDefault();
+    if(!joinCode.trim()) return;
+    setMsg("");
+    try {
+      // Verificar se grupo existe
+      const docRef = doc(db, 'artifacts', APP_ID, 'groups', joinCode.trim());
+      const docSnap = await getDoc(docRef);
+      if(!docSnap.exists()) {
+         setMsg("Grupo não encontrado. Verifica o código.");
+         return;
+      }
+      
+      // Adicionar user aos membros
+      await updateDoc(docRef, {
+        members: arrayUnion(user.uid)
+      });
+      setMsg("Entraste no grupo!");
+      setJoinCode("");
+    } catch(err) {
+      console.error(err);
+      setMsg("Erro ao entrar.");
     }
   };
 
@@ -556,22 +665,36 @@ const GroupSelector = ({ user, onLogout }) => {
              {user.photoURL ? <img src={user.photoURL} alt="Eu" className="w-full h-full object-cover" /> : <User className="p-2 text-slate-400 w-full h-full"/>}
           </div>
         </header>
-        <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg mb-8">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><PlusCircle className="text-emerald-400" size={18}/> Criar Novo Grupo</h2>
-          <form onSubmit={createGroup} className="flex gap-3">
-            <input type="text" value={newGroup} onChange={e=>setNewGroup(e.target.value)} placeholder="Ex: Pelada de Terça" className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 text-white focus:border-emerald-500 outline-none transition-colors"/>
-            <button type="submit" disabled={!newGroup.trim()} className="bg-emerald-600 text-white px-6 rounded-lg font-bold hover:bg-emerald-500 disabled:opacity-50 transition-colors">Criar</button>
-          </form>
+
+        {/* SECÇÃO: CRIAR NOVO GRUPO */}
+        <div className="grid md:grid-cols-2 gap-4 mb-8">
+           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+             <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><PlusCircle className="text-emerald-400" size={18}/> Criar Novo Grupo</h2>
+             <form onSubmit={createGroup} className="flex gap-3">
+               <input type="text" value={newGroup} onChange={e=>setNewGroup(e.target.value)} placeholder="Nome do grupo..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 text-white focus:border-emerald-500 outline-none transition-colors"/>
+               <button type="submit" disabled={!newGroup.trim()} className="bg-emerald-600 text-white px-4 rounded-lg font-bold hover:bg-emerald-500 disabled:opacity-50 transition-colors">Criar</button>
+             </form>
+           </div>
+
+           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+             <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><UserPlus className="text-blue-400" size={18}/> Entrar com Código</h2>
+             <form onSubmit={joinGroup} className="flex gap-3">
+               <input type="text" value={joinCode} onChange={e=>setJoinCode(e.target.value)} placeholder="Código do convite..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 text-white focus:border-blue-500 outline-none transition-colors"/>
+               <button type="submit" disabled={!joinCode.trim()} className="bg-blue-600 text-white px-4 rounded-lg font-bold hover:bg-blue-500 disabled:opacity-50 transition-colors">Entrar</button>
+             </form>
+             {msg && <p className="text-xs text-emerald-400 mt-2">{msg}</p>}
+           </div>
         </div>
+
         {groups.length === 0 ? (
-          <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-xl"><Users size={48} className="mx-auto text-slate-700 mb-4"/><p className="text-slate-500">Cria o teu primeiro grupo para começar!</p></div>
+          <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-xl"><Users size={48} className="mx-auto text-slate-700 mb-4"/><p className="text-slate-500">Cria um grupo ou pede um código a um amigo!</p></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {groups.map(g => (
               <div key={g.id} onClick={() => setSelectedGroup(g)} className="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-emerald-500/50 cursor-pointer transition-all hover:translate-y-[-2px] group relative shadow-md">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-slate-900 rounded-lg text-emerald-500 group-hover:text-emerald-400 transition-colors"><Users size={24}/></div>
-                  <button onClick={(e) => deleteGroup(e, g.id)} className="text-slate-600 hover:text-red-400 p-2 rounded-full hover:bg-slate-700 transition-colors"><Trash2 size={16}/></button>
+                  {/* Removido o botão de apagar daqui para evitar acidentes. Agora é nas definições dentro do grupo */}
                 </div>
                 <h3 className="text-lg font-bold text-white mb-1 truncate">{g.name}</h3>
                 <p className="text-xs text-slate-500 flex items-center gap-1 group-hover:text-emerald-400 transition-colors">Entrar no grupo <ArrowRight size={12}/></p>
