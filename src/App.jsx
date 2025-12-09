@@ -4,8 +4,8 @@ import {
   Shuffle, Check, ArrowLeft, ArrowRight, LogOut, LayoutGrid, 
   PlusCircle, Loader2, Gamepad2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
-  Cloud, Sun, MapPin, ExternalLink, Link as LinkIcon,
-  Clock, Map as MapIcon, ThermometerSun, CloudRain, Activity
+  MapPin, ExternalLink, Link as LinkIcon,
+  Clock, Map as MapIcon, Activity
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -25,23 +25,6 @@ const SoccerBall = ({ className = "", size = 24 }) => (
     <circle cx="12" cy="12" r="10"/><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z"/><path d="m12 17v5"/><path d="m7.8 14.5-4 2.8"/><path d="m16.2 14.5 4 2.8"/><path d="m9.4 9.4-4.2-2.6"/><path d="m14.6 9.4 4.2-2.6"/>
   </svg>
 );
-
-// --- HELPER: EXTRAIR COORDENADAS DO GOOGLE MAPS ---
-const getCoordsFromUrl = (url) => {
-  try {
-    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const match = url.match(regex);
-    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-    
-    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const qMatch = url.match(queryRegex);
-    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
-
-    return null;
-  } catch (e) {
-    return null;
-  }
-};
 
 // --- COMPONENTE ESTRELAS (VOTAÇÃO) ---
 const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
@@ -238,14 +221,13 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [matches, setMatches] = useState([]);
   const [nextGame, setNextGame] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
-  const [weather, setWeather] = useState(null);
   
   // Settings Inputs
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editFreq, setEditFreq] = useState("weekly");
   const [editLocationUrl, setEditLocationUrl] = useState("");
-  const [groupLocation, setGroupLocation] = useState(null); // --- ESTADO DA LOCALIZAÇÃO ---
+  const [groupLocation, setGroupLocation] = useState(null);
 
   // Player Expansion & Voting State
   const [expandedPlayerId, setExpandedPlayerId] = useState(null);
@@ -303,7 +285,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         if(s.exists()) {
             const data = s.data();
             setEditLocationUrl(data.locationUrl || "");
-            if (data.location) setGroupLocation(data.location); // ATUALIZAR COORDENADAS
+            if (data.location) setGroupLocation(data.location); 
         }
     });
     return () => unsubGroup();
@@ -330,26 +312,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     }
   }, [players.length, currentUser.uid]); 
 
-  // --- WEATHER UPDATE (DINÂMICO) ---
-  useEffect(() => {
-    if (!nextGame?.date) return;
-    const fetchWeather = async () => {
-      try {
-        // Usa as coordenadas do estado groupLocation (tempo real) ou Lisboa por defeito
-        const lat = groupLocation?.lat || 38.7223;
-        const lng = groupLocation?.lng || -9.1393;
-        
-        const dateStr = nextGame.date.split('T')[0];
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
-        const data = await res.json();
-        if (data.daily) {
-            setWeather({ max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0], rain: data.daily.precipitation_probability_max[0] });
-        }
-      } catch (error) { console.error("Weather error", error); }
-    };
-    fetchWeather();
-  }, [nextGame?.date, groupLocation]); // DEPENDE AGORA DO groupLocation
-
+  // --- PRÉ-SELECIONAR JOGADORES ---
   useEffect(() => {
     if (activeTab === 'team' && players.length > 0 && !isGenerated) {
         const goingUids = Object.entries(nextGame?.responses || {})
@@ -595,14 +558,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 {nextGame?.date ? new Date(nextGame.date).toLocaleDateString('pt-PT', {weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'}) : 'A definir'}
               </div>
               
-              {weather && (
-                <div className="grid grid-cols-3 gap-2 bg-slate-900/50 p-3 rounded-xl border border-slate-700 mb-6">
-                   <div className="flex flex-col items-center"><ThermometerSun size={20} className="text-orange-400 mb-1"/><span className="text-[10px] text-slate-400 uppercase">Máx</span><span className="font-bold text-white">{weather.max}°C</span></div>
-                   <div className="flex flex-col items-center border-x border-slate-700">{weather.rain > 50 ? <CloudRain size={20} className="text-blue-400 mb-1"/> : <Sun size={20} className="text-yellow-400 mb-1"/>}<span className="text-[10px] text-slate-400 uppercase">Céu</span><span className="font-bold text-white">{weather.rain > 50 ? "Chuva" : "Sol"}</span></div>
-                   <div className="flex flex-col items-center"><CloudRain size={20} className="text-slate-400 mb-1"/><span className="text-[10px] text-slate-400 uppercase">Chuva</span><span className="font-bold text-white">{weather.rain}%</span></div>
-                </div>
-              )}
-              
               {editLocationUrl && (
                   <div className="flex justify-center mb-6">
                      <a href={editLocationUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 px-3 py-1.5 rounded-full border border-blue-900/50">
@@ -748,7 +703,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 </div>
                 <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 mt-4 shadow-lg">
                   <div className="text-center text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">Resultado Final</div>
-                  <div className="flex justify-center items-center gap-4 mb-4"><input type="number" value={scoreA} onChange={e=>setScoreA(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/><span className="text-slate-500 font-light text-2xl">X</span><input type="number" value={scoreB} onChange={e=>setScoreB(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/></div>
+                  <div className="flex justify-center items-center gap-4 mb-4"><input type="number" min="0" value={scoreA} onChange={e=>setScoreA(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/><span className="text-slate-500 font-light text-2xl">X</span><input type="number" min="0" value={scoreB} onChange={e=>setScoreB(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/></div>
                   <button onClick={saveMatch} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-900/20">Terminar Jogo</button>
                 </div>
               </div>
@@ -808,7 +763,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   );
 };
 
-// --- GROUP SELECTOR ---
+// ... (RESTO DO CÓDIGO IGUAL: GroupSelector, NavButton, App) ...
 const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState('groups');
   const [groups, setGroups] = useState([]);
@@ -818,7 +773,6 @@ const GroupSelector = ({ user, onLogout }) => {
   const [msg, setMsg] = useState('');
   const [createError, setCreateError] = useState('');
 
-  // Busca os grupos ordenados por data
   useEffect(() => {
     const q = query(
       collection(db, 'artifacts', APP_ID, 'groups'), 
