@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, CalendarCheck, Shield, History, UserPlus, Plus, Trash2, 
   Shuffle, Check, ArrowLeft, ArrowRight, LogOut, LayoutGrid, 
-  PlusCircle, Loader2, Gamepad2, Globe, Calendar, User, Camera, Save,
-  ShieldCheck, Crown, ShieldAlert, Settings, Copy, Share2, Star, Trophy
+  PlusCircle, Loader2, Globe, Calendar, User, Camera, Save,
+  ShieldCheck, Crown, ShieldAlert, Settings, Copy, Share2, Star, Trophy, AlertCircle,
+  CloudRain, Sun, ThermometerSun, MapPin, ExternalLink, UserCheck, Link as LinkIcon
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -16,6 +17,34 @@ import {
   getFirestore, collection, addDoc, doc, updateDoc, 
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion 
 } from 'firebase/firestore';
+
+// --- CUSTOM ICONS ---
+const SoccerBall = ({ className = "", size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10"/><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z"/><path d="m12 17v5"/><path d="m7.8 14.5-4 2.8"/><path d="m16.2 14.5 4 2.8"/><path d="m9.4 9.4-4.2-2.6"/><path d="m14.6 9.4 4.2-2.6"/>
+  </svg>
+);
+
+// --- COMPONENTE ESTRELAS (VOTAÇÃO) ---
+const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(star); }}
+          disabled={readOnly}
+          className={`${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}
+        >
+          <Star 
+            size={size} 
+            className={`${star <= value ? 'fill-yellow-500 text-yellow-500' : 'text-slate-600'}`} 
+          />
+        </button>
+      ))}
+    </div>
+  );
+};
 
 // --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
 const firebaseConfig = {
@@ -58,26 +87,32 @@ const AuthScreen = () => {
     <div className="min-h-screen flex items-center justify-center p-6 bg-slate-900">
       <div className="w-full max-w-md space-y-8 text-center animate-in fade-in zoom-in duration-300">
         <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg rotate-3 border border-white/10">
-            <Gamepad2 className="text-white w-10 h-10" />
+          <div className="w-24 h-24 bg-gradient-to-tr from-emerald-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-2xl rotate-3 border-2 border-white/10 group hover:rotate-6 transition-transform duration-500">
+            <SoccerBall className="text-white drop-shadow-md" size={48} />
           </div>
         </div>
-        <h1 className="text-3xl font-bold text-white">Futeboladas V2</h1>
-        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl text-left">
-          <h2 className="text-xl font-bold mb-6 text-white text-center">{isLogin ? "Entrar" : "Criar Conta"}</h2>
+        <div>
+          <h1 className="text-4xl font-extrabold text-white tracking-tight">Futeboladas</h1>
+          <p className="text-emerald-400 font-medium text-sm uppercase tracking-widest mt-1">Gestor de Equipas V2</p>
+        </div>
+        
+        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl text-left mt-8">
+          <h2 className="text-xl font-bold mb-6 text-white text-center">{isLogin ? "Entrar em Campo" : "Criar Conta"}</h2>
           {error && <div className="bg-red-500/10 text-red-400 p-3 rounded mb-4 text-sm border border-red-500/20">{error}</div>}
+          
           <button onClick={handleGoogle} className="w-full bg-white text-slate-900 py-3 rounded-lg font-bold mb-4 flex justify-center gap-2 items-center hover:bg-slate-100 transition-colors">
-            <Globe size={18}/> Google
+            <Globe size={18}/> Continuar com Google
           </button>
-          <div className="relative py-2 text-center"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-800 px-2 text-slate-500">Ou email</span></div></div>
+          
+          <div className="relative py-2 text-center"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-800 px-2 text-slate-500">Ou usar email</span></div></div>
           <form onSubmit={handleAuth} className="space-y-4 mt-4">
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-600 rounded text-white focus:border-emerald-500 outline-none transition-colors" placeholder="Email" required />
             <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-600 rounded text-white focus:border-emerald-500 outline-none transition-colors" placeholder="Password" required />
-            <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50 shadow-lg shadow-emerald-900/20">
               {loading ? <Loader2 className="animate-spin mx-auto" /> : (isLogin ? "Entrar" : "Registar")}
             </button>
           </form>
-          <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-4 text-emerald-400 text-sm hover:underline text-center block">{isLogin ? "Criar conta grátis" : "Já tenho conta"}</button>
+          <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-6 text-emerald-400 text-sm hover:underline text-center block">{isLogin ? "Ainda não tens conta? Cria grátis" : "Já tens conta? Faz login"}</button>
         </div>
       </div>
     </div>
@@ -182,12 +217,20 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [matches, setMatches] = useState([]);
   const [nextGame, setNextGame] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [weather, setWeather] = useState(null);
   
+  // Player Expansion & Voting State
+  const [expandedPlayerId, setExpandedPlayerId] = useState(null);
+  const [votingStars, setVotingStars] = useState(3);
+
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
   const [newPlayerName, setNewPlayerName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Equipas & Votação
+  // --- ESTADO PARA ADICIONAR JOGADOR ---
+  const [addPlayerType, setAddPlayerType] = useState('guest'); 
+  const [guestHostId, setGuestHostId] = useState(''); 
+  
   const [selectedIds, setSelectedIds] = useState([]);
   const [teamA, setTeamA] = useState([]);
   const [teamB, setTeamB] = useState([]);
@@ -195,27 +238,93 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
   
-  // Estado para Votação MVP
   const [votingMatchId, setVotingMatchId] = useState(null);
   const [mvpSelectedId, setMvpSelectedId] = useState("");
 
-  // NOVA ESTRUTURA: Grupos são partilhados (raiz da DB)
   const groupRef = (col) => collection(db, 'artifacts', APP_ID, 'groups', group.id, col);
   const groupDoc = (col, id) => doc(db, 'artifacts', APP_ID, 'groups', group.id, col, id);
 
   const isOwner = group.ownerId === currentUser.uid;
+  const myPlayerProfile = players.find(p => p.uid === currentUser.uid);
+  const amIAdmin = isOwner || (myPlayerProfile && myPlayerProfile.isAdmin);
 
   useEffect(() => {
-    // Escutar dados do grupo público
     const unsubP = onSnapshot(groupRef('players'), s => setPlayers(s.docs.map(d => ({id: d.id, ...d.data()}))));
     const qMatches = query(groupRef('matches'), orderBy('createdAt', 'desc'));
     const unsubM = onSnapshot(qMatches, s => setMatches(s.docs.map(d => ({id: d.id, ...d.data()}))));
     const unsubG = onSnapshot(groupDoc('schedule', 'next'), s => {
-      if (s.exists()) setNextGame(s.data());
-      else setNextGame({ date: new Date().toISOString(), responses: {} });
+      if (s.exists()) {
+        const data = s.data();
+        setNextGame(data);
+      } else {
+        setNextGame({ date: new Date().toISOString(), responses: {} });
+      }
     });
     return () => { unsubP(); unsubM(); unsubG(); };
-  }, [group.id]); 
+  }, [group.id]);
+
+  // --- SYNC PROFILE PHOTO ---
+  // Quando o utilizador entra no grupo, verificamos se a foto dele mudou
+  useEffect(() => {
+    if (players.length > 0) {
+        const syncProfile = async () => {
+            const myPlayer = players.find(p => p.uid === currentUser.uid);
+            if (myPlayer) {
+                // Ir buscar a foto mais recente ao perfil global
+                try {
+                    const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid));
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        const latestPhoto = userData.photoUrl || currentUser.photoURL;
+                        
+                        // Se a foto no grupo for diferente, atualizar
+                        if (myPlayer.photoUrl !== latestPhoto) {
+                            await updateDoc(groupDoc('players', myPlayer.id), {
+                                photoUrl: latestPhoto
+                            });
+                            console.log("Foto sincronizada!");
+                        }
+                    }
+                } catch(e) { console.error("Erro sync:", e); }
+            }
+        };
+        syncProfile();
+    }
+  }, [players.length, currentUser.uid]); // Corre quando a lista de jogadores carrega
+
+  useEffect(() => {
+    if (!nextGame?.date) return;
+    const fetchWeather = async () => {
+      try {
+        const dateStr = nextGame.date.split('T')[0];
+        const lat = 38.7223; const lng = -9.1393;
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
+        const data = await res.json();
+        if (data.daily) {
+            setWeather({ max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0], rain: data.daily.precipitation_probability_max[0] });
+        }
+      } catch (error) { console.error("Weather error", error); }
+    };
+    fetchWeather();
+  }, [nextGame?.date]);
+
+  // --- PRÉ-SELECIONAR JOGADORES ---
+  useEffect(() => {
+    if (activeTab === 'team' && players.length > 0 && !isGenerated) {
+        const goingUids = Object.entries(nextGame?.responses || {})
+            .filter(([uid, status]) => status === 'going')
+            .map(([uid]) => uid);
+        
+        const confirmedPlayerIds = players
+            .filter(p => p.uid && goingUids.includes(p.uid))
+            .map(p => p.id);
+        
+        if (selectedIds.length === 0 && confirmedPlayerIds.length > 0) {
+            setSelectedIds(confirmedPlayerIds);
+            showToast("Jogadores confirmados pré-selecionados!");
+        }
+    }
+  }, [activeTab, players, nextGame, isGenerated]); 
 
   const showToast = (msg, type='success') => {
     setToast({show: true, msg, type});
@@ -237,35 +346,48 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
 
   const addPlayer = async () => {
-    if(!newPlayerName.trim()) return;
+    if(!newPlayerName.trim()) return showToast("Nome inválido", "error");
+    if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error");
+
     await addDoc(groupRef('players'), {
-      name: newPlayerName,
+      name: newPlayerName + (addPlayerType === 'guest' ? ' (C)' : ''),
+      type: addPlayerType,
+      hostId: addPlayerType === 'guest' ? guestHostId : null,
       stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
       isAdmin: false, 
-      rating: 3,
+      votes: {}, 
       createdAt: serverTimestamp()
     });
     setNewPlayerName('');
-    showToast("Jogador adicionado");
+    showToast(addPlayerType === 'guest' ? "Convidado adicionado!" : "Membro adicionado!");
   };
 
   const joinAsPlayer = async () => {
     const alreadyExists = players.find(p => p.uid === currentUser.uid);
     if(alreadyExists) return showToast("Já estás no plantel!", "error");
 
+    // Tentar obter a foto mais recente
+    let photo = currentUser.photoURL;
+    try {
+        const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid));
+        if (userDoc.exists()) photo = userDoc.data().photoUrl || photo;
+    } catch(e) {}
+
     await addDoc(groupRef('players'), {
       name: currentUser.displayName || "Eu",
       uid: currentUser.uid, 
+      type: 'member', 
       stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
       isAdmin: isOwner, 
-      photoUrl: currentUser.photoURL,
-      rating: 3,
+      photoUrl: photo,
+      votes: {},
       createdAt: serverTimestamp()
     });
     showToast("Entraste no plantel!");
   };
 
   const deletePlayer = async (id) => {
+    if (!amIAdmin) return showToast("Apenas Admins podem apagar.", "error");
     if(window.confirm("Apagar jogador?")) await deleteDoc(groupDoc('players', id));
   };
 
@@ -277,19 +399,68 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
 
   const toggleAdmin = async (player) => {
-    if (!isOwner) return showToast("Apenas o Dono pode promover admins.", "error");
+    if (!isOwner) return showToast("Apenas o Dono do grupo pode gerir admins.", "error");
+    if (player.uid === group.ownerId) return showToast("O Dono é sempre Admin.", "error");
+    
     await updateDoc(groupDoc('players', player.id), { isAdmin: !player.isAdmin });
-    showToast(player.isAdmin ? "Admin removido." : "Novo Admin adicionado!");
+    showToast(player.isAdmin ? "Admin removido." : "Novo Admin promovido!");
   };
+
+  const submitPlayerVote = async (targetPlayer, rating) => {
+    const newVotes = { ...targetPlayer.votes, [currentUser.uid]: rating };
+    await updateDoc(groupDoc('players', targetPlayer.id), { votes: newVotes });
+    setExpandedPlayerId(null);
+    showToast("Classificação guardada!");
+  };
+
+  const getAverageRating = (player) => {
+    if (!player.votes) return 3;
+    const values = Object.values(player.votes);
+    if (values.length === 0) return 3;
+    return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
+  };
+
+  const getPlayerRatingValue = (p) => parseFloat(getAverageRating(p));
 
   const generateTeams = () => {
     if(selectedIds.length < 2) return showToast("Mínimo 2 jogadores", "error");
-    const pool = players.filter(p => selectedIds.includes(p.id));
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    const mid = Math.ceil(shuffled.length / 2);
-    setTeamA(shuffled.slice(0, mid));
-    setTeamB(shuffled.slice(mid));
-    setIsGenerated(true);
+    
+    const selectedPlayers = players.filter(p => selectedIds.includes(p.id));
+    
+    const groupsMap = {}; 
+    const selectedIdsSet = new Set(selectedIds);
+
+    selectedPlayers.forEach(p => {
+        let leaderId = p.id;
+        if (p.type === 'guest' && p.hostId && selectedIdsSet.has(p.hostId)) {
+            leaderId = p.hostId;
+        }
+        if (!groupsMap[leaderId]) groupsMap[leaderId] = [];
+        groupsMap[leaderId].push(p);
+    });
+
+    const blocks = Object.values(groupsMap).map(blockMembers => {
+        const totalRating = blockMembers.reduce((sum, p) => sum + getPlayerRatingValue(p), 0);
+        return { members: blockMembers, rating: totalRating };
+    });
+
+    blocks.sort((a, b) => b.rating - a.rating + (Math.random() - 0.5));
+
+    let tA = [], tB = [];
+    let sumA = 0, sumB = 0;
+
+    blocks.forEach(block => {
+      if (sumA <= sumB) {
+        tA = [...tA, ...block.members];
+        sumA += block.rating;
+      } else {
+        tB = [...tB, ...block.members];
+        sumB += block.rating;
+      }
+    });
+
+    setTeamA(tA); setTeamB(tB); setIsGenerated(true);
+    showToast(`Equipas geradas! (${tA.length} vs ${tB.length})`);
   };
 
   const saveMatch = async () => {
@@ -297,8 +468,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     await addDoc(groupRef('matches'), {
       date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB),
       teamA: teamA.map(p => ({id: p.id, name: p.name})), teamB: teamB.map(p => ({id: p.id, name: p.name})),
-      mvpVotes: {}, // Inicializa objeto de votos
-      createdAt: serverTimestamp()
+      mvpVotes: {}, createdAt: serverTimestamp()
     });
     const winner = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw');
     const updateStats = (p, result) => {
@@ -315,36 +485,19 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     showToast("Jogo guardado!");
   };
 
-  // --- LÓGICA DE VOTAÇÃO MVP ---
   const submitMvpVote = async (match) => {
     if(!mvpSelectedId) return showToast("Escolhe um jogador", "error");
-    
-    // Regista o voto
     const newVotes = { ...match.mvpVotes, [currentUser.uid]: mvpSelectedId };
     await updateDoc(groupDoc('matches', match.id), { mvpVotes: newVotes });
-    
-    // Verificar se todos votaram (ou se queremos fechar a votação automaticamente)
-    // Aqui simplificamos: Cada voto conta.
-    
-    // (Opcional) Verificar MVP Vencedor em tempo real
-    // Mas para simplificar, apenas guardamos o voto e o UI calcula o vencedor visualmente
-    setVotingMatchId(null);
-    setMvpSelectedId("");
-    showToast("Voto registado!");
+    setVotingMatchId(null); setMvpSelectedId(""); showToast("Voto registado!");
   };
 
   const getMatchMVP = (match) => {
     if (!match.mvpVotes || Object.keys(match.mvpVotes).length === 0) return null;
     const counts = {};
     Object.values(match.mvpVotes).forEach(pid => counts[pid] = (counts[pid] || 0) + 1);
-    
-    // Encontrar ID com mais votos
-    let maxVotes = 0;
-    let winnerId = null;
-    Object.entries(counts).forEach(([pid, count]) => {
-      if (count > maxVotes) { maxVotes = count; winnerId = pid; }
-    });
-    
+    let maxVotes = 0; let winnerId = null;
+    Object.entries(counts).forEach(([pid, count]) => { if (count > maxVotes) { maxVotes = count; winnerId = pid; } });
     const player = players.find(p => p.id === winnerId);
     return player ? { ...player, votes: maxVotes } : null;
   };
@@ -356,7 +509,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   return (
     <div className="h-screen flex flex-col bg-slate-900 animate-in fade-in duration-300 relative">
-      {/* HEADER GRUPO */}
       <div className="bg-slate-800 p-4 border-b border-slate-700 flex items-center justify-between sticky top-0 z-20 shadow-md">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="p-2 hover:bg-slate-700 rounded-full transition-colors text-slate-300"><ArrowLeft size={20} /></button>
@@ -381,36 +533,61 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       )}
 
       <div className="flex-1 overflow-y-auto p-4 pb-28 no-scrollbar">
-        {/* AGENDA */}
         {activeTab === 'schedule' && (
           <div className="space-y-6 max-w-md mx-auto">
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center shadow-lg">
               <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Próxima Peladinha</h3>
-              <div className="text-2xl font-bold text-white mb-6 bg-slate-900/50 py-2 rounded-lg border border-slate-700/50">
+              <div className="text-2xl font-bold text-white mb-4 bg-slate-900/50 py-2 rounded-lg border border-slate-700/50">
                 {nextGame?.date ? new Date(nextGame.date).toLocaleDateString('pt-PT', {weekday: 'long', day: 'numeric', month: 'long'}) : 'A definir'}
+              </div>
+              {weather && (
+                <div className="grid grid-cols-3 gap-2 bg-slate-900/50 p-3 rounded-xl border border-slate-700 mb-6">
+                   <div className="flex flex-col items-center"><ThermometerSun size={20} className="text-orange-400 mb-1"/><span className="text-[10px] text-slate-400 uppercase">Máx</span><span className="font-bold text-white">{weather.max}°C</span></div>
+                   <div className="flex flex-col items-center border-x border-slate-700">{weather.rain > 50 ? <CloudRain size={20} className="text-blue-400 mb-1"/> : <Sun size={20} className="text-yellow-400 mb-1"/>}<span className="text-[10px] text-slate-400 uppercase">Céu</span><span className="font-bold text-white">{weather.rain > 50 ? "Chuva" : "Sol"}</span></div>
+                   <div className="flex flex-col items-center"><CloudRain size={20} className="text-slate-400 mb-1"/><span className="text-[10px] text-slate-400 uppercase">Chuva</span><span className="font-bold text-white">{weather.rain}%</span></div>
+                </div>
+              )}
+              <div className="flex justify-center mb-6">
+                 <a href="https://www.google.com/maps/search/?api=1&query=Campo+Futebol" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 px-3 py-1.5 rounded-full border border-blue-900/50">
+                    <MapPin size={14}/> Ver Localização <ExternalLink size={12}/>
+                 </a>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <button onClick={() => toggleSchedule('going')} className={`p-4 rounded-xl border transition-all active:scale-95 ${nextGame?.responses?.[currentUser.uid] === 'going' ? 'bg-emerald-600 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-700/30 border-slate-600 hover:bg-slate-700'}`}>
-                  <div className="text-2xl mb-1">👍</div><div className="font-bold text-sm text-white">Vou Jogo</div>
+                  <div className="text-2xl mb-1">👍</div><div className="font-bold text-sm text-white">Vou a Jogo</div>
                 </button>
                 <button onClick={() => toggleSchedule('not_going')} className={`p-4 rounded-xl border transition-all active:scale-95 ${nextGame?.responses?.[currentUser.uid] === 'not_going' ? 'bg-red-600 border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.3)]' : 'bg-slate-700/30 border-slate-600 hover:bg-slate-700'}`}>
                   <div className="text-2xl mb-1">👎</div><div className="font-bold text-sm text-white">Não Vou</div>
                 </button>
               </div>
-              <div className="mt-6 pt-4 border-t border-slate-700">
-                <div className="text-[10px] text-slate-500 mb-2 uppercase tracking-widest font-bold">Confirmados</div>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {Object.entries(nextGame?.responses || {}).filter(([k,v]) => v === 'going').length > 0 ? 
-                    <span className="text-emerald-400 font-bold bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-900/50 text-sm">{Object.entries(nextGame?.responses || {}).filter(([k,v]) => v === 'going').length} jogadores</span>
-                    : <span className="text-slate-600 italic text-sm">Ainda ninguém confirmou</span>
+              <div className="mt-6 pt-4 border-t border-slate-700 text-left">
+                <div className="text-[10px] text-slate-500 mb-3 uppercase tracking-widest font-bold">Jogadores Confirmados</div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(nextGame?.responses || {})
+                    .filter(([_, status]) => status === 'going')
+                    .map(([uid]) => {
+                        const p = players.find(player => player.uid === uid);
+                        if (!p) return null;
+                        return (
+                            <div key={uid} className="flex items-center gap-2 bg-slate-700/50 px-3 py-1.5 pr-4 rounded-full border border-slate-600">
+                                <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden border border-slate-500 shadow-sm">
+                                    {p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
+                                </div>
+                                <span className="text-xs text-white font-medium">{p.name}</span>
+                            </div>
+                        );
+                    })
                   }
+                  {Object.values(nextGame?.responses || {}).filter(v => v === 'going').length === 0 && (
+                      <span className="text-slate-600 italic text-sm w-full text-center py-2">Ainda ninguém confirmou</span>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* PLANTEL */}
+        {/* TAB PLANTEL (ATUALIZADA) */}
         {activeTab === 'players' && (
           <div className="space-y-4 max-w-md mx-auto">
             {!players.find(p => p.uid === currentUser.uid) && (
@@ -423,47 +600,154 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               </div>
             )}
 
+            {/* CARTÃO DE ADICIONAR JOGADOR */}
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
-              <h3 className="font-bold text-white mb-3 flex items-center gap-2 text-sm"><UserPlus size={16} className="text-emerald-400"/> Adicionar Convidado</h3>
-              <div className="flex gap-2">
-                <input type="text" value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Nome do craque..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 text-sm text-white focus:border-emerald-500 outline-none transition-colors"/>
-                <button onClick={addPlayer} className="bg-emerald-600 text-white p-2.5 rounded-lg hover:bg-emerald-500 transition-colors"><Plus size={18}/></button>
+              <div className="flex justify-between items-center mb-3">
+                 <h3 className="font-bold text-white text-sm flex items-center gap-2"><UserPlus size={16} className="text-emerald-400"/> Novo Jogador</h3>
+                 {/* SELETOR DE TIPO */}
+                 <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-600">
+                    <button onClick={() => setAddPlayerType('guest')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'guest' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Convidado</button>
+                    <button onClick={() => setAddPlayerType('member')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'member' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Membro</button>
+                 </div>
+              </div>
+              
+              <div className="space-y-3">
+                <input 
+                  type="text" 
+                  value={newPlayerName} 
+                  onChange={e => setNewPlayerName(e.target.value)} 
+                  placeholder={addPlayerType === 'guest' ? "Nome do convidado..." : "Nome do membro..."} 
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none transition-colors"
+                />
+                
+                {/* SE CONVIDADO, PEDE QUEM CONVIDOU */}
+                {addPlayerType === 'guest' && (
+                   <select 
+                     value={guestHostId} 
+                     onChange={e => setGuestHostId(e.target.value)}
+                     className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none"
+                   >
+                      <option value="">Quem convidou? (Obrigatório)</option>
+                      {/* Mostrar apenas membros como possíveis hosts */}
+                      {players.filter(p => p.type !== 'guest').map(p => (
+                         <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                   </select>
+                )}
+
+                <button onClick={addPlayer} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2">
+                   <Plus size={16}/> Adicionar {addPlayerType === 'guest' ? 'Convidado' : 'Membro'}
+                </button>
               </div>
             </div>
 
             <div className="space-y-2">
-              {players.map(p => (
-                <div key={p.id} className={`bg-slate-800/50 p-3 rounded-lg border flex items-center justify-between transition-colors ${p.isAdmin ? 'border-yellow-500/30' : 'border-slate-700 hover:border-slate-600'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border relative overflow-hidden ${p.isAdmin ? 'bg-yellow-900/20 border-yellow-500 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>
-                      {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
-                      {p.isAdmin && <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-0.5"><Crown size={6} className="text-black"/></div>}
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm text-white flex items-center gap-1">
-                        {p.name}
-                        {p.isAdmin && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1 rounded">Admin</span>}
-                      </div>
-                      <div className="text-[10px] text-slate-500 flex gap-2">
-                        <span>J: {p.stats?.games || 0}</span> • <span>V: {p.stats?.wins || 0}</span>
-                      </div>
+              {players.map(p => {
+                const stats = p.stats || { games: 0, wins: 0, draws: 0, losses: 0 };
+                const myVote = p.votes?.[currentUser.uid] || 0;
+                
+                // Procurar nome do host se for convidado
+                const hostName = p.type === 'guest' && p.hostId ? players.find(h => h.id === p.hostId)?.name : null;
+
+                return (
+                  <div key={p.id} onClick={() => {
+                     if (expandedPlayerId === p.id) {
+                       setExpandedPlayerId(null);
+                     } else {
+                       setExpandedPlayerId(p.id);
+                       setVotingStars(myVote || 3);
+                     }
+                  }}>
+                    <div className={`bg-slate-800/50 p-3 rounded-lg border transition-all cursor-pointer ${expandedPlayerId === p.id ? 'border-emerald-500/50 bg-slate-800 shadow-lg' : 'border-slate-700 hover:border-slate-600'}`}>
+                       <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border relative overflow-hidden ${p.isAdmin ? 'bg-yellow-900/20 border-yellow-500 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>
+                            {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
+                            {p.isAdmin && <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-0.5"><Crown size={6} className="text-black"/></div>}
+                          </div>
+                          <div className="flex-1">
+                             <div className="font-bold text-sm text-white flex items-center gap-1">
+                                {p.name}
+                                {p.isAdmin && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1 rounded">Admin</span>}
+                             </div>
+                             <div className="text-[10px] text-slate-500 flex gap-2 items-center">
+                                {p.type === 'guest' ? (
+                                   <span className="flex items-center gap-1 text-slate-400"><LinkIcon size={8}/> de {hostName || '?'}</span>
+                                ) : (
+                                   <span className="text-blue-400">Membro</span>
+                                )}
+                                <span className="text-slate-700">|</span>
+                                {amIAdmin ? (
+                                   <span className="text-yellow-500 flex items-center gap-1 font-bold"><Star size={10} fill="currentColor"/> {getAverageRating(p)}</span>
+                                ) : (
+                                   myVote ? <span className="text-emerald-500 font-medium">Avaliado</span> : <span>Toca para avaliar</span>
+                                )}
+                             </div>
+                          </div>
+                          <div className={`text-slate-600 transition-transform ${expandedPlayerId === p.id ? 'rotate-90' : ''}`}>
+                             <ArrowRight size={16}/>
+                          </div>
+                       </div>
+
+                       {/* EXPANDED SECTION */}
+                       {expandedPlayerId === p.id && (
+                         <div className="mt-4 pt-4 border-t border-slate-700/50 animate-in slide-in-from-top-2 fade-in duration-300">
+                            {/* ESTATÍSTICAS */}
+                            <div className="grid grid-cols-4 gap-2 mb-4">
+                              <div className="bg-slate-800/80 p-2 rounded text-center border border-slate-600">
+                                <div className="text-[10px] text-slate-400 font-bold">J</div>
+                                <div className="font-bold text-white text-sm">{stats.games}</div>
+                              </div>
+                              <div className="bg-emerald-900/20 p-2 rounded text-center border border-emerald-500/30">
+                                <div className="text-[10px] text-emerald-400 font-bold">V</div>
+                                <div className="font-bold text-emerald-100 text-sm">{stats.wins}</div>
+                              </div>
+                              <div className="bg-yellow-900/20 p-2 rounded text-center border border-yellow-500/30">
+                                <div className="text-[10px] text-yellow-400 font-bold">E</div>
+                                <div className="font-bold text-yellow-100 text-sm">{stats.draws}</div>
+                              </div>
+                              <div className="bg-red-900/20 p-2 rounded text-center border border-red-500/30">
+                                <div className="text-[10px] text-red-400 font-bold">D</div>
+                                <div className="font-bold text-red-100 text-sm">{stats.losses}</div>
+                              </div>
+                            </div>
+
+                            {/* VOTING AREA */}
+                            {p.uid !== currentUser.uid && (
+                                <div className="mb-4 text-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+                                   <div className="text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Classificar Jogador</div>
+                                   <div className="flex justify-center mb-3">
+                                      <StarRating value={votingStars} onChange={setVotingStars} size={28} />
+                                   </div>
+                                   <button onClick={(e) => { e.stopPropagation(); submitPlayerVote(p, votingStars); }} className="w-full bg-slate-700 hover:bg-slate-600 text-xs py-2 rounded-lg text-white font-bold transition-colors">
+                                      Confirmar Classificação
+                                   </button>
+                                </div>
+                            )}
+
+                            {/* ADMIN ACTIONS */}
+                            {amIAdmin && (
+                               <div className="flex gap-2 pt-2 border-t border-slate-700/50">
+                                  {isOwner && p.uid !== group.ownerId && (
+                                     <button onClick={(e) => { e.stopPropagation(); toggleAdmin(p); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold border transition-colors flex items-center justify-center gap-1 ${p.isAdmin ? 'border-red-500/30 text-red-400 bg-red-900/10 hover:bg-red-900/20' : 'border-yellow-500/30 text-yellow-400 bg-yellow-900/10 hover:bg-yellow-900/20'}`}>
+                                        {p.isAdmin ? <><ShieldAlert size={14}/> Remover Admin</> : <><ShieldCheck size={14}/> Promover Admin</>}
+                                     </button>
+                                  )}
+                                  <button onClick={(e) => { e.stopPropagation(); deletePlayer(p.id); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold border border-red-500/30 text-red-400 bg-red-900/10 hover:bg-red-900/20 flex items-center justify-center gap-1">
+                                     <Trash2 size={14}/> Eliminar
+                                  </button>
+                               </div>
+                            )}
+                         </div>
+                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {isOwner && p.uid !== currentUser.uid && (
-                      <button onClick={() => toggleAdmin(p)} className={`p-2 rounded-lg transition-colors ${p.isAdmin ? 'text-yellow-500 hover:bg-yellow-900/20' : 'text-slate-600 hover:text-yellow-500 hover:bg-slate-700'}`}>
-                        {p.isAdmin ? <ShieldCheck size={16}/> : <Shield size={16}/>}
-                      </button>
-                    )}
-                    <button onClick={() => deletePlayer(p.id)} className="text-slate-600 hover:text-red-400 p-2 transition-colors"><Trash2 size={16}/></button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* CONVOCATÓRIA */}
+        {/* ... (RESTO DAS TABS IGUAIS) ... */}
         {activeTab === 'team' && (
           <div className="space-y-6 max-w-md mx-auto">
             {!isGenerated ? (
@@ -471,7 +755,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 sticky top-0 z-10 shadow-lg">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-white text-sm">Selecionar ({selectedIds.length})</h3>
-                    <button onClick={generateTeams} className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold hover:bg-emerald-500 flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-900/20"><Shuffle size={14}/> Gerar Equipas</button>
+                    <button onClick={generateTeams} className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold hover:bg-emerald-500 flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-900/20"><Shuffle size={14}/> Criar Equipas</button>
                   </div>
                   <input type="text" placeholder="Procurar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition-colors"/>
                 </div>
@@ -479,14 +763,17 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                   {players.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
                     <div key={p.id} onClick={() => toggleSelection(p.id)} className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2 ${selectedIds.includes(p.id) ? 'bg-emerald-900/30 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
                       <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${selectedIds.includes(p.id) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'}`}>{selectedIds.includes(p.id) && <Check size={10} className="text-white"/>}</div>
-                      <span className="text-xs font-medium truncate">{p.name}</span>
+                      <div className="truncate">
+                          <span className="text-xs font-medium block">{p.name}</span>
+                          {amIAdmin && <span className="text-[9px] text-slate-500 flex items-center gap-0.5"><Star size={8} className="fill-slate-500"/> {getAverageRating(p)}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
               <div className="animate-in zoom-in duration-300 space-y-4">
-                <div className="flex justify-between items-center"><h3 className="font-bold text-white text-lg flex items-center gap-2"><Gamepad2 size={20} className="text-yellow-500"/> Jogo a Decorrer</h3><button onClick={() => setIsGenerated(false)} className="text-xs text-red-400 hover:underline font-medium">Cancelar</button></div>
+                <div className="flex justify-between items-center"><h3 className="font-bold text-white text-lg flex items-center gap-2"><SoccerBall size={20} className="text-yellow-500"/> Jogo a Decorrer</h3><button onClick={() => setIsGenerated(false)} className="text-xs text-red-400 hover:underline font-medium">Cancelar</button></div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-white shadow-lg"><div className="font-bold text-center text-white mb-3 text-sm border-b border-slate-700 pb-2">Equipa Branco ({teamA.length})</div><ul className="text-xs text-slate-300 space-y-1.5">{teamA.map(p => <li key={p.id} className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-white rounded-full"></div> {p.name}</li>)}</ul></div>
                   <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-slate-950 shadow-lg"><div className="font-bold text-center text-slate-400 mb-3 text-sm border-b border-slate-700 pb-2">Equipa Preto ({teamB.length})</div><ul className="text-xs text-slate-300 space-y-1.5">{teamB.map(p => <li key={p.id} className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-black border border-slate-600 rounded-full"></div> {p.name}</li>)}</ul></div>
@@ -505,7 +792,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
-        {/* HISTÓRICO & VOTAÇÃO */}
         {activeTab === 'history' && (
           <div className="space-y-4 max-w-md mx-auto">
             {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
@@ -520,7 +806,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                     <div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div><div className="text-[10px] text-slate-500 truncate mt-1">Preto</div></div>
                   </div>
                   
-                  {/* SECÇÃO MVP */}
                   <div className="bg-slate-900/30 p-2 border-t border-slate-700/50">
                      {mvp ? (
                         <div className="flex items-center justify-center gap-2 text-yellow-500">
@@ -590,24 +875,46 @@ const GroupSelector = ({ user, onLogout }) => {
   const [joinCode, setJoinCode] = useState('');
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [msg, setMsg] = useState('');
+  const [createError, setCreateError] = useState('');
 
-  // NOVA LÓGICA: Buscar grupos onde o utilizador está na lista de 'members'
   useEffect(() => {
-    // Nota: Como estamos a mudar a estrutura, isto só vai buscar os grupos novos criados com esta lógica
-    const q = query(collection(db, 'artifacts', APP_ID, 'groups'), where('members', 'array-contains', user.uid));
-    return onSnapshot(q, s => setGroups(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    const q = query(
+      collection(db, 'artifacts', APP_ID, 'groups'), 
+      where('members', 'array-contains', user.uid)
+    );
+    return onSnapshot(q, s => {
+      const list = s.docs.map(d => ({id: d.id, ...d.data()}));
+      list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setGroups(list);
+    });
   }, [user]);
 
   const createGroup = async (e) => {
     e.preventDefault();
     if(!newGroup.trim()) return;
-    await addDoc(collection(db, 'artifacts', APP_ID, 'groups'), {
-      name: newGroup,
-      ownerId: user.uid,
-      members: [user.uid], // Adicionar criador aos membros automaticamente
-      createdAt: serverTimestamp()
-    });
-    setNewGroup('');
+    setCreateError("");
+    try {
+      const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'groups'), {
+        name: newGroup,
+        ownerId: user.uid,
+        members: [user.uid],
+        createdAt: serverTimestamp()
+      });
+      
+      const newGroupData = { 
+        id: docRef.id, 
+        name: newGroup, 
+        ownerId: user.uid, 
+        members: [user.uid],
+        createdAt: { seconds: Date.now() / 1000 }
+      };
+      
+      setGroups(prev => [newGroupData, ...prev]);
+      setNewGroup('');
+    } catch (err) {
+      console.error(err);
+      setCreateError("Erro de permissão. Verifica as Regras na Firebase.");
+    }
   };
 
   const joinGroup = async (e) => {
@@ -615,7 +922,6 @@ const GroupSelector = ({ user, onLogout }) => {
     if(!joinCode.trim()) return;
     setMsg("");
     try {
-      // Verificar se grupo existe
       const docRef = doc(db, 'artifacts', APP_ID, 'groups', joinCode.trim());
       const docSnap = await getDoc(docRef);
       if(!docSnap.exists()) {
@@ -623,10 +929,22 @@ const GroupSelector = ({ user, onLogout }) => {
          return;
       }
       
-      // Adicionar user aos membros
+      const groupData = docSnap.data();
+      if (groupData.members && groupData.members.includes(user.uid)) {
+          setMsg("Já pertences a este grupo!");
+          return;
+      }
+
       await updateDoc(docRef, {
         members: arrayUnion(user.uid)
       });
+      
+      const newGroup = { id: docSnap.id, ...groupData, members: [...(groupData.members || []), user.uid] };
+      setGroups(prev => {
+          if (prev.find(g => g.id === newGroup.id)) return prev;
+          return [newGroup, ...prev].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      });
+
       setMsg("Entraste no grupo!");
       setJoinCode("");
     } catch(err) {
@@ -666,7 +984,6 @@ const GroupSelector = ({ user, onLogout }) => {
           </div>
         </header>
 
-        {/* SECÇÃO: CRIAR NOVO GRUPO */}
         <div className="grid md:grid-cols-2 gap-4 mb-8">
            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
              <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><PlusCircle className="text-emerald-400" size={18}/> Criar Novo Grupo</h2>
@@ -674,6 +991,7 @@ const GroupSelector = ({ user, onLogout }) => {
                <input type="text" value={newGroup} onChange={e=>setNewGroup(e.target.value)} placeholder="Nome do grupo..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 text-white focus:border-emerald-500 outline-none transition-colors"/>
                <button type="submit" disabled={!newGroup.trim()} className="bg-emerald-600 text-white px-4 rounded-lg font-bold hover:bg-emerald-500 disabled:opacity-50 transition-colors">Criar</button>
              </form>
+             {createError && <div className="mt-3 text-xs bg-red-900/30 text-red-400 p-2 rounded border border-red-500/30 flex items-center gap-2"><AlertCircle size={12}/> {createError}</div>}
            </div>
 
            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
@@ -694,7 +1012,6 @@ const GroupSelector = ({ user, onLogout }) => {
               <div key={g.id} onClick={() => setSelectedGroup(g)} className="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-emerald-500/50 cursor-pointer transition-all hover:translate-y-[-2px] group relative shadow-md">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-slate-900 rounded-lg text-emerald-500 group-hover:text-emerald-400 transition-colors"><Users size={24}/></div>
-                  {/* Removido o botão de apagar daqui para evitar acidentes. Agora é nas definições dentro do grupo */}
                 </div>
                 <h3 className="text-lg font-bold text-white mb-1 truncate">{g.name}</h3>
                 <p className="text-xs text-slate-500 flex items-center gap-1 group-hover:text-emerald-400 transition-colors">Entrar no grupo <ArrowRight size={12}/></p>
