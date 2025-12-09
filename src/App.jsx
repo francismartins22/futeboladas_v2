@@ -4,8 +4,8 @@ import {
   Shuffle, Check, ArrowLeft, ArrowRight, LogOut, LayoutGrid, 
   PlusCircle, Loader2, Gamepad2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
-  MapPin, ExternalLink, Link as LinkIcon,
-  Clock, Map as MapIcon, Activity
+  Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
+  Wallet, ClipboardList, CheckCircle, Banknote, X
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -25,6 +25,23 @@ const SoccerBall = ({ className = "", size = 24 }) => (
     <circle cx="12" cy="12" r="10"/><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z"/><path d="m12 17v5"/><path d="m7.8 14.5-4 2.8"/><path d="m16.2 14.5 4 2.8"/><path d="m9.4 9.4-4.2-2.6"/><path d="m14.6 9.4 4.2-2.6"/>
   </svg>
 );
+
+// --- HELPER: EXTRAIR COORDENADAS DO GOOGLE MAPS ---
+const getCoordsFromUrl = (url) => {
+  try {
+    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const match = url.match(regex);
+    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    
+    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const qMatch = url.match(queryRegex);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
 
 // --- COMPONENTE ESTRELAS (VOTAÇÃO) ---
 const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
@@ -46,6 +63,14 @@ const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
     </div>
   );
 };
+
+// --- COMPONENTE NAV BUTTON ---
+const NavButton = ({ active, onClick, icon: Icon, label }) => (
+  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
+    <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
+    <span className="text-[10px] font-medium mt-1">{label}</span>
+  </button>
+);
 
 // --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
 const firebaseConfig = {
@@ -195,7 +220,7 @@ const UserProfile = ({ user, onLogout }) => {
               {photoUrl ? <img src={photoUrl} alt="Perfil" className="w-full h-full object-cover" /> : <User size={40} className="text-slate-400" />}
             </div>
             <div className="absolute bottom-0 right-0 bg-emerald-600 p-2 rounded-full text-white shadow-lg border border-slate-900 group-hover:scale-110 transition-transform">
-               {uploading ? <Activity className="animate-spin" size={16}/> : <Camera size={16} />}
+               {uploading ? <Loader2 className="animate-spin" size={16}/> : <Camera size={16} />}
             </div>
           </div>
           <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
@@ -227,7 +252,16 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [editTime, setEditTime] = useState("");
   const [editFreq, setEditFreq] = useState("weekly");
   const [editLocationUrl, setEditLocationUrl] = useState("");
-  const [groupLocation, setGroupLocation] = useState(null);
+  
+  // Group Settings (Defaults)
+  const [hasMonthlyFee, setHasMonthlyFee] = useState(true);
+  const [guestFee, setGuestFee] = useState(4.5);
+  
+  // Treasury State
+  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [monthlyFixedIds, setMonthlyFixedIds] = useState([]); 
+  const [monthlyPayments, setMonthlyPayments] = useState({}); 
+  const [monthlyFee, setMonthlyFee] = useState(0);
 
   // Player Expansion & Voting State
   const [expandedPlayerId, setExpandedPlayerId] = useState(null);
@@ -280,17 +314,39 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   }, [group.id]);
 
   useEffect(() => {
-    // ESCUTAR ATUALIZAÇÕES DO GRUPO (INCLUINDO LOCALIZAÇÃO)
+    // ESCUTAR ATUALIZAÇÕES DO GRUPO (LOCALIZAÇÃO E SETTINGS)
     const unsubGroup = onSnapshot(doc(db, 'artifacts', APP_ID, 'groups', group.id), (s) => {
         if(s.exists()) {
             const data = s.data();
             setEditLocationUrl(data.locationUrl || "");
-            if (data.location) setGroupLocation(data.location); 
+            if (data.settings) {
+                setHasMonthlyFee(data.settings.hasMonthlyFee ?? true);
+                setGuestFee(data.settings.guestFee ?? 4.5);
+            }
         }
     });
     return () => unsubGroup();
   }, [group.id]);
 
+  // --- SYNC TREASURY ---
+  useEffect(() => {
+    const monthDocRef = groupDoc('treasury', `month_${currentMonth}`);
+    const unsubTreasury = onSnapshot(monthDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setMonthlyFixedIds(Array.isArray(data.fixedIds) ? data.fixedIds : []);
+        setMonthlyPayments(data.payments || {});
+        setMonthlyFee(data.monthlyFee || 0); 
+      } else {
+        setMonthlyFixedIds([]);
+        setMonthlyPayments({});
+        setMonthlyFee(0);
+      }
+    });
+    return () => unsubTreasury();
+  }, [group.id, currentMonth]);
+
+  // --- SYNC PROFILE PHOTO ---
   useEffect(() => {
     if (players.length > 0) {
         const syncProfile = async () => {
@@ -409,6 +465,47 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     showToast(player.isAdmin ? "Admin removido." : "Novo Admin promovido!");
   };
 
+  // --- TREASURY FUNCTIONS ---
+  const saveMonthlyFee = async () => {
+    await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseInt(monthlyFee) }, { merge: true });
+    showToast("Valor atualizado!");
+  };
+
+  const toggleMonthlyPayment = async (playerId) => {
+    const newPayments = { ...(monthlyPayments || {}), [playerId]: !(monthlyPayments || {})[playerId] };
+    await setDoc(groupDoc('treasury', `month_${currentMonth}`), { payments: newPayments }, { merge: true });
+  };
+
+  const selfSignUp = async () => {
+    const myPlayer = players.find(p => p.uid === currentUser.uid);
+    if (!myPlayer) return showToast("Entra no plantel primeiro!", "error");
+    
+    if (monthlyFixedIds.length >= 18) return showToast("Lista cheia (Máx 18)!", "error");
+    if (monthlyFixedIds.includes(myPlayer.id)) return showToast("Já estás inscrito!");
+    
+    const newIds = [...monthlyFixedIds, myPlayer.id];
+    await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true });
+    showToast("Inscrito como Fixo!");
+  };
+
+  const selfSignOut = async () => {
+    const myPlayer = players.find(p => p.uid === currentUser.uid);
+    if (!myPlayer) return;
+
+    const newIds = monthlyFixedIds.filter(id => id !== myPlayer.id);
+    await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true });
+    showToast("Inscrição cancelada.");
+  };
+
+  const settleMatchPayment = async (matchId, playerId) => {
+     const match = matches.find(m => m.id === matchId);
+     if(!match || !match.payments) return;
+     
+     const newPayments = { ...match.payments, [playerId]: true };
+     await updateDoc(groupDoc('matches', matchId), { payments: newPayments });
+     showToast("Dívida regularizada!");
+  };
+
   const saveGameSettings = async () => {
       try {
           const updates = {};
@@ -419,12 +516,20 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               await setDoc(groupDoc('schedule', 'next'), updates, { merge: true });
           }
 
+          // Salvar Location e Group Settings (Guest Fee + Monthly Toggle)
+          const groupUpdates = { 
+              settings: {
+                  hasMonthlyFee: hasMonthlyFee,
+                  guestFee: parseFloat(guestFee)
+              }
+          };
           if (editLocationUrl) {
               const coords = getCoordsFromUrl(editLocationUrl);
-              const groupUpdates = { locationUrl: editLocationUrl };
+              groupUpdates.locationUrl = editLocationUrl;
               if (coords) groupUpdates.location = coords; 
-              await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), groupUpdates);
           }
+
+          await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), groupUpdates);
           showToast("Definições guardadas!");
       } catch (err) {
           console.error(err);
@@ -482,11 +587,26 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const saveMatch = async () => {
     if(!scoreA || !scoreB) return showToast("Insere o resultado", "error");
+    
+    // Calcular pagamentos
+    const gamePayments = {};
+    [...teamA, ...teamB].forEach(p => {
+        // Se mensalidades ativas: Só paga quem não é fixo
+        // Se mensalidades inativas: Todos pagam
+        const needsToPay = hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true;
+        
+        if (needsToPay) {
+            gamePayments[p.id] = false; // false = não pagou ainda
+        }
+    });
+
     await addDoc(groupRef('matches'), {
       date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB),
       teamA: teamA.map(p => ({id: p.id, name: p.name})), teamB: teamB.map(p => ({id: p.id, name: p.name})),
-      mvpVotes: {}, createdAt: serverTimestamp()
+      mvpVotes: {}, payments: gamePayments, createdAt: serverTimestamp()
     });
+    
+    // Update Stats
     const winner = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw');
     const updateStats = (p, result) => {
       const stats = p.stats || { games: 0, wins: 0, draws: 0, losses: 0 };
@@ -498,6 +618,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     };
     teamA.forEach(p => updateStats(p, winner === 'A' ? 'win' : (winner === 'draw' ? 'draw' : 'loss')));
     teamB.forEach(p => updateStats(p, winner === 'B' ? 'win' : (winner === 'draw' ? 'draw' : 'loss')));
+    
     setIsGenerated(false); setSelectedIds([]); setScoreA(''); setScoreB(''); setActiveTab('history');
     showToast("Jogo guardado!");
   };
@@ -677,6 +798,126 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
+        {/* TAB MEMBROS FIXOS (NOVA) */}
+        {activeTab === 'members' && hasMonthlyFee && (
+          <div className="space-y-6">
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center">
+              <h2 className="text-xl font-bold text-white mb-2 flex items-center justify-center gap-2"><ClipboardList/> Inscrições Mensais</h2>
+              <p className="text-xs text-slate-400 mb-4">Mês Atual: <span className="font-bold text-white">{currentMonth}</span></p>
+              
+              <div className="flex justify-center mb-6">
+                <div className={`w-32 h-32 rounded-full border-4 flex flex-col items-center justify-center ${monthlyFixedIds.length >= 18 ? 'border-red-500 bg-red-900/20 text-red-500' : 'border-green-500 bg-green-900/20 text-green-500'}`}>
+                  <span className="text-4xl font-bold">{monthlyFixedIds.length}</span>
+                  <span className="text-xs font-bold uppercase">de 18</span>
+                </div>
+              </div>
+
+              {monthlyFixedIds.includes(players.find(p => p.uid === currentUser.uid)?.id) ? (
+                 <div className="space-y-3">
+                    <div className="bg-emerald-900/30 text-emerald-400 p-3 rounded-lg border border-emerald-600/30 flex items-center justify-center gap-2 font-bold text-sm">
+                       <CheckCircle size={16}/> Lugar Garantido!
+                    </div>
+                    <button onClick={selfSignOut} className="text-xs text-red-400 hover:text-red-300 underline">Cancelar Inscrição</button>
+                 </div>
+              ) : (
+                 <button onClick={selfSignUp} disabled={monthlyFixedIds.length >= 18} className={`w-full py-3 rounded-lg font-bold text-white shadow-lg transition-all ${monthlyFixedIds.length >= 18 ? 'bg-slate-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                    {monthlyFixedIds.length >= 18 ? "Lista Cheia" : "Inscrever como Fixo"}
+                 </button>
+              )}
+            </div>
+
+            <div className="space-y-2">
+               <h3 className="text-xs font-bold text-slate-400 uppercase ml-1">Lista de Inscritos</h3>
+               {monthlyFixedIds.map((pid, idx) => {
+                  const p = players.find(pl => pl.id === pid);
+                  if(!p) return null;
+                  return (
+                    <div key={pid} className="bg-slate-800 p-3 rounded-lg border border-slate-700 flex items-center justify-between">
+                       <div className="flex items-center gap-3">
+                          <span className="text-slate-500 font-mono text-xs w-4">{idx + 1}.</span>
+                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-600">
+                             {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
+                          </div>
+                          <span className="text-sm font-medium text-white">{p.name}</span>
+                       </div>
+                       {p.uid === currentUser.uid && <span className="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded border border-blue-800">Tu</span>}
+                    </div>
+                  );
+               })}
+               {monthlyFixedIds.length === 0 && <div className="text-center text-slate-500 text-sm py-4 italic">Ainda sem inscritos este mês.</div>}
+            </div>
+          </div>
+        )}
+
+        {/* TAB TESOURARIA (ADMIN ONLY) */}
+        {activeTab === 'treasury' && amIAdmin && (
+          <div className="space-y-6">
+             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                <div className="flex justify-between items-center mb-4">
+                   <h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2>
+                   <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/>
+                </div>
+
+                {/* SETTINGS MENSALIDADE */}
+                {hasMonthlyFee && (
+                    <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-600 mb-4 flex items-center justify-between">
+                       <span className="text-xs text-slate-400">Valor Mensalidade (€)</span>
+                       <div className="flex gap-2">
+                          <input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-16 bg-slate-800 border border-slate-600 rounded text-center text-white text-sm p-1 outline-none"/>
+                          <button onClick={saveMonthlyFee} className="bg-blue-600 p-1.5 rounded text-white hover:bg-blue-500"><Save size={14}/></button>
+                       </div>
+                    </div>
+                )}
+
+                {/* FIXED PAYMENTS */}
+                {hasMonthlyFee && (
+                    <div className="space-y-2 mb-6">
+                       <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Mensalidades ({monthlyFixedIds.length})</h3>
+                       {monthlyFixedIds.map(pid => {
+                          const p = players.find(pl => pl.id === pid);
+                          if(!p) return null;
+                          const isPaid = monthlyPayments[pid];
+                          return (
+                             <div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700">
+                                <span className="text-sm text-white">{p.name}</span>
+                                <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>
+                                   {isPaid ? 'PAGO' : 'FALTA'}
+                                </button>
+                             </div>
+                          );
+                       })}
+                    </div>
+                )}
+                
+                {/* GAME DEBTS */}
+                <div>
+                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Banknote size={16} className="text-orange-400"/> Dívidas de Jogos ({guestFee}€)</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                       {matches.map(m => {
+                          const unpaid = Object.entries(m.payments || {}).filter(([_, paid]) => !paid);
+                          if(unpaid.length === 0) return null;
+                          return unpaid.map(([pid]) => {
+                             const p = players.find(pl => pl.id === pid);
+                             return (
+                                <div key={`${m.id}-${pid}`} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
+                                   <div>
+                                      <div className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString()}</div>
+                                      <div className="text-sm font-bold text-white">{p ? p.name : 'Desconhecido'}</div>
+                                   </div>
+                                   <button onClick={() => settleMatchPayment(m.id, pid)} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">
+                                      Regularizar
+                                   </button>
+                                </div>
+                             );
+                          });
+                       })}
+                       {matches.every(m => !m.payments || Object.values(m.payments).every(p => p)) && <div className="text-center text-xs text-slate-500 italic py-2">Tudo pago!</div>}
+                    </div>
+                 </div>
+             </div>
+          </div>
+        )}
+
         {activeTab === 'team' && (
           <div className="space-y-6 max-w-md mx-auto">
             {!isGenerated ? (
@@ -730,6 +971,29 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         {/* DEFINIÇÕES (ADMIN ONLY) */}
         {activeTab === 'settings' && amIAdmin && (
           <div className="space-y-6 max-w-md mx-auto">
+             {/* CONFIGURAÇÃO DO TIPO DE GRUPO */}
+             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3>
+                <div className="space-y-4">
+                   {/* TOGGLE MENSALIDADES */}
+                   <div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600">
+                      <div>
+                         <div className="text-xs font-bold text-white">Mensalidades (Fixos)</div>
+                         <div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div>
+                      </div>
+                      <button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                         {hasMonthlyFee ? "Ativo" : "Inativo"}
+                      </button>
+                   </div>
+                   
+                   {/* PREÇO CONVIDADOS */}
+                   <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label>
+                      <input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/>
+                   </div>
+                </div>
+             </div>
+
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Clock size={18} className="text-blue-400"/> Próximo Jogo</h3>
                 <div className="space-y-3">
@@ -742,7 +1006,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
              </div>
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><MapIcon size={18} className="text-emerald-400"/> Localização do Campo</h3>
-                <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">A meteorologia será atualizada automaticamente com base neste link.</p></div>
+                <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/></div>
              </div>
              <button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button>
              {isOwner && (<div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8"><div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div><p className="text-sm text-red-300">Apagar este grupo irá remover permanentemente todo o histórico.</p><button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button></div>)}
@@ -754,6 +1018,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
           <NavButton active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon={CalendarCheck} label="Agenda" />
           <NavButton active={activeTab==='team'} onClick={()=>setActiveTab('team')} icon={Shield} label="Convocatória" />
+          {hasMonthlyFee && <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />}
+          {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
           <NavButton active={activeTab==='players'} onClick={()=>setActiveTab('players')} icon={Users} label="Plantel" />
           <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
           {amIAdmin && <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />}
@@ -763,7 +1029,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   );
 };
 
-// ... (RESTO DO CÓDIGO IGUAL: GroupSelector, NavButton, App) ...
+// --- GROUP SELECTOR ---
 const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState('groups');
   const [groups, setGroups] = useState([]);
@@ -805,7 +1071,10 @@ const GroupSelector = ({ user, onLogout }) => {
         createdAt: { seconds: Date.now() / 1000 }
       };
       
-      setGroups(prev => [newGroupData, ...prev]);
+      setGroups(prev => {
+          if (prev.find(g => g.id === docRef.id)) return prev;
+          return [newGroupData, ...prev];
+      });
       setNewGroup('');
     } catch (err) {
       console.error(err);
@@ -925,13 +1194,6 @@ const GroupSelector = ({ user, onLogout }) => {
     </div>
   );
 };
-
-const NavButton = ({ active, onClick, icon: Icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
-    <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
-    <span className="text-[10px] font-medium mt-1">{label}</span>
-  </button>
-);
 
 export default function App() {
   const [user, setUser] = useState(null);
