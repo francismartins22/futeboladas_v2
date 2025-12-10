@@ -2,11 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, CalendarCheck, Shield, History as HistoryIcon, UserPlus, Plus, Trash2, 
   Shuffle, Check, ArrowLeft, ArrowRight, LogOut, LayoutGrid, 
-  PlusCircle, Loader2, Gamepad2, Globe, User, Camera, Save,
+  PlusCircle, Loader2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
   Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal,
-  Sun, Cloud, CloudRain, Activity
+  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -20,37 +19,31 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion 
 } from 'firebase/firestore';
 
-// --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
-  authDomain: "futeboladas-v2-dev.firebaseapp.com",
-  projectId: "futeboladas-v2-dev",
-  storageBucket: "futeboladas-v2-dev.firebasestorage.app",
-  messagingSenderId: "899361657772",
-  appId: "1:899361657772:web:cdd265c50fc9574119e009"
-};
-
-// Inicialização da Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const APP_ID = "futeboladas-v2";
-
-// --- CUSTOM ICONS & COMPONENTS ---
-
+// --- CUSTOM ICONS ---
 const SoccerBall = ({ className = "", size = 24 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="10"/><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z"/><path d="m12 17v5"/><path d="m7.8 14.5-4 2.8"/><path d="m16.2 14.5 4 2.8"/><path d="m9.4 9.4-4.2-2.6"/><path d="m14.6 9.4 4.2-2.6"/>
   </svg>
 );
 
-const NavButton = ({ active, onClick, icon: Icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
-    <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
-    <span className="text-[10px] font-medium mt-1">{label}</span>
-  </button>
-);
+// --- HELPER: EXTRAIR COORDENADAS DO GOOGLE MAPS ---
+const getCoordsFromUrl = (url) => {
+  try {
+    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const match = url.match(regex);
+    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    
+    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const qMatch = url.match(queryRegex);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
 
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// --- COMPONENTE ESTRELAS (VOTAÇÃO) ---
 const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
   return (
     <div className="flex gap-1">
@@ -71,22 +64,29 @@ const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
   );
 };
 
-// --- HELPER: EXTRAIR COORDENADAS DO GOOGLE MAPS ---
-const getCoordsFromUrl = (url) => {
-  try {
-    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const match = url.match(regex);
-    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-    
-    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const qMatch = url.match(queryRegex);
-    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+// --- COMPONENTE NAV BUTTON ---
+const NavButton = ({ active, onClick, icon: Icon, label }) => (
+  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
+    <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
+    <span className="text-[10px] font-medium mt-1">{label}</span>
+  </button>
+);
 
-    return null;
-  } catch (e) {
-    return null;
-  }
+// --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
+  authDomain: "futeboladas-v2-dev.firebaseapp.com",
+  projectId: "futeboladas-v2-dev",
+  storageBucket: "futeboladas-v2-dev.firebasestorage.app",
+  messagingSenderId: "899361657772",
+  appId: "1:899361657772:web:cdd265c50fc9574119e009"
 };
+
+// Inicialização da Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const APP_ID = "futeboladas-v2";
 
 // --- LOGIN SCREEN ---
 const AuthScreen = () => {
@@ -316,7 +316,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   }, [group.id]);
 
   useEffect(() => {
-    // ESCUTAR ATUALIZAÇÕES DO GRUPO (LOCALIZAÇÃO E SETTINGS)
     const unsubGroup = onSnapshot(doc(db, 'artifacts', APP_ID, 'groups', group.id), (s) => {
         if(s.exists()) {
             const data = s.data();
@@ -348,7 +347,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     return () => unsubTreasury();
   }, [group.id, currentMonth]);
 
-  // --- SYNC PROFILE PHOTO ---
+  // --- SYNC PROFILE DATA (NOME E FOTO) ---
   useEffect(() => {
     if (players.length > 0) {
         const syncProfile = async () => {
@@ -376,24 +375,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     }
   }, [players.length, currentUser.uid]); 
 
-  // --- WEATHER UPDATE (DINÂMICO) ---
-  useEffect(() => {
-    if (!nextGame?.date) return;
-    const fetchWeather = async () => {
-      try {
-        const lat = groupLocation?.lat || 38.7223;
-        const lng = groupLocation?.lng || -9.1393;
-        
-        const dateStr = nextGame.date.split('T')[0];
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
-        const data = await res.json();
-        if (data.daily) {
-            setWeather({ max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0], rain: data.daily.precipitation_probability_max[0] });
-        }
-      } catch (error) { console.error("Weather error", error); }
-    };
-    fetchWeather();
-  }, [nextGame?.date, groupLocation]); 
+  // --- WEATHER UPDATE (REMOVIDO A PEDIDO, MAS O EFFECT MANTÉM-SE VAZIO SE PRECISARMOS) ---
+  // Substituído pelo MAPA visual na UI.
 
   // --- PRÉ-SELECIONAR JOGADORES ---
   useEffect(() => {
@@ -511,7 +494,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     if(window.confirm("Apagar jogador?")) await deleteDoc(groupDoc('players', id));
   };
   
-  // NOVA FUNÇÃO DELETE MATCH (HISTÓRICO)
   const deleteMatch = async (id) => {
     if (!amIAdmin) return showToast("Apenas Admins podem apagar jogos.", "error");
     if(window.confirm("Tem a certeza que deseja apagar este jogo do histórico?")) {
@@ -904,142 +886,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
-        {/* TAB MEMBROS FIXOS (NOVA) */}
-        {activeTab === 'members' && hasMonthlyFee && (
-          <div className="space-y-6">
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center">
-              <h2 className="text-xl font-bold text-white mb-2 flex items-center justify-center gap-2"><ClipboardList/> Inscrições Mensais</h2>
-              <p className="text-xs text-slate-400 mb-4">Mês Atual: <span className="font-bold text-white">{currentMonth}</span></p>
-              
-              <div className="flex justify-center mb-6">
-                <div className={`w-32 h-32 rounded-full border-4 flex flex-col items-center justify-center ${monthlyFixedIds.length >= 18 ? 'border-red-500 bg-red-900/20 text-red-500' : 'border-green-500 bg-green-900/20 text-green-500'}`}>
-                  <span className="text-4xl font-bold">{monthlyFixedIds.length}</span>
-                  <span className="text-xs font-bold uppercase">de 18</span>
-                </div>
-              </div>
-
-              {monthlyFixedIds.includes(players.find(p => p.uid === currentUser.uid)?.id) ? (
-                 <div className="space-y-3">
-                    <div className="bg-emerald-900/30 text-emerald-400 p-3 rounded-lg border border-emerald-600/30 flex items-center justify-center gap-2 font-bold text-sm">
-                       <CheckCircle size={16}/> Lugar Garantido!
-                    </div>
-                    <button onClick={selfSignOut} className="text-xs text-red-400 hover:text-red-300 underline">Cancelar Inscrição</button>
-                 </div>
-              ) : (
-                 <button onClick={selfSignUp} disabled={monthlyFixedIds.length >= 18} className={`w-full py-3 rounded-lg font-bold text-white shadow-lg transition-all ${monthlyFixedIds.length >= 18 ? 'bg-slate-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                    {monthlyFixedIds.length >= 18 ? "Lista Cheia" : "Inscrever como Fixo"}
-                 </button>
-              )}
-            </div>
-
-            <div className="space-y-2">
-               <h3 className="text-xs font-bold text-slate-400 uppercase ml-1">Lista de Inscritos</h3>
-               {monthlyFixedIds.map((pid, idx) => {
-                  const p = players.find(pl => pl.id === pid);
-                  if(!p) return null;
-                  return (
-                    <div key={pid} className="bg-slate-800 p-3 rounded-lg border border-slate-700 flex items-center justify-between">
-                       <div className="flex items-center gap-3">
-                          <span className="text-slate-500 font-mono text-xs w-4">{idx + 1}.</span>
-                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-600">
-                             {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
-                          </div>
-                          <span className="text-sm font-medium text-white">{p.name}</span>
-                       </div>
-                       {p.uid === currentUser.uid && <span className="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded border border-blue-800">Tu</span>}
-                    </div>
-                  );
-               })}
-               {monthlyFixedIds.length === 0 && <div className="text-center text-slate-500 text-sm py-4 italic">Ainda sem inscritos este mês.</div>}
-            </div>
-          </div>
-        )}
-
-        {/* TAB TESOURARIA (ADMIN ONLY) */}
-        {activeTab === 'treasury' && amIAdmin && (
-          <div className="space-y-6">
-             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-                <div className="flex justify-between items-center mb-4">
-                   <h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2>
-                   <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/>
-                </div>
-
-                 {/* DEBT SUMMARY (NEW) */}
-                 <div className="grid grid-cols-1 gap-4 mb-6">
-                    <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                        <h3 className="font-bold text-white mb-3 flex items-center gap-2">
-                            <AlertCircle size={18} className="text-red-400"/> Resumo de Dívidas
-                        </h3>
-                        <div className="space-y-2">
-                            {players
-                                .map(p => ({ ...p, debt: calculatePlayerDebt(p.id) }))
-                                .filter(p => p.debt > 0)
-                                .sort((a, b) => b.debt - a.debt)
-                                .map(p => (
-                                <div key={p.id} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">
-                                            {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
-                                        </div>
-                                        <span className="text-sm text-slate-200">{p.name}</span>
-                                    </div>
-                                    <span className="text-sm font-bold text-red-400">{p.debt.toFixed(2)}€</span>
-                                </div>
-                            ))}
-                            {players.every(p => calculatePlayerDebt(p.id) === 0) && <div className="text-center text-slate-500 text-xs py-2 italic">Ninguém deve nada! 🎉</div>}
-                        </div>
-                    </div>
-                 </div>
-
-                {/* FIXED PAYMENTS */}
-                {hasMonthlyFee && (
-                    <div className="space-y-2 mb-6">
-                       <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Mensalidades ({monthlyFixedIds.length})</h3>
-                       {monthlyFixedIds.map(pid => {
-                          const p = players.find(pl => pl.id === pid);
-                          if(!p) return null;
-                          const isPaid = monthlyPayments[pid];
-                          return (
-                             <div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700">
-                                <span className="text-sm text-white">{p.name}</span>
-                                <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>
-                                   {isPaid ? 'PAGO' : 'FALTA'}
-                                </button>
-                             </div>
-                          );
-                       })}
-                    </div>
-                )}
-                
-                {/* GAME DEBTS */}
-                <div>
-                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Banknote size={16} className="text-orange-400"/> Detalhe Jogos ({guestFee}€)</h3>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                       {matches.map(m => {
-                          const unpaid = Object.entries(m.payments || {}).filter(([_, paid]) => !paid);
-                          if(unpaid.length === 0) return null;
-                          return unpaid.map(([pid]) => {
-                             const p = players.find(pl => pl.id === pid);
-                             return (
-                                <div key={`${m.id}-${pid}`} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
-                                   <div>
-                                      <div className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString()}</div>
-                                      <div className="text-sm font-bold text-white">{p ? p.name : 'Desconhecido'}</div>
-                                   </div>
-                                   <button onClick={() => settleMatchPayment(m.id, pid)} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">
-                                      Regularizar
-                                   </button>
-                                </div>
-                             );
-                          });
-                       })}
-                       {matches.every(m => !m.payments || Object.values(m.payments).every(p => p)) && <div className="text-center text-xs text-slate-500 italic py-2">Tudo pago!</div>}
-                    </div>
-                 </div>
-             </div>
-          </div>
-        )}
-
         {activeTab === 'team' && (
           <div className="space-y-6 max-w-md mx-auto">
             {!isGenerated ? (
@@ -1180,6 +1026,91 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
+        {/* TAB TESOURARIA (ADMIN ONLY) */}
+        {activeTab === 'treasury' && amIAdmin && (
+          <div className="space-y-6">
+             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                <div className="flex justify-between items-center mb-4">
+                   <h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2>
+                   <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/>
+                </div>
+
+                 {/* DEBT SUMMARY (NEW) */}
+                 <div className="grid grid-cols-1 gap-4 mb-6">
+                    <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <h3 className="font-bold text-white mb-3 flex items-center gap-2">
+                            <AlertCircle size={18} className="text-red-400"/> Resumo de Dívidas
+                        </h3>
+                        <div className="space-y-2">
+                            {players
+                                .map(p => ({ ...p, debt: calculatePlayerDebt(p.id) }))
+                                .filter(p => p.debt > 0)
+                                .sort((a, b) => b.debt - a.debt)
+                                .map(p => (
+                                <div key={p.id} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">
+                                            {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
+                                        </div>
+                                        <span className="text-sm text-slate-200">{p.name}</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-red-400">{p.debt.toFixed(2)}€</span>
+                                </div>
+                            ))}
+                            {players.every(p => calculatePlayerDebt(p.id) === 0) && <div className="text-center text-slate-500 text-xs py-2 italic">Ninguém deve nada! 🎉</div>}
+                        </div>
+                    </div>
+                 </div>
+
+                {/* FIXED PAYMENTS */}
+                {hasMonthlyFee && (
+                    <div className="space-y-2 mb-6">
+                       <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Mensalidades ({monthlyFixedIds.length})</h3>
+                       {monthlyFixedIds.map(pid => {
+                          const p = players.find(pl => pl.id === pid);
+                          if(!p) return null;
+                          const isPaid = monthlyPayments[pid];
+                          return (
+                             <div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700">
+                                <span className="text-sm text-white">{p.name}</span>
+                                <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>
+                                   {isPaid ? 'PAGO' : 'FALTA'}
+                                </button>
+                             </div>
+                          );
+                       })}
+                    </div>
+                )}
+                
+                {/* GAME DEBTS */}
+                <div>
+                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Banknote size={16} className="text-orange-400"/> Detalhe Jogos ({guestFee}€)</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                       {matches.map(m => {
+                          const unpaid = Object.entries(m.payments || {}).filter(([_, paid]) => !paid);
+                          if(unpaid.length === 0) return null;
+                          return unpaid.map(([pid]) => {
+                             const p = players.find(pl => pl.id === pid);
+                             return (
+                                <div key={`${m.id}-${pid}`} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
+                                   <div>
+                                      <div className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString()}</div>
+                                      <div className="text-sm font-bold text-white">{p ? p.name : 'Desconhecido'}</div>
+                                   </div>
+                                   <button onClick={() => settleMatchPayment(m.id, pid)} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">
+                                      Regularizar
+                                   </button>
+                                </div>
+                             );
+                          });
+                       })}
+                       {matches.every(m => !m.payments || Object.values(m.payments).every(p => p)) && <div className="text-center text-xs text-slate-500 italic py-2">Tudo pago!</div>}
+                    </div>
+                 </div>
+             </div>
+          </div>
+        )}
+
         {/* DEFINIÇÕES (ADMIN ONLY) */}
         {activeTab === 'settings' && amIAdmin && (
           <div className="space-y-6 max-w-md mx-auto">
@@ -1228,7 +1159,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
              </div>
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><MapIcon size={18} className="text-emerald-400"/> Localização do Campo</h3>
-                <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">O mapa será atualizado automaticamente com base neste link.</p></div>
+                <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">A meteorologia será atualizada automaticamente com base neste link.</p></div>
              </div>
              <button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button>
              {isOwner && (<div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8"><div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div><p className="text-sm text-red-300">Apagar este grupo irá remover permanentemente todo o histórico.</p><button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button></div>)}
