@@ -19,80 +19,53 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
 
-// --- ERROR BOUNDARY (PROTEÇÃO CONTRA ECRÃ BRANCO) ---
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, errorInfo: null };
-  }
+// --- 1. VACINA CONTRA ECRÃ BRANCO (GLOBAL) ---
+// Este código corre antes de qualquer componente React
+// Se o browser tentar carregar um ficheiro antigo (404), forçamos um reload limpo.
+window.addEventListener('error', (event) => {
+  const msg = event?.message?.toLowerCase() || '';
+  const isChunkError = msg.includes('loading chunk') || 
+                       msg.includes('importing a module script failed') ||
+                       msg.includes('unexpected token');
+  
+  const isScriptError = event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK');
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error("Crash apanhado pela barreira:", error, errorInfo);
-    this.setState({ errorInfo: error?.message || "Erro desconhecido" });
-  }
-
-  handleReload = () => {
-    // Tenta apenas recarregar a página (soft refresh)
-    window.location.reload();
-  };
-
-  handleHardReset = () => {
-    // Limpa caches e força reload (hard refresh) - Simula "Apagar dados"
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        names.forEach((name) => {
-          caches.delete(name);
-        });
-      });
+  if (isChunkError || isScriptError) {
+    console.warn('⚠️ Erro de versão detetado (ChunkLoadError). A limpar cache e recarregar...');
+    
+    // Evita loop infinito: só recarrega se não tiver recarregado nos últimos 10 segundos
+    const lastReload = sessionStorage.getItem('app_last_rescue_reload');
+    const now = Date.now();
+    
+    if (!lastReload || now - parseInt(lastReload) > 10000) {
+        sessionStorage.setItem('app_last_rescue_reload', now.toString());
+        // Tenta limpar caches conhecidas
+        if ('caches' in window) {
+            caches.keys().then((names) => {
+                names.forEach((name) => caches.delete(name));
+            });
+        }
+        // Hard Reload
+        window.location.reload(true);
     }
-    // Opcional: localStorage.clear(); // Descomentar se for crítico, mas faz logout
-    window.location.href = window.location.href; // Força refresh da URL
-    window.location.reload(true);
-  };
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center animate-in fade-in">
-          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl max-w-sm w-full">
-            <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
-                <Activity size={32} className="text-red-400" />
-            </div>
-            <h1 className="text-xl font-bold mb-2">Algo correu mal no campo! 🤕</h1>
-            <p className="text-slate-400 text-xs mb-6 font-mono bg-slate-900 p-2 rounded border border-slate-700 break-words">
-              {this.state.errorInfo}
-            </p>
-            
-            <div className="space-y-3">
-              <button 
-                onClick={this.handleReload} 
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2"
-              >
-                <RefreshCw size={18}/> Tentar Novamente
-              </button>
-              
-              <button 
-                onClick={this.handleHardReset} 
-                className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 py-3 rounded-xl font-bold transition-all border border-slate-600 active:scale-95 flex items-center justify-center gap-2 text-sm"
-              >
-                <Eraser size={16}/> Limpar Cache e Reparar
-              </button>
-            </div>
-            <p className="mt-4 text-[10px] text-slate-500">
-              Se acabaste de fazer uma atualização, clica em "Limpar Cache".
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children; 
   }
-}
+}, true); // 'true' para capturar erros na fase de captura (scripts)
+
+// --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
+  authDomain: "futeboladas-v2-dev.firebaseapp.com",
+  projectId: "futeboladas-v2-dev",
+  storageBucket: "futeboladas-v2-dev.firebasestorage.app",
+  messagingSenderId: "899361657772",
+  appId: "1:899361657772:web:cdd265c50fc9574119e009"
+};
+
+// Inicialização da Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const APP_ID = "futeboladas-v2";
 
 // --- CUSTOM ICONS ---
 const SoccerBall = ({ className = "", size = 24 }) => (
@@ -117,6 +90,61 @@ const getCoordsFromUrl = (url) => {
     return null;
   }
 };
+
+// --- ERROR BOUNDARY (PROTEÇÃO EM RUNTIME) ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Crash apanhado pela barreira:", error, errorInfo);
+    this.setState({ errorInfo: error?.message || "Erro desconhecido" });
+  }
+
+  handleHardReset = () => {
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => {
+          caches.delete(name);
+        });
+      });
+    }
+    // Não limpa localStorage para não perder sessão, apenas força refresh
+    window.location.href = window.location.href; 
+    window.location.reload(true);
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center animate-in fade-in">
+          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl max-w-sm w-full">
+            <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+                <Activity size={32} className="text-red-400" />
+            </div>
+            <h1 className="text-xl font-bold mb-2">Algo correu mal! 🤕</h1>
+            <p className="text-slate-400 text-xs mb-6">
+              Provavelmente devido a uma nova atualização. Vamos limpar o campo.
+            </p>
+            <button 
+              onClick={this.handleHardReset} 
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2"
+            >
+              <RefreshCw size={18}/> Corrigir Agora
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children; 
+  }
+}
 
 // --- COMPONENTE ESTRELAS (VOTAÇÃO) ---
 const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
@@ -146,22 +174,6 @@ const NavButton = ({ active, onClick, icon: Icon, label }) => (
     <span className="text-[10px] font-medium mt-1">{label}</span>
   </button>
 );
-
-// --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
-  authDomain: "futeboladas-v2-dev.firebaseapp.com",
-  projectId: "futeboladas-v2-dev",
-  storageBucket: "futeboladas-v2-dev.firebasestorage.app",
-  messagingSenderId: "899361657772",
-  appId: "1:899361657772:web:cdd265c50fc9574119e009"
-};
-
-// Inicialização da Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const APP_ID = "futeboladas-v2";
 
 // --- LOGIN SCREEN ---
 const AuthScreen = () => {
@@ -828,6 +840,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               {editLocationUrl && (
                   <div className="flex justify-center mb-6">
                      <div className="rounded-xl overflow-hidden border border-slate-700 relative h-32 w-full bg-slate-800 group cursor-pointer" onClick={() => window.open(editLocationUrl, '_blank')}>
+                        {/* MAPA PLACEHOLDER SIMPLES */}
                         <div className="absolute inset-0 bg-slate-800 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]">
                              <div className="bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform shadow-lg">
                                 <MapPin size={16} className="text-red-500 fill-red-500/20" /> Ver no Mapa
