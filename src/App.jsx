@@ -66,7 +66,7 @@ const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
 
 // --- COMPONENTE NAV BUTTON ---
 const NavButton = ({ active, onClick, icon: Icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
+  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[64px] flex-shrink-0 ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
     <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
     <span className="text-[10px] font-medium mt-1">{label}</span>
   </button>
@@ -159,7 +159,6 @@ const UserProfile = ({ user, onLogout }) => {
   useEffect(() => {
     const fetchProfileAndStats = async () => {
       try {
-        // 1. Fetch Basic Profile
         const docSnap = await getDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -167,7 +166,6 @@ const UserProfile = ({ user, onLogout }) => {
           if(data.photoUrl) setPhotoUrl(data.photoUrl);
         }
 
-        // 2. Fetch Global Stats (Aggregation from all groups)
         const groupsQuery = query(collection(db, 'artifacts', APP_ID, 'groups'), where('members', 'array-contains', user.uid));
         const groupsSnap = await getDocs(groupsQuery);
         
@@ -175,11 +173,9 @@ const UserProfile = ({ user, onLogout }) => {
         let totalWins = 0;
         let totalMvps = 0; 
 
-        // Percorrer cada grupo
         for (const groupDocSnapshot of groupsSnap.docs) {
            const groupRef = groupDocSnapshot.ref;
            
-           // Encontrar o ID do jogador neste grupo
            const playersQuery = query(
              collection(groupRef, 'players'), 
              where('uid', '==', user.uid)
@@ -196,7 +192,6 @@ const UserProfile = ({ user, onLogout }) => {
               myPlayerIdInGroup = pDoc.id;
            });
 
-           // Calcular MVPs dinamicamente consultando os jogos deste grupo
            if (myPlayerIdInGroup) {
                try {
                    const matchesQuery = query(collection(groupRef, 'matches'));
@@ -205,34 +200,22 @@ const UserProfile = ({ user, onLogout }) => {
                    matchesSnap.forEach(mDoc => {
                        const mData = mDoc.data();
                        if (mData.mvpVotes) {
-                           // Lógica simples de MVP: Quem tem mais votos
                            const counts = {};
                            Object.values(mData.mvpVotes).forEach(pid => counts[pid] = (counts[pid] || 0) + 1);
-                           
                            let maxVotes = 0; 
                            let winnerId = null;
                            Object.entries(counts).forEach(([pid, count]) => { 
                                if (count > maxVotes) { maxVotes = count; winnerId = pid; } 
                            });
-                           
-                           if (winnerId === myPlayerIdInGroup) {
-                               totalMvps++;
-                           }
+                           if (winnerId === myPlayerIdInGroup) totalMvps++;
                        }
                    });
-               } catch (err) {
-                   console.error("Erro ao calcular MVPs globais para um grupo", err);
-               }
+               } catch (err) { console.error("Erro ao calcular MVPs globais", err); }
            }
         }
         
         setGlobalStats({ games: totalGames, wins: totalWins, mvps: totalMvps });
-
-      } catch (e) { 
-        console.error(e); 
-      } finally { 
-        setLoadingData(false); 
-      }
+      } catch (e) { console.error(e); } finally { setLoadingData(false); }
     };
     fetchProfileAndStats();
   }, [user.uid]);
@@ -281,9 +264,7 @@ const UserProfile = ({ user, onLogout }) => {
   return (
     <div className="p-6 max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4">
       <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><User className="text-emerald-500" /> Meu Perfil</h2>
-      
       <div className="space-y-6">
-        {/* CARD FOTO E NOME */}
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl space-y-6">
           <div className="flex flex-col items-center">
             <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -304,7 +285,6 @@ const UserProfile = ({ user, onLogout }) => {
           </button>
         </div>
 
-        {/* CARD ESTATISTICAS GLOBAIS */}
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl relative overflow-hidden">
            <div className="absolute top-0 right-0 p-4 opacity-5"><Globe size={100} className="text-blue-500"/></div>
            <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Trophy size={18} className="text-yellow-400"/> Números Globais</h3>
@@ -348,43 +328,30 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [nextGame, setNextGame] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
   const [weather, setWeather] = useState(null);
-  
-  // Settings Inputs
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editFreq, setEditFreq] = useState("weekly");
   const [editLocationUrl, setEditLocationUrl] = useState("");
   const [groupLocation, setGroupLocation] = useState(null);
-
-  // Group Settings (Defaults)
   const [hasMonthlyFee, setHasMonthlyFee] = useState(true);
   const [guestFee, setGuestFee] = useState(4.5);
-  
-  // Treasury State
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [monthlyFixedIds, setMonthlyFixedIds] = useState([]); 
   const [monthlyPayments, setMonthlyPayments] = useState({}); 
   const [monthlyFee, setMonthlyFee] = useState(0);
-
-  // Player Expansion & Voting State
   const [expandedPlayerId, setExpandedPlayerId] = useState(null);
   const [votingStars, setVotingStars] = useState(3);
-
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
   const [newPlayerName, setNewPlayerName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // --- ESTADO PARA ADICIONAR JOGADOR ---
   const [addPlayerType, setAddPlayerType] = useState('guest'); 
   const [guestHostId, setGuestHostId] = useState(''); 
-  
   const [selectedIds, setSelectedIds] = useState([]);
   const [teamA, setTeamA] = useState([]);
   const [teamB, setTeamB] = useState([]);
   const [isGenerated, setIsGenerated] = useState(false);
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
-  
   const [votingMatchId, setVotingMatchId] = useState(null);
   const [mvpSelectedId, setMvpSelectedId] = useState("");
 
@@ -431,7 +398,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     return () => unsubGroup();
   }, [group.id]);
 
-  // --- SYNC TREASURY ---
   useEffect(() => {
     const monthDocRef = groupDoc('treasury', `month_${currentMonth}`);
     const unsubTreasury = onSnapshot(monthDocRef, (docSnap) => {
@@ -448,7 +414,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     return () => unsubTreasury();
   }, [group.id, currentMonth]);
 
-  // --- SYNC PROFILE DATA (NOME E FOTO) ---
   useEffect(() => {
     if (players.length > 0) {
         const syncProfile = async () => {
@@ -476,20 +441,12 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     }
   }, [players.length, currentUser.uid]); 
 
-  // --- WEATHER UPDATE (REMOVIDO A PEDIDO, MAS O EFFECT MANTÉM-SE VAZIO SE PRECISARMOS) ---
-  // Substituído pelo MAPA visual na UI.
-
-  // --- PRÉ-SELECIONAR JOGADORES ---
   useEffect(() => {
     if (activeTab === 'team' && players.length > 0 && !isGenerated) {
         const goingUids = Object.entries(nextGame?.responses || {})
             .filter(([uid, status]) => status === 'going')
             .map(([uid]) => uid);
-        
-        const confirmedPlayerIds = players
-            .filter(p => p.uid && goingUids.includes(p.uid))
-            .map(p => p.id);
-        
+        const confirmedPlayerIds = players.filter(p => p.uid && goingUids.includes(p.uid)).map(p => p.id);
         if (selectedIds.length === 0 && confirmedPlayerIds.length > 0) {
             setSelectedIds(confirmedPlayerIds);
             showToast("Jogadores confirmados pré-selecionados!");
@@ -505,42 +462,24 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const copyInviteCode = () => {
     const text = group.id;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text)
-            .then(() => {
-                setIsCopied(true);
-                showToast("Código copiado! Partilha com amigos.");
-                setTimeout(() => setIsCopied(false), 2000);
-            })
-            .catch(err => {
-                fallbackCopyText(text);
-            });
-    } else {
-        fallbackCopyText(text);
-    }
+        navigator.clipboard.writeText(text).then(() => {
+                setIsCopied(true); showToast("Código copiado! Partilha com amigos."); setTimeout(() => setIsCopied(false), 2000);
+            }).catch(err => fallbackCopyText(text));
+    } else fallbackCopyText(text);
   };
 
   const fallbackCopyText = (text) => {
     try {
         const textArea = document.createElement("textarea");
         textArea.value = text;
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.position = "fixed";
+        textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed";
         document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
+        textArea.focus(); textArea.select();
         const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
-        if(successful) {
-            setIsCopied(true);
-            showToast("Código copiado! Partilha com amigos.");
-            setTimeout(() => setIsCopied(false), 2000);
-        } else {
-            showToast("Erro ao copiar.", "error");
-        }
-    } catch (err) {
-        showToast("Erro ao copiar.", "error");
-    }
+        if(successful) { setIsCopied(true); showToast("Código copiado! Partilha com amigos."); setTimeout(() => setIsCopied(false), 2000); } 
+        else showToast("Erro ao copiar.", "error");
+    } catch (err) { showToast("Erro ao copiar.", "error"); }
   };
 
   const toggleSchedule = async (status) => {
@@ -553,15 +492,12 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const addPlayer = async () => {
     if(!newPlayerName.trim()) return showToast("Nome inválido", "error");
     if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error");
-
     await addDoc(groupRef('players'), {
       name: newPlayerName + (addPlayerType === 'guest' ? ' (C)' : ''),
       type: addPlayerType,
       hostId: addPlayerType === 'guest' ? guestHostId : null,
       stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
-      isAdmin: false, 
-      votes: {}, 
-      createdAt: serverTimestamp()
+      isAdmin: false, votes: {}, createdAt: serverTimestamp()
     });
     setNewPlayerName('');
     showToast(addPlayerType === 'guest' ? "Convidado adicionado!" : "Membro adicionado!");
@@ -570,22 +506,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const joinAsPlayer = async () => {
     const alreadyExists = players.find(p => p.uid === currentUser.uid);
     if(alreadyExists) return showToast("Já estás no plantel!", "error");
-
     let photo = currentUser.photoURL;
     try {
         const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid));
         if (userDoc.exists()) photo = userDoc.data().photoUrl || photo;
     } catch(e) {}
-
     await addDoc(groupRef('players'), {
-      name: currentUser.displayName || "Eu",
-      uid: currentUser.uid, 
-      type: 'member', 
+      name: currentUser.displayName || "Eu", uid: currentUser.uid, type: 'member', 
       stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
-      isAdmin: isOwner, 
-      photoUrl: photo,
-      votes: {},
-      createdAt: serverTimestamp()
+      isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp()
     });
     showToast("Entraste no plantel!");
   };
@@ -598,13 +527,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const deleteMatch = async (id) => {
     if (!amIAdmin) return showToast("Apenas Admins podem apagar jogos.", "error");
     if(window.confirm("Tem a certeza que deseja apagar este jogo do histórico?")) {
-        try {
-            await deleteDoc(groupDoc('matches', id));
-            showToast("Jogo apagado.");
-        } catch (e) {
-            console.error("Erro apagar jogo:", e);
-            showToast("Erro ao apagar.", "error");
-        }
+        try { await deleteDoc(groupDoc('matches', id)); showToast("Jogo apagado."); } 
+        catch (e) { console.error("Erro apagar jogo:", e); showToast("Erro ao apagar.", "error"); }
     }
   };
 
@@ -612,17 +536,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
      if (isOwner) return showToast("O dono não pode sair. Apaga o grupo ou transfere a posse.", "error");
      if (window.confirm("Tens a certeza que queres sair deste grupo?")) {
          try {
-             // Remover do array de membros do grupo
-             await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), {
-                 members: arrayRemove(currentUser.uid)
-             });
-             // Opcional: Remover o documento de jogador correspondente (ou manter como inativo)
-             // Vamos manter simples e apenas sair.
+             await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), { members: arrayRemove(currentUser.uid) });
              onBack();
-         } catch(e) {
-             console.error(e);
-             showToast("Erro ao sair do grupo.", "error");
-         }
+         } catch(e) { console.error(e); showToast("Erro ao sair do grupo.", "error"); }
      }
   };
 
@@ -636,16 +552,13 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const toggleAdmin = async (player) => {
     if (!isOwner) return showToast("Apenas o Dono do grupo pode gerir admins.", "error");
     if (player.uid === group.ownerId) return showToast("O Dono é sempre Admin.", "error");
-    
     await updateDoc(groupDoc('players', player.id), { isAdmin: !player.isAdmin });
     showToast(player.isAdmin ? "Admin removido." : "Novo Admin promovido!");
   };
 
-  // --- TREASURY FUNCTIONS ---
   const saveMonthlyFee = async (newFee) => {
     await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseInt(newFee) }, { merge: true });
-    setMonthlyFee(newFee); 
-    showToast("Valor atualizado!");
+    setMonthlyFee(newFee); showToast("Valor atualizado!");
   };
 
   const toggleMonthlyPayment = async (playerId) => {
@@ -656,10 +569,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const selfSignUp = async () => {
     const myPlayer = players.find(p => p.uid === currentUser.uid);
     if (!myPlayer) return showToast("Entra no plantel primeiro!", "error");
-    
     if (monthlyFixedIds.length >= 18) return showToast("Lista cheia (Máx 18)!", "error");
     if (monthlyFixedIds.includes(myPlayer.id)) return showToast("Já estás inscrito!");
-    
     const newIds = [...monthlyFixedIds, myPlayer.id];
     await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true });
     showToast("Inscrito como Fixo!");
@@ -668,7 +579,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const selfSignOut = async () => {
     const myPlayer = players.find(p => p.uid === currentUser.uid);
     if (!myPlayer) return;
-
     const newIds = monthlyFixedIds.filter(id => id !== myPlayer.id);
     await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true });
     showToast("Inscrição cancelada.");
@@ -677,29 +587,22 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const settleMatchPayment = async (matchId, playerId) => {
      const match = matches.find(m => m.id === matchId);
      if(!match || !match.payments) return;
-     
      const newPayments = { ...match.payments, [playerId]: true };
      await updateDoc(groupDoc('matches', matchId), { payments: newPayments });
      showToast("Dívida regularizada!");
   };
   
-  // --- CALCULAR DÍVIDA TOTAL DE UM JOGADOR ---
   const calculatePlayerDebt = (playerId) => {
     let total = 0;
-    // 1. Mensalidade (Se aplicável e ainda não paga)
     if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) {
         if (!monthlyPayments[playerId]) total += monthlyFee;
     }
-    // 2. Jogos (Iterar histórico)
     matches.forEach(m => {
-        if (m.payments && m.payments[playerId] === false) {
-             total += guestFee;
-        }
+        if (m.payments && m.payments[playerId] === false) total += guestFee;
     });
     return total;
   };
   
-  // --- OBTER ESTATÍSTICAS DE JOGO (MVP) ---
   const getMVPCount = (playerId) => {
      let count = 0;
      matches.forEach(m => {
@@ -714,41 +617,24 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           const updates = {};
           if (editDate && editTime) updates.date = `${editDate}T${editTime}:00`;
           if (editFreq) updates.frequency = editFreq;
-          
-          if (Object.keys(updates).length > 0) {
-              await setDoc(groupDoc('schedule', 'next'), updates, { merge: true });
-          }
+          if (Object.keys(updates).length > 0) await setDoc(groupDoc('schedule', 'next'), updates, { merge: true });
 
-          const groupUpdates = { 
-              settings: {
-                  hasMonthlyFee: hasMonthlyFee,
-                  guestFee: parseFloat(guestFee)
-              }
-          };
+          const groupUpdates = { settings: { hasMonthlyFee: hasMonthlyFee, guestFee: parseFloat(guestFee) } };
           if (editLocationUrl) {
               const coords = getCoordsFromUrl(editLocationUrl);
               groupUpdates.locationUrl = editLocationUrl;
               if (coords) groupUpdates.location = coords; 
           }
-
           await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), groupUpdates);
-          
-          if (hasMonthlyFee) {
-             await saveMonthlyFee(monthlyFee);
-          }
-
+          if (hasMonthlyFee) await saveMonthlyFee(monthlyFee);
           showToast("Definições guardadas!");
-      } catch (err) {
-          console.error(err);
-          showToast("Erro ao guardar.", "error");
-      }
+      } catch (err) { console.error(err); showToast("Erro ao guardar.", "error"); }
   };
 
   const submitPlayerVote = async (targetPlayer, rating) => {
     const newVotes = { ...targetPlayer.votes, [currentUser.uid]: rating };
     await updateDoc(groupDoc('players', targetPlayer.id), { votes: newVotes });
-    setExpandedPlayerId(null);
-    showToast("Classificação guardada!");
+    setExpandedPlayerId(null); showToast("Classificação guardada!");
   };
 
   const getAverageRating = (player) => {
@@ -762,65 +648,48 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const generateTeams = () => {
     if(selectedIds.length < 2) return showToast("Mínimo 2 jogadores", "error");
-    
     const selectedPlayers = players.filter(p => selectedIds.includes(p.id));
-    const groupsMap = {}; 
-    const selectedIdsSet = new Set(selectedIds);
-
+    const groupsMap = {}; const selectedIdsSet = new Set(selectedIds);
     selectedPlayers.forEach(p => {
         let leaderId = p.id;
         if (p.type === 'guest' && p.hostId && selectedIdsSet.has(p.hostId)) leaderId = p.hostId;
         if (!groupsMap[leaderId]) groupsMap[leaderId] = [];
         groupsMap[leaderId].push(p);
     });
-
     const blocks = Object.values(groupsMap).map(blockMembers => {
         const totalRating = blockMembers.reduce((sum, p) => sum + getPlayerRatingValue(p), 0);
         return { members: blockMembers, rating: totalRating };
     });
-
     blocks.sort((a, b) => b.rating - a.rating + (Math.random() - 0.5));
-
-    let tA = [], tB = [];
-    let sumA = 0, sumB = 0;
-
+    let tA = [], tB = []; let sumA = 0, sumB = 0;
     blocks.forEach(block => {
       if (sumA <= sumB) { tA = [...tA, ...block.members]; sumA += block.rating; } else { tB = [...tB, ...block.members]; sumB += block.rating; }
     });
-
     setTeamA(tA); setTeamB(tB); setIsGenerated(true);
     showToast(`Equipas geradas! (${tA.length} vs ${tB.length})`);
   };
 
   const saveMatch = async () => {
     if(!scoreA || !scoreB) return showToast("Insere o resultado", "error");
-    
     const gamePayments = {};
     [...teamA, ...teamB].forEach(p => {
         const needsToPay = hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true;
-        if (needsToPay) {
-            gamePayments[p.id] = false; 
-        }
+        if (needsToPay) gamePayments[p.id] = false; 
     });
-
     await addDoc(groupRef('matches'), {
       date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB),
       teamA: teamA.map(p => ({id: p.id, name: p.name})), teamB: teamB.map(p => ({id: p.id, name: p.name})),
       mvpVotes: {}, payments: gamePayments, createdAt: serverTimestamp()
     });
-    
     const winner = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw');
     const updateStats = (p, result) => {
       const stats = p.stats || { games: 0, wins: 0, draws: 0, losses: 0 };
       stats.games += 1;
-      if(result === 'win') stats.wins += 1;
-      if(result === 'draw') stats.draws += 1;
-      if(result === 'loss') stats.losses += 1;
+      if(result === 'win') stats.wins += 1; if(result === 'draw') stats.draws += 1; if(result === 'loss') stats.losses += 1;
       updateDoc(groupDoc('players', p.id), { stats });
     };
     teamA.forEach(p => updateStats(p, winner === 'A' ? 'win' : (winner === 'draw' ? 'draw' : 'loss')));
     teamB.forEach(p => updateStats(p, winner === 'B' ? 'win' : (winner === 'draw' ? 'draw' : 'loss')));
-    
     setIsGenerated(false); setSelectedIds([]); setScoreA(''); setScoreB(''); setActiveTab('history');
     showToast("Jogo guardado!");
   };
@@ -905,9 +774,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               <div className="mt-6 pt-4 border-t border-slate-700 text-left">
                 <div className="text-[10px] text-slate-500 mb-3 uppercase tracking-widest font-bold">Jogadores Confirmados</div>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(nextGame?.responses || {})
-                    .filter(([_, status]) => status === 'going')
-                    .map(([uid]) => {
+                  {Object.entries(nextGame?.responses || {}).filter(([_, status]) => status === 'going').map(([uid]) => {
                         const p = players.find(player => player.uid === uid);
                         if (!p) return null;
                         return (
@@ -920,12 +787,48 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                         );
                     })
                   }
-                  {Object.values(nextGame?.responses || {}).filter(v => v === 'going').length === 0 && (
-                      <span className="text-slate-600 italic text-sm w-full text-center py-2">Ainda ninguém confirmou</span>
-                  )}
+                  {Object.values(nextGame?.responses || {}).filter(v => v === 'going').length === 0 && <span className="text-slate-600 italic text-sm w-full text-center py-2">Ainda ninguém confirmou</span>}
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB INSCRIÇÕES */}
+        {activeTab === 'members' && (
+          <div className="space-y-6 max-w-md mx-auto">
+             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center">
+                <h3 className="text-white font-bold mb-4 flex items-center justify-center gap-2 text-sm"><ClipboardList size={18} className="text-emerald-400"/> Inscrições Mensais</h3>
+                <p className="text-xs text-slate-400 mb-6">Gere a tua inscrição como membro fixo para este mês ({new Date().toLocaleDateString('pt-PT', { month: 'long' })}).</p>
+                <div className="flex justify-center gap-4 mb-6">
+                   {monthlyFixedIds.includes(myPlayerProfile?.id) ? (
+                      <button onClick={selfSignOut} className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-900/20 w-full">Cancelar Inscrição</button>
+                   ) : (
+                      <button onClick={selfSignUp} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-lg shadow-emerald-900/20 w-full">Inscrever como Fixo</button>
+                   )}
+                </div>
+                <div className="text-left">
+                   <div className="text-[10px] text-slate-500 font-bold uppercase mb-3 tracking-widest border-b border-slate-700 pb-1 flex justify-between">
+                      <span>Membros Fixos</span><span>{monthlyFixedIds.length}/18</span>
+                   </div>
+                   <div className="space-y-2">
+                      {monthlyFixedIds.map(pid => {
+                         const p = players.find(pl => pl.id === pid);
+                         if (!p) return null;
+                         return (
+                            <div key={pid} className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                               <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden border border-slate-600">
+                                  {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
+                               </div>
+                               <span className="text-sm text-white font-medium">{p.name}</span>
+                               {pid === myPlayerProfile?.id && <span className="ml-auto text-[10px] bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Eu</span>}
+                            </div>
+                         );
+                      })}
+                      {monthlyFixedIds.length === 0 && <div className="text-center text-slate-500 text-xs italic py-4">Ainda sem inscrições.</div>}
+                   </div>
+                </div>
+             </div>
           </div>
         )}
 
@@ -941,7 +844,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 <Plus size={16} className="text-emerald-400"/>
               </div>
             )}
-
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
               <div className="flex justify-between items-center mb-3">
                  <h3 className="font-bold text-white text-sm flex items-center gap-2"><UserPlus size={16} className="text-emerald-400"/> Novo Jogador</h3>
@@ -961,7 +863,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 <button onClick={addPlayer} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Adicionar {addPlayerType === 'guest' ? 'Convidado' : 'Membro'}</button>
               </div>
             </div>
-
             <div className="space-y-2">
               {players.map(p => {
                 const stats = p.stats || { games: 0, wins: 0, draws: 0, losses: 0 };
@@ -1005,6 +906,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
+        {/* TAB TEAM */}
         {activeTab === 'team' && (
           <div className="space-y-6 max-w-md mx-auto">
             {!isGenerated ? (
@@ -1039,6 +941,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
+        {/* TAB HISTORY */}
         {activeTab === 'history' && (
           <div className="space-y-4 max-w-md mx-auto">
             {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
@@ -1049,13 +952,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                   <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">
                     {new Date(m.date).toLocaleDateString()}
                     {amIAdmin && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} 
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1"
-                            title="Apagar Jogo"
-                        >
-                            <Trash2 size={12} />
-                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1" title="Apagar Jogo"><Trash2 size={12} /></button>
                     )}
                   </div>
                   <div className="flex items-center justify-between p-4"><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div><div className="text-[10px] text-slate-500 truncate mt-1">Branco</div></div><div className="text-slate-600 text-sm font-light">X</div><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div><div className="text-[10px] text-slate-500 truncate mt-1">Preto</div></div></div>
@@ -1066,122 +963,53 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
-        {/* TAB CARREIRA / TROFÉUS (NOVO) */}
+        {/* TAB TROPHIES */}
         {activeTab === 'trophies' && (
           <div className="space-y-6 animate-in fade-in">
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={120} className="text-yellow-500"/></div>
-                
                 <div className="relative z-10">
                    <div className="w-20 h-20 mx-auto rounded-full bg-slate-700 border-2 border-slate-500 flex items-center justify-center mb-3 overflow-hidden shadow-xl">
                       {myPlayerProfile?.photoUrl ? <img src={myPlayerProfile.photoUrl} className="w-full h-full object-cover"/> : <User size={40} className="text-slate-400"/>}
                    </div>
                    <h2 className="text-xl font-bold text-white">{myPlayerProfile?.name || "Eu"}</h2>
                    <p className="text-xs text-slate-400 uppercase tracking-widest mb-6">Estatísticas de Carreira</p>
-                   
-                   {/* STATS GRID */}
                    <div className={`grid ${amIAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mb-6`}>
-                      <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700">
-                         <div className="text-[10px] text-slate-500 font-bold uppercase">Jogos</div>
-                         <div className="text-lg font-bold text-white">{myPlayerProfile?.stats?.games || 0}</div>
-                      </div>
-                      <div className="bg-emerald-900/20 p-2 rounded-lg border border-emerald-500/20">
-                         <div className="text-[10px] text-emerald-500 font-bold uppercase">Vitórias</div>
-                         <div className="text-lg font-bold text-emerald-400">{myPlayerProfile?.stats?.wins || 0}</div>
-                      </div>
-                      <div className="bg-yellow-900/20 p-2 rounded-lg border border-yellow-500/20">
-                         <div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div>
-                         <div className="text-lg font-bold text-yellow-400">{getMVPCount(myPlayerProfile?.id)}</div>
-                      </div>
-                      {amIAdmin && (
-                        <div className="bg-blue-900/20 p-2 rounded-lg border border-blue-500/20">
-                           <div className="text-[10px] text-blue-500 font-bold uppercase">Rating</div>
-                           <div className="text-lg font-bold text-blue-400">{getAverageRating(myPlayerProfile)}</div>
-                        </div>
-                      )}
+                      <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700"><div className="text-[10px] text-slate-500 font-bold uppercase">Jogos</div><div className="text-lg font-bold text-white">{myPlayerProfile?.stats?.games || 0}</div></div>
+                      <div className="bg-emerald-900/20 p-2 rounded-lg border border-emerald-500/20"><div className="text-[10px] text-emerald-500 font-bold uppercase">Vitórias</div><div className="text-lg font-bold text-emerald-400">{myPlayerProfile?.stats?.wins || 0}</div></div>
+                      <div className="bg-yellow-900/20 p-2 rounded-lg border border-yellow-500/20"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-lg font-bold text-yellow-400">{getMVPCount(myPlayerProfile?.id)}</div></div>
+                      {amIAdmin && <div className="bg-blue-900/20 p-2 rounded-lg border border-blue-500/20"><div className="text-[10px] text-blue-500 font-bold uppercase">Rating</div><div className="text-lg font-bold text-blue-400">{getAverageRating(myPlayerProfile)}</div></div>}
                    </div>
-
-                   {/* BADGES GRID */}
                    <h3 className="text-left text-sm font-bold text-slate-300 mb-3 flex items-center gap-2"><Award size={16}/> Conquistas</h3>
                    <div className="grid grid-cols-1 gap-2">
-                      {/* LENDA */}
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 50 ? 'bg-gradient-to-r from-yellow-900/40 to-slate-800 border-yellow-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
-                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Trophy size={18} className="text-yellow-500"/></div>
-                         <div className="text-left">
-                            <div className="text-sm font-bold text-white">Lenda do Clube</div>
-                            <div className="text-[10px] text-slate-400">+50 Jogos realizados</div>
-                         </div>
-                      </div>
-
-                      {/* VETERANO */}
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 10 ? 'bg-gradient-to-r from-blue-900/40 to-slate-800 border-blue-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
-                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Medal size={18} className="text-blue-500"/></div>
-                         <div className="text-left">
-                            <div className="text-sm font-bold text-white">Veterano</div>
-                            <div className="text-[10px] text-slate-400">+10 Jogos realizados</div>
-                         </div>
-                      </div>
-
-                      {/* INVENCIVEL */}
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${(myPlayerProfile?.stats?.wins / myPlayerProfile?.stats?.games > 0.6 && myPlayerProfile?.stats?.games >= 5) ? 'bg-gradient-to-r from-orange-900/40 to-slate-800 border-orange-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
-                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Flame size={18} className="text-orange-500"/></div>
-                         <div className="text-left">
-                            <div className="text-sm font-bold text-white">Imparável</div>
-                            <div className="text-[10px] text-slate-400">+60% Vitórias (min. 5 jogos)</div>
-                         </div>
-                      </div>
-                      
-                      {/* FIXO */}
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${monthlyFixedIds.includes(myPlayerProfile?.id) ? 'bg-gradient-to-r from-emerald-900/40 to-slate-800 border-emerald-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
-                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><ShieldCheck size={18} className="text-emerald-500"/></div>
-                         <div className="text-left">
-                            <div className="text-sm font-bold text-white">Membro Fixo</div>
-                            <div className="text-[10px] text-slate-400">Inscrito na mensalidade atual</div>
-                         </div>
-                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 50 ? 'bg-gradient-to-r from-yellow-900/40 to-slate-800 border-yellow-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Trophy size={18} className="text-yellow-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Lenda do Clube</div><div className="text-[10px] text-slate-400">+50 Jogos realizados</div></div></div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 10 ? 'bg-gradient-to-r from-blue-900/40 to-slate-800 border-blue-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Medal size={18} className="text-blue-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Veterano</div><div className="text-[10px] text-slate-400">+10 Jogos realizados</div></div></div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${(myPlayerProfile?.stats?.wins / myPlayerProfile?.stats?.games > 0.6 && myPlayerProfile?.stats?.games >= 5) ? 'bg-gradient-to-r from-orange-900/40 to-slate-800 border-orange-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Flame size={18} className="text-orange-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Imparável</div><div className="text-[10px] text-slate-400">+60% Vitórias (min. 5 jogos)</div></div></div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${monthlyFixedIds.includes(myPlayerProfile?.id) ? 'bg-gradient-to-r from-emerald-900/40 to-slate-800 border-emerald-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><ShieldCheck size={18} className="text-emerald-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Membro Fixo</div><div className="text-[10px] text-slate-400">Inscrito na mensalidade atual</div></div></div>
                    </div>
                 </div>
              </div>
           </div>
         )}
 
-        {/* TAB TESOURARIA (ADMIN ONLY) */}
+        {/* TAB TREASURY */}
         {activeTab === 'treasury' && amIAdmin && (
           <div className="space-y-6">
              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-                <div className="flex justify-between items-center mb-4">
-                   <h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2>
-                   <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/>
-                </div>
-
-                 {/* DEBT SUMMARY (NEW) */}
+                <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2><input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/></div>
                  <div className="grid grid-cols-1 gap-4 mb-6">
                     <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                        <h3 className="font-bold text-white mb-3 flex items-center gap-2">
-                            <AlertCircle size={18} className="text-red-400"/> Resumo de Dívidas
-                        </h3>
+                        <h3 className="font-bold text-white mb-3 flex items-center gap-2"><AlertCircle size={18} className="text-red-400"/> Resumo de Dívidas</h3>
                         <div className="space-y-2">
-                            {players
-                                .map(p => ({ ...p, debt: calculatePlayerDebt(p.id) }))
-                                .filter(p => p.debt > 0)
-                                .sort((a, b) => b.debt - a.debt)
-                                .map(p => (
+                            {players.map(p => ({ ...p, debt: calculatePlayerDebt(p.id) })).filter(p => p.debt > 0).sort((a, b) => b.debt - a.debt).map(p => (
                                 <div key={p.id} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">
-                                            {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
-                                        </div>
-                                        <span className="text-sm text-slate-200">{p.name}</span>
-                                    </div>
-                                    <span className="text-sm font-bold text-red-400">{p.debt.toFixed(2)}€</span>
+                                    <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}</div><span className="text-sm text-slate-200">{p.name}</span></div><span className="text-sm font-bold text-red-400">{p.debt.toFixed(2)}€</span>
                                 </div>
                             ))}
                             {players.every(p => calculatePlayerDebt(p.id) === 0) && <div className="text-center text-slate-500 text-xs py-2 italic">Ninguém deve nada! 🎉</div>}
                         </div>
                     </div>
                  </div>
-
-                {/* FIXED PAYMENTS */}
                 {hasMonthlyFee && (
                     <div className="space-y-2 mb-6">
                        <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Mensalidades ({monthlyFixedIds.length})</h3>
@@ -1192,16 +1020,12 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                           return (
                              <div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700">
                                 <span className="text-sm text-white">{p.name}</span>
-                                <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>
-                                   {isPaid ? 'PAGO' : 'FALTA'}
-                                </button>
+                                <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>{isPaid ? 'PAGO' : 'FALTA'}</button>
                              </div>
                           );
                        })}
                     </div>
                 )}
-                
-                {/* GAME DEBTS */}
                 <div>
                     <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Banknote size={16} className="text-orange-400"/> Detalhe Jogos ({guestFee}€)</h3>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -1212,13 +1036,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                              const p = players.find(pl => pl.id === pid);
                              return (
                                 <div key={`${m.id}-${pid}`} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
-                                   <div>
-                                      <div className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString()}</div>
-                                      <div className="text-sm font-bold text-white">{p ? p.name : 'Desconhecido'}</div>
-                                   </div>
-                                   <button onClick={() => settleMatchPayment(m.id, pid)} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">
-                                      Regularizar
-                                   </button>
+                                   <div><div className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString()}</div><div className="text-sm font-bold text-white">{p ? p.name : 'Desconhecido'}</div></div>
+                                   <button onClick={() => settleMatchPayment(m.id, pid)} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">Regularizar</button>
                                 </div>
                              );
                           });
@@ -1230,45 +1049,19 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
-        {/* DEFINIÇÕES (AGORA VISÍVEL PARA TODOS) */}
+        {/* TAB SETTINGS */}
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-md mx-auto">
-             {/* CONFIGURAÇÃO DO TIPO DE GRUPO (APENAS ADMIN) */}
              {amIAdmin && (
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3>
                 <div className="space-y-4">
-                   {/* TOGGLE MENSALIDADES */}
-                   <div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600">
-                      <div>
-                         <div className="text-xs font-bold text-white">Mensalidades (Fixos)</div>
-                         <div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div>
-                      </div>
-                      <button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
-                         {hasMonthlyFee ? "Ativo" : "Inativo"}
-                      </button>
-                   </div>
-                   
-                   {/* VALOR MENSALIDADE */}
-                   {hasMonthlyFee && (
-                       <div>
-                          <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label>
-                          <div className="flex gap-2">
-                             <input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/>
-                          </div>
-                       </div>
-                   )}
-                   
-                   {/* PREÇO JOGO */}
-                   <div>
-                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label>
-                      <input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/>
-                   </div>
+                   <div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600"><div><div className="text-xs font-bold text-white">Mensalidades (Fixos)</div><div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div></div><button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{hasMonthlyFee ? "Ativo" : "Inativo"}</button></div>
+                   {hasMonthlyFee && (<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label><div className="flex gap-2"><input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div>)}
+                   <div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label><input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div>
                 </div>
              </div>
              )}
-
-             {/* DEFINIÇÕES DE JOGO (APENAS ADMIN) */}
              {amIAdmin && (
              <>
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
@@ -1288,11 +1081,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
              <button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button>
              </>
              )}
-
-             {/* ZONA DE PERIGO (TODOS) */}
              <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8">
                 <div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div>
-                
                 {isOwner ? (
                     <>
                       <p className="text-sm text-red-300">Como dono, podes apagar este grupo permanentemente. Esta ação é irreversível.</p>
@@ -1310,23 +1100,24 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       </div>
 
       <div className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe z-30">
-        <div className="flex justify-around items-center p-2 max-w-md mx-auto">
-          <NavButton active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon={CalendarCheck} label="Agenda" />
-          <NavButton active={activeTab==='team'} onClick={()=>setActiveTab('team')} icon={Shield} label="Convocatória" />
-          {hasMonthlyFee && <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />}
-          <NavButton active={activeTab==='players'} onClick={()=>setActiveTab('players')} icon={Users} label="Plantel" />
-          <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
-          <NavButton active={activeTab==='trophies'} onClick={()=>setActiveTab('trophies')} icon={Trophy} label="Carreira" />
-          {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
-          {/* DEFINIÇÕES AGORA É VISÍVEL PARA TODOS, MAS CONTEÚDO DIFERE */}
-          <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />
+        <div className="flex items-center justify-center">
+            <div className="flex overflow-x-auto items-center p-2 gap-4 px-6 no-scrollbar w-full max-w-3xl md:justify-center">
+                <NavButton active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon={CalendarCheck} label="Agenda" />
+                <NavButton active={activeTab==='team'} onClick={()=>setActiveTab('team')} icon={Shield} label="Convocatória" />
+                {hasMonthlyFee && <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />}
+                <NavButton active={activeTab==='players'} onClick={()=>setActiveTab('players')} icon={Users} label="Plantel" />
+                <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
+                <NavButton active={activeTab==='trophies'} onClick={()=>setActiveTab('trophies')} icon={Trophy} label="Carreira" />
+                {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
+                <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />
+            </div>
         </div>
       </div>
     </div>
   );
 };
 
-// --- COMPONENTE: GROUP SELECTOR (RECUPERADO) ---
+// --- COMPONENTE: GROUP SELECTOR ---
 const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState('groups');
   const [groups, setGroups] = useState([]);
