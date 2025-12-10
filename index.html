@@ -18,10 +18,24 @@
     <!-- Cor do tema do browser (deve coincidir com o manifest.json) -->
     <meta name="theme-color" content="#0f172a">
     
-    <!-- Viewport otimizado para mobile (evita zoom acidental em inputs) -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- Viewport otimizado: viewport-fit=cover preenche todo o ecrã (incluindo notch) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
     <title>Futeboladas V2</title>
+    
+    <!-- Garante que a app ocupa a altura toda sem scroll no body -->
+    <style>
+      html, body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+      #root {
+        height: 100%;
+      }
+    </style>
   </head>
   <body class="bg-slate-900 text-white overscroll-none">
     <div id="root"></div>
