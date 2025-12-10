@@ -16,7 +16,7 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, collection, addDoc, doc, updateDoc, 
-  onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion 
+  onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
 
 // --- CUSTOM ICONS ---
@@ -146,27 +146,95 @@ const AuthScreen = () => {
   );
 };
 
-// --- USER PROFILE ---
+// --- USER PROFILE (GLOBAL) ---
 const UserProfile = ({ user, onLogout }) => {
   const [name, setName] = useState(user.displayName || "");
   const [photoUrl, setPhotoUrl] = useState(user.photoURL || "");
   const [uploading, setUploading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [msg, setMsg] = useState("");
+  const [globalStats, setGlobalStats] = useState({ games: 0, wins: 0, mvps: 0 });
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileAndStats = async () => {
       try {
+        // 1. Fetch Basic Profile
         const docSnap = await getDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
         if (docSnap.exists()) {
           const data = docSnap.data();
           if(data.name) setName(data.name);
           if(data.photoUrl) setPhotoUrl(data.photoUrl);
         }
-      } catch (e) { console.error(e); } finally { setLoadingData(false); }
+
+        // 2. Fetch Global Stats (Aggregation from all groups)
+        const groupsQuery = query(collection(db, 'artifacts', APP_ID, 'groups'), where('members', 'array-contains', user.uid));
+        const groupsSnap = await getDocs(groupsQuery);
+        
+        let totalGames = 0;
+        let totalWins = 0;
+        let totalMvps = 0; 
+
+        // Percorrer cada grupo
+        for (const groupDocSnapshot of groupsSnap.docs) {
+           const groupRef = groupDocSnapshot.ref;
+           
+           // Encontrar o ID do jogador neste grupo
+           const playersQuery = query(
+             collection(groupRef, 'players'), 
+             where('uid', '==', user.uid)
+           );
+           const playersSnap = await getDocs(playersQuery);
+           let myPlayerIdInGroup = null;
+           
+           playersSnap.forEach(pDoc => {
+              const pData = pDoc.data();
+              if (pData.stats) {
+                 totalGames += (pData.stats.games || 0);
+                 totalWins += (pData.stats.wins || 0);
+              }
+              myPlayerIdInGroup = pDoc.id;
+           });
+
+           // Calcular MVPs dinamicamente consultando os jogos deste grupo
+           if (myPlayerIdInGroup) {
+               try {
+                   const matchesQuery = query(collection(groupRef, 'matches'));
+                   const matchesSnap = await getDocs(matchesQuery);
+                   
+                   matchesSnap.forEach(mDoc => {
+                       const mData = mDoc.data();
+                       if (mData.mvpVotes) {
+                           // Lógica simples de MVP: Quem tem mais votos
+                           const counts = {};
+                           Object.values(mData.mvpVotes).forEach(pid => counts[pid] = (counts[pid] || 0) + 1);
+                           
+                           let maxVotes = 0; 
+                           let winnerId = null;
+                           Object.entries(counts).forEach(([pid, count]) => { 
+                               if (count > maxVotes) { maxVotes = count; winnerId = pid; } 
+                           });
+                           
+                           if (winnerId === myPlayerIdInGroup) {
+                               totalMvps++;
+                           }
+                       }
+                   });
+               } catch (err) {
+                   console.error("Erro ao calcular MVPs globais para um grupo", err);
+               }
+           }
+        }
+        
+        setGlobalStats({ games: totalGames, wins: totalWins, mvps: totalMvps });
+
+      } catch (e) { 
+        console.error(e); 
+      } finally { 
+        setLoadingData(false); 
+      }
     };
-    fetchProfile();
+    fetchProfileAndStats();
   }, [user.uid]);
 
   const handleImageUpload = (e) => {
@@ -213,24 +281,57 @@ const UserProfile = ({ user, onLogout }) => {
   return (
     <div className="p-6 max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4">
       <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><User className="text-emerald-500" /> Meu Perfil</h2>
-      <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl space-y-6">
-        <div className="flex flex-col items-center">
-          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-            <div className="w-24 h-24 rounded-full bg-slate-700 border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-lg group-hover:border-emerald-500 transition-colors">
-              {photoUrl ? <img src={photoUrl} alt="Perfil" className="w-full h-full object-cover" /> : <User size={40} className="text-slate-400" />}
+      
+      <div className="space-y-6">
+        {/* CARD FOTO E NOME */}
+        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl space-y-6">
+          <div className="flex flex-col items-center">
+            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+              <div className="w-24 h-24 rounded-full bg-slate-700 border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-lg group-hover:border-emerald-500 transition-colors">
+                {photoUrl ? <img src={photoUrl} alt="Perfil" className="w-full h-full object-cover" /> : <User size={40} className="text-slate-400" />}
+              </div>
+              <div className="absolute bottom-0 right-0 bg-emerald-600 p-2 rounded-full text-white shadow-lg border border-slate-900 group-hover:scale-110 transition-transform">
+                {uploading ? <Activity className="animate-spin" size={16}/> : <Camera size={16} />}
+              </div>
             </div>
-            <div className="absolute bottom-0 right-0 bg-emerald-600 p-2 rounded-full text-white shadow-lg border border-slate-900 group-hover:scale-110 transition-transform">
-               {uploading ? <Activity className="animate-spin" size={16}/> : <Camera size={16} />}
-            </div>
+            <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+            <p className="text-xs text-slate-500 mt-2">Toque para alterar a foto</p>
           </div>
-          <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
-          <p className="text-xs text-slate-500 mt-2">Toque para alterar a foto</p>
+          <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase">Nome de Jogador</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none transition-colors" placeholder="O teu nome..." /></div>
+          {msg && <div className={`text-sm text-center p-2 rounded ${msg.includes('sucesso') ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>{msg}</div>}
+          <button onClick={handleSave} disabled={uploading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {uploading ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} {uploading ? "A guardar..." : "Guardar Alterações"}
+          </button>
         </div>
-        <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase">Nome de Jogador</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none transition-colors" placeholder="O teu nome..." /></div>
-        {msg && <div className={`text-sm text-center p-2 rounded ${msg.includes('sucesso') ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>{msg}</div>}
-        <button onClick={handleSave} disabled={uploading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-          {uploading ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} {uploading ? "A guardar..." : "Guardar Alterações"}
-        </button>
+
+        {/* CARD ESTATISTICAS GLOBAIS */}
+        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-4 opacity-5"><Globe size={100} className="text-blue-500"/></div>
+           <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Trophy size={18} className="text-yellow-400"/> Números Globais</h3>
+           <p className="text-xs text-slate-400 mb-4">O somatório da tua carreira em todos os grupos.</p>
+           
+           <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700 text-center">
+                 <div className="text-xs text-slate-500 font-bold uppercase mb-1">Jogos</div>
+                 <div className="text-xl font-bold text-white">{globalStats.games}</div>
+              </div>
+              <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-500/30 text-center">
+                 <div className="text-xs text-emerald-500 font-bold uppercase mb-1">Vitórias</div>
+                 <div className="text-xl font-bold text-emerald-400">{globalStats.wins}</div>
+              </div>
+              <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/30 text-center">
+                 <div className="text-xs text-yellow-500 font-bold uppercase mb-1">MVPs</div>
+                 <div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div>
+              </div>
+              <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 text-center">
+                 <div className="text-xs text-blue-500 font-bold uppercase mb-1">Win Rate</div>
+                 <div className="text-xl font-bold text-blue-400">
+                    {globalStats.games > 0 ? Math.round((globalStats.wins / globalStats.games) * 100) : 0}%
+                 </div>
+              </div>
+           </div>
+        </div>
+
         <div className="pt-4 border-t border-slate-700"><button onClick={onLogout} className="w-full py-3 text-red-400 hover:bg-red-900/10 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"><LogOut size={16}/> Terminar Sessão</button></div>
       </div>
     </div>
@@ -505,6 +606,24 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             showToast("Erro ao apagar.", "error");
         }
     }
+  };
+
+  const leaveThisGroup = async () => {
+     if (isOwner) return showToast("O dono não pode sair. Apaga o grupo ou transfere a posse.", "error");
+     if (window.confirm("Tens a certeza que queres sair deste grupo?")) {
+         try {
+             // Remover do array de membros do grupo
+             await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), {
+                 members: arrayRemove(currentUser.uid)
+             });
+             // Opcional: Remover o documento de jogador correspondente (ou manter como inativo)
+             // Vamos manter simples e apenas sair.
+             onBack();
+         } catch(e) {
+             console.error(e);
+             showToast("Erro ao sair do grupo.", "error");
+         }
+     }
   };
 
   const deleteThisGroup = async () => {
@@ -1111,10 +1230,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
-        {/* DEFINIÇÕES (ADMIN ONLY) */}
-        {activeTab === 'settings' && amIAdmin && (
+        {/* DEFINIÇÕES (AGORA VISÍVEL PARA TODOS) */}
+        {activeTab === 'settings' && (
           <div className="space-y-6 max-w-md mx-auto">
-             {/* CONFIGURAÇÃO DO TIPO DE GRUPO */}
+             {/* CONFIGURAÇÃO DO TIPO DE GRUPO (APENAS ADMIN) */}
+             {amIAdmin && (
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3>
                 <div className="space-y-4">
@@ -1146,11 +1266,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                    </div>
                 </div>
              </div>
+             )}
 
+             {/* DEFINIÇÕES DE JOGO (APENAS ADMIN) */}
+             {amIAdmin && (
+             <>
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Clock size={18} className="text-blue-400"/> Próximo Jogo</h3>
                 <div className="space-y-3">
-                   <div className="grid grid-cols-2 gap-3">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Data</label><input type="date" value={editDate} onChange={e=>setEditDate(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div>
                       <div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Hora</label><input type="time" value={editTime} onChange={e=>setEditTime(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div>
                    </div>
@@ -1162,7 +1286,25 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">A meteorologia será atualizada automaticamente com base neste link.</p></div>
              </div>
              <button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button>
-             {isOwner && (<div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8"><div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div><p className="text-sm text-red-300">Apagar este grupo irá remover permanentemente todo o histórico.</p><button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button></div>)}
+             </>
+             )}
+
+             {/* ZONA DE PERIGO (TODOS) */}
+             <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8">
+                <div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div>
+                
+                {isOwner ? (
+                    <>
+                      <p className="text-sm text-red-300">Como dono, podes apagar este grupo permanentemente. Esta ação é irreversível.</p>
+                      <button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button>
+                    </>
+                ) : (
+                    <>
+                      <p className="text-sm text-red-300">Se saíres do grupo, deixarás de receber notificações e convocatórias. O teu histórico de jogos neste grupo será mantido.</p>
+                      <button onClick={leaveThisGroup} className="w-full bg-red-600/80 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><LogOut size={18} /> Sair do Grupo</button>
+                    </>
+                )}
+             </div>
           </div>
         )}
       </div>
@@ -1176,14 +1318,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
           <NavButton active={activeTab==='trophies'} onClick={()=>setActiveTab('trophies')} icon={Trophy} label="Carreira" />
           {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
-          {amIAdmin && <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />}
+          {/* DEFINIÇÕES AGORA É VISÍVEL PARA TODOS, MAS CONTEÚDO DIFERE */}
+          <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />
         </div>
       </div>
     </div>
   );
 };
 
-// ... (RESTO DO CÓDIGO IGUAL: GroupSelector, NavButton, App) ...
+// --- COMPONENTE: GROUP SELECTOR (RECUPERADO) ---
 const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState('groups');
   const [groups, setGroups] = useState([]);
@@ -1304,20 +1447,20 @@ const GroupSelector = ({ user, onLogout }) => {
         </header>
 
         <div className="grid md:grid-cols-2 gap-4 mb-8">
-           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+           <div className="bg-slate-800 p-4 sm:p-6 rounded-xl border border-slate-700 shadow-lg">
              <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><PlusCircle className="text-emerald-400" size={18}/> Criar Novo Grupo</h2>
-             <form onSubmit={createGroup} className="flex gap-3">
-               <input type="text" value={newGroup} onChange={e=>setNewGroup(e.target.value)} placeholder="Nome do grupo..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 text-white focus:border-emerald-500 outline-none transition-colors"/>
-               <button type="submit" disabled={!newGroup.trim()} className="bg-emerald-600 text-white px-4 rounded-lg font-bold hover:bg-emerald-500 disabled:opacity-50 transition-colors">Criar</button>
+             <form onSubmit={createGroup} className="flex flex-col sm:flex-row gap-3">
+               <input type="text" value={newGroup} onChange={e=>setNewGroup(e.target.value)} placeholder="Nome do grupo..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 sm:py-2 text-white focus:border-emerald-500 outline-none transition-colors"/>
+               <button type="submit" disabled={!newGroup.trim()} className="w-full sm:w-auto bg-emerald-600 text-white px-4 py-3 sm:py-2 rounded-lg font-bold hover:bg-emerald-500 disabled:opacity-50 transition-colors">Criar</button>
              </form>
              {createError && <div className="mt-3 text-xs bg-red-900/30 text-red-400 p-2 rounded border border-red-500/30 flex items-center gap-2"><AlertCircle size={12}/> {createError}</div>}
            </div>
 
-           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+           <div className="bg-slate-800 p-4 sm:p-6 rounded-xl border border-slate-700 shadow-lg">
              <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><UserPlus className="text-blue-400" size={18}/> Entrar com Código</h2>
-             <form onSubmit={joinGroup} className="flex gap-3">
-               <input type="text" value={joinCode} onChange={e=>setJoinCode(e.target.value)} placeholder="Código do convite..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 text-white focus:border-blue-500 outline-none transition-colors"/>
-               <button type="submit" disabled={!joinCode.trim()} className="bg-blue-600 text-white px-4 rounded-lg font-bold hover:bg-blue-500 disabled:opacity-50 transition-colors">Entrar</button>
+             <form onSubmit={joinGroup} className="flex flex-col sm:flex-row gap-3">
+               <input type="text" value={joinCode} onChange={e=>setJoinCode(e.target.value)} placeholder="Código do convite..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 sm:py-2 text-white focus:border-blue-500 outline-none transition-colors"/>
+               <button type="submit" disabled={!joinCode.trim()} className="w-full sm:w-auto bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg font-bold hover:bg-blue-500 disabled:opacity-50 transition-colors">Entrar</button>
              </form>
              {msg && <p className="text-xs text-emerald-400 mt-2">{msg}</p>}
            </div>
