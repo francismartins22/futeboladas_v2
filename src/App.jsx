@@ -5,7 +5,7 @@ import {
   PlusCircle, Loader2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
   Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw
+  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -19,11 +19,11 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
 
-// --- ERROR BOUNDARY (CORREÇÃO ECRÃ BRANCO) ---
+// --- ERROR BOUNDARY (PROTEÇÃO CONTRA ECRÃ BRANCO) ---
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, errorInfo: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -31,38 +31,60 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
-    // Se o erro for de carregamento de chunk (comum após deploy), podemos tentar forçar reload
-    if (error?.message?.includes('Loading chunk') || error?.message?.includes('Importing a module script failed')) {
-       // Opcional: window.location.reload(); 
-       // Mas é mais seguro deixar o utilizador clicar para evitar loops infinitos
-    }
+    console.error("Crash apanhado pela barreira:", error, errorInfo);
+    this.setState({ errorInfo: error?.message || "Erro desconhecido" });
   }
 
   handleReload = () => {
-    // Força o reload limpando a cache da página atual
-    window.location.href = window.location.href;
+    // Tenta apenas recarregar a página (soft refresh)
     window.location.reload();
+  };
+
+  handleHardReset = () => {
+    // Limpa caches e força reload (hard refresh) - Simula "Apagar dados"
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => {
+          caches.delete(name);
+        });
+      });
+    }
+    // Opcional: localStorage.clear(); // Descomentar se for crítico, mas faz logout
+    window.location.href = window.location.href; // Força refresh da URL
+    window.location.reload(true);
   };
 
   render() {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center animate-in fade-in">
-          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl max-w-sm">
-            <div className="w-16 h-16 bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
-                <RefreshCw size={32} className="text-emerald-400 animate-spin-slow" />
+          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl max-w-sm w-full">
+            <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+                <Activity size={32} className="text-red-400" />
             </div>
-            <h1 className="text-xl font-bold mb-2">Atualização Disponível! ⚽</h1>
-            <p className="text-slate-400 text-sm mb-6">
-              Lançámos novidades ou correções. Precisamos de atualizar o campo para continuar o jogo.
+            <h1 className="text-xl font-bold mb-2">Algo correu mal no campo! 🤕</h1>
+            <p className="text-slate-400 text-xs mb-6 font-mono bg-slate-900 p-2 rounded border border-slate-700 break-words">
+              {this.state.errorInfo}
             </p>
-            <button 
-              onClick={this.handleReload} 
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2"
-            >
-              <RefreshCw size={18}/> Atualizar Agora
-            </button>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={this.handleReload} 
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={18}/> Tentar Novamente
+              </button>
+              
+              <button 
+                onClick={this.handleHardReset} 
+                className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 py-3 rounded-xl font-bold transition-all border border-slate-600 active:scale-95 flex items-center justify-center gap-2 text-sm"
+              >
+                <Eraser size={16}/> Limpar Cache e Reparar
+              </button>
+            </div>
+            <p className="mt-4 text-[10px] text-slate-500">
+              Se acabaste de fazer uma atualização, clica em "Limpar Cache".
+            </p>
           </div>
         </div>
       );
@@ -1335,15 +1357,28 @@ const GroupSelector = ({ user, onLogout }) => {
   );
 };
 
-export default function App() {
+// --- COMPONENTE: MAIN APP (LOGICA DE AUTH E LOADING) ---
+const MainApp = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { return onAuthStateChanged(auth, u => { setUser(u); setLoading(false); }); }, []);
+
+  useEffect(() => { 
+    return onAuthStateChanged(auth, u => { 
+      setUser(u); 
+      setLoading(false); 
+    }); 
+  }, []);
+
   if(loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-emerald-500"><Loader2 className="animate-spin" size={40}/></div>;
   if(!user) return <AuthScreen />;
+  return <GroupSelector user={user} onLogout={() => signOut(auth)} />;
+};
+
+// --- COMPONENTE EXPORTADO: APP (COM ERROR BOUNDARY) ---
+export default function App() {
   return (
     <ErrorBoundary>
-        <GroupSelector user={user} onLogout={() => signOut(auth)} />
+        <MainApp />
     </ErrorBoundary>
   );
 }
