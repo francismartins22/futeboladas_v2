@@ -26,5 +26,20 @@
   <body class="bg-slate-900 text-white overscroll-none">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Registo do Service Worker para PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registado com sucesso:', registration.scope);
+            })
+            .catch(err => {
+              console.log('Falha ao registar SW:', err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
