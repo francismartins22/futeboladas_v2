@@ -5,7 +5,7 @@ import {
   PlusCircle, Loader2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
   Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity
+  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -18,6 +18,59 @@ import {
   getFirestore, collection, addDoc, doc, updateDoc, 
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
+
+// --- ERROR BOUNDARY (CORREÇÃO ECRÃ BRANCO) ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+    // Se o erro for de carregamento de chunk (comum após deploy), podemos tentar forçar reload
+    if (error?.message?.includes('Loading chunk') || error?.message?.includes('Importing a module script failed')) {
+       // Opcional: window.location.reload(); 
+       // Mas é mais seguro deixar o utilizador clicar para evitar loops infinitos
+    }
+  }
+
+  handleReload = () => {
+    // Força o reload limpando a cache da página atual
+    window.location.href = window.location.href;
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center animate-in fade-in">
+          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl max-w-sm">
+            <div className="w-16 h-16 bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+                <RefreshCw size={32} className="text-emerald-400 animate-spin-slow" />
+            </div>
+            <h1 className="text-xl font-bold mb-2">Atualização Disponível! ⚽</h1>
+            <p className="text-slate-400 text-sm mb-6">
+              Lançámos novidades ou correções. Precisamos de atualizar o campo para continuar o jogo.
+            </p>
+            <button 
+              onClick={this.handleReload} 
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2"
+            >
+              <RefreshCw size={18}/> Atualizar Agora
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children; 
+  }
+}
 
 // --- CUSTOM ICONS ---
 const SoccerBall = ({ className = "", size = 24 }) => (
@@ -753,7 +806,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               {editLocationUrl && (
                   <div className="flex justify-center mb-6">
                      <div className="rounded-xl overflow-hidden border border-slate-700 relative h-32 w-full bg-slate-800 group cursor-pointer" onClick={() => window.open(editLocationUrl, '_blank')}>
-                        {/* MAPA PLACEHOLDER SIMPLES */}
                         <div className="absolute inset-0 bg-slate-800 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]">
                              <div className="bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform shadow-lg">
                                 <MapPin size={16} className="text-red-500 fill-red-500/20" /> Ver no Mapa
@@ -1289,5 +1341,9 @@ export default function App() {
   useEffect(() => { return onAuthStateChanged(auth, u => { setUser(u); setLoading(false); }); }, []);
   if(loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-emerald-500"><Loader2 className="animate-spin" size={40}/></div>;
   if(!user) return <AuthScreen />;
-  return <GroupSelector user={user} onLogout={() => signOut(auth)} />;
+  return (
+    <ErrorBoundary>
+        <GroupSelector user={user} onLogout={() => signOut(auth)} />
+    </ErrorBoundary>
+  );
 }
