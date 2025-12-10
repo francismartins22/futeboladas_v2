@@ -7,9 +7,9 @@ const urlsToCache = [
   '/pwa-512x512.png'
 ];
 
-// Instalar o Service Worker e colocar ficheiros em cache
+// 1. Instalação: Cache dos ficheiros estáticos
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Força a ativação imediata
+  self.skipWaiting(); // Força o SW a ativar-se imediatamente
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -19,11 +19,11 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Ativar e limpar caches antigas se necessário
+// 2. Ativação: Limpeza de caches antigas e controlo imediato
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
-      self.clients.claim(), // Controla a página imediatamente
+      self.clients.claim(), // Controla a página sem precisar de recarregar
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
@@ -37,16 +37,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Interceptar pedidos de rede: serve da cache se existir, senão vai à net
+// 3. Fetch: Obrigatório para PWA (serve ficheiros mesmo offline)
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
+        // Se estiver em cache, devolve. Senão, vai à rede.
+        return response || fetch(event.request);
       })
   );
 });
