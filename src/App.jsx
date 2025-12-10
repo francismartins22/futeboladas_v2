@@ -5,7 +5,8 @@ import {
   PlusCircle, Loader2, Gamepad2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
   Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X
+  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal,
+  Sun, Cloud, CloudRain, Activity
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -19,31 +20,37 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion 
 } from 'firebase/firestore';
 
-// --- CUSTOM ICONS ---
+// --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
+  authDomain: "futeboladas-v2-dev.firebaseapp.com",
+  projectId: "futeboladas-v2-dev",
+  storageBucket: "futeboladas-v2-dev.firebasestorage.app",
+  messagingSenderId: "899361657772",
+  appId: "1:899361657772:web:cdd265c50fc9574119e009"
+};
+
+// Inicialização da Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const APP_ID = "futeboladas-v2";
+
+// --- CUSTOM ICONS & COMPONENTS ---
+
 const SoccerBall = ({ className = "", size = 24 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="10"/><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z"/><path d="m12 17v5"/><path d="m7.8 14.5-4 2.8"/><path d="m16.2 14.5 4 2.8"/><path d="m9.4 9.4-4.2-2.6"/><path d="m14.6 9.4 4.2-2.6"/>
   </svg>
 );
 
-// --- HELPER: EXTRAIR COORDENADAS DO GOOGLE MAPS ---
-const getCoordsFromUrl = (url) => {
-  try {
-    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const match = url.match(regex);
-    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-    
-    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const qMatch = url.match(queryRegex);
-    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+const NavButton = ({ active, onClick, icon: Icon, label }) => (
+  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
+    <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
+    <span className="text-[10px] font-medium mt-1">{label}</span>
+  </button>
+);
 
-    return null;
-  } catch (e) {
-    return null;
-  }
-};
-
-// --- COMPONENTE ESTRELAS (VOTAÇÃO) ---
 const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
   return (
     <div className="flex gap-1">
@@ -64,29 +71,22 @@ const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
   );
 };
 
-// --- COMPONENTE NAV BUTTON ---
-const NavButton = ({ active, onClick, icon: Icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
-    <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
-    <span className="text-[10px] font-medium mt-1">{label}</span>
-  </button>
-);
+// --- HELPER: EXTRAIR COORDENADAS DO GOOGLE MAPS ---
+const getCoordsFromUrl = (url) => {
+  try {
+    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const match = url.match(regex);
+    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    
+    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const qMatch = url.match(queryRegex);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
 
-// --- CONFIGURAÇÃO FIREBASE (V2 PROD) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
-  authDomain: "futeboladas-v2-dev.firebaseapp.com",
-  projectId: "futeboladas-v2-dev",
-  storageBucket: "futeboladas-v2-dev.firebasestorage.app",
-  messagingSenderId: "899361657772",
-  appId: "1:899361657772:web:cdd265c50fc9574119e009"
+    return null;
+  } catch (e) {
+    return null;
+  }
 };
-
-// Inicialização da Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const APP_ID = "futeboladas-v2";
 
 // --- LOGIN SCREEN ---
 const AuthScreen = () => {
@@ -220,7 +220,7 @@ const UserProfile = ({ user, onLogout }) => {
               {photoUrl ? <img src={photoUrl} alt="Perfil" className="w-full h-full object-cover" /> : <User size={40} className="text-slate-400" />}
             </div>
             <div className="absolute bottom-0 right-0 bg-emerald-600 p-2 rounded-full text-white shadow-lg border border-slate-900 group-hover:scale-110 transition-transform">
-               {uploading ? <Loader2 className="animate-spin" size={16}/> : <Camera size={16} />}
+               {uploading ? <Activity className="animate-spin" size={16}/> : <Camera size={16} />}
             </div>
           </div>
           <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
@@ -246,13 +246,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [matches, setMatches] = useState([]);
   const [nextGame, setNextGame] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [weather, setWeather] = useState(null);
   
   // Settings Inputs
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editFreq, setEditFreq] = useState("weekly");
   const [editLocationUrl, setEditLocationUrl] = useState("");
-  
+  const [groupLocation, setGroupLocation] = useState(null);
+
   // Group Settings (Defaults)
   const [hasMonthlyFee, setHasMonthlyFee] = useState(true);
   const [guestFee, setGuestFee] = useState(4.5);
@@ -319,6 +321,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         if(s.exists()) {
             const data = s.data();
             setEditLocationUrl(data.locationUrl || "");
+            if (data.location) setGroupLocation(data.location); 
             if (data.settings) {
                 setHasMonthlyFee(data.settings.hasMonthlyFee ?? true);
                 setGuestFee(data.settings.guestFee ?? 4.5);
@@ -336,11 +339,10 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         const data = docSnap.data();
         setMonthlyFixedIds(Array.isArray(data.fixedIds) ? data.fixedIds : []);
         setMonthlyPayments(data.payments || {});
-        setMonthlyFee(data.monthlyFee || 0); 
+        if (data.monthlyFee) setMonthlyFee(data.monthlyFee); 
       } else {
         setMonthlyFixedIds([]);
         setMonthlyPayments({});
-        setMonthlyFee(0);
       }
     });
     return () => unsubTreasury();
@@ -357,8 +359,14 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
                         const latestPhoto = userData.photoUrl || currentUser.photoURL;
-                        if (myPlayer.photoUrl !== latestPhoto) {
-                            await updateDoc(groupDoc('players', myPlayer.id), { photoUrl: latestPhoto });
+                        const latestName = userData.name || currentUser.displayName;
+                        
+                        const updates = {};
+                        if (myPlayer.photoUrl !== latestPhoto) updates.photoUrl = latestPhoto;
+                        if (myPlayer.name !== latestName) updates.name = latestName;
+
+                        if (Object.keys(updates).length > 0) {
+                            await updateDoc(groupDoc('players', myPlayer.id), updates);
                         }
                     }
                 } catch(e) { console.error("Erro sync:", e); }
@@ -367,6 +375,25 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         syncProfile();
     }
   }, [players.length, currentUser.uid]); 
+
+  // --- WEATHER UPDATE (DINÂMICO) ---
+  useEffect(() => {
+    if (!nextGame?.date) return;
+    const fetchWeather = async () => {
+      try {
+        const lat = groupLocation?.lat || 38.7223;
+        const lng = groupLocation?.lng || -9.1393;
+        
+        const dateStr = nextGame.date.split('T')[0];
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
+        const data = await res.json();
+        if (data.daily) {
+            setWeather({ max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0], rain: data.daily.precipitation_probability_max[0] });
+        }
+      } catch (error) { console.error("Weather error", error); }
+    };
+    fetchWeather();
+  }, [nextGame?.date, groupLocation]); 
 
   // --- PRÉ-SELECIONAR JOGADORES ---
   useEffect(() => {
@@ -392,10 +419,44 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
 
   const copyInviteCode = () => {
-    navigator.clipboard.writeText(group.id);
-    setIsCopied(true);
-    showToast("Código copiado! Partilha com amigos.");
-    setTimeout(() => setIsCopied(false), 2000);
+    const text = group.id;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                setIsCopied(true);
+                showToast("Código copiado! Partilha com amigos.");
+                setTimeout(() => setIsCopied(false), 2000);
+            })
+            .catch(err => {
+                fallbackCopyText(text);
+            });
+    } else {
+        fallbackCopyText(text);
+    }
+  };
+
+  const fallbackCopyText = (text) => {
+    try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if(successful) {
+            setIsCopied(true);
+            showToast("Código copiado! Partilha com amigos.");
+            setTimeout(() => setIsCopied(false), 2000);
+        } else {
+            showToast("Erro ao copiar.", "error");
+        }
+    } catch (err) {
+        showToast("Erro ao copiar.", "error");
+    }
   };
 
   const toggleSchedule = async (status) => {
@@ -449,6 +510,20 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     if (!amIAdmin) return showToast("Apenas Admins podem apagar.", "error");
     if(window.confirm("Apagar jogador?")) await deleteDoc(groupDoc('players', id));
   };
+  
+  // NOVA FUNÇÃO DELETE MATCH (HISTÓRICO)
+  const deleteMatch = async (id) => {
+    if (!amIAdmin) return showToast("Apenas Admins podem apagar jogos.", "error");
+    if(window.confirm("Tem a certeza que deseja apagar este jogo do histórico?")) {
+        try {
+            await deleteDoc(groupDoc('matches', id));
+            showToast("Jogo apagado.");
+        } catch (e) {
+            console.error("Erro apagar jogo:", e);
+            showToast("Erro ao apagar.", "error");
+        }
+    }
+  };
 
   const deleteThisGroup = async () => {
     if(window.confirm("ATENÇÃO: Isto apagará o grupo para TODOS. Continuar?")) {
@@ -466,8 +541,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
 
   // --- TREASURY FUNCTIONS ---
-  const saveMonthlyFee = async () => {
-    await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseInt(monthlyFee) }, { merge: true });
+  const saveMonthlyFee = async (newFee) => {
+    await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseInt(newFee) }, { merge: true });
+    setMonthlyFee(newFee); 
     showToast("Valor atualizado!");
   };
 
@@ -505,6 +581,32 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
      await updateDoc(groupDoc('matches', matchId), { payments: newPayments });
      showToast("Dívida regularizada!");
   };
+  
+  // --- CALCULAR DÍVIDA TOTAL DE UM JOGADOR ---
+  const calculatePlayerDebt = (playerId) => {
+    let total = 0;
+    // 1. Mensalidade (Se aplicável e ainda não paga)
+    if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) {
+        if (!monthlyPayments[playerId]) total += monthlyFee;
+    }
+    // 2. Jogos (Iterar histórico)
+    matches.forEach(m => {
+        if (m.payments && m.payments[playerId] === false) {
+             total += guestFee;
+        }
+    });
+    return total;
+  };
+  
+  // --- OBTER ESTATÍSTICAS DE JOGO (MVP) ---
+  const getMVPCount = (playerId) => {
+     let count = 0;
+     matches.forEach(m => {
+        const mvp = getMatchMVP(m);
+        if (mvp && mvp.id === playerId) count++;
+     });
+     return count;
+  };
 
   const saveGameSettings = async () => {
       try {
@@ -516,7 +618,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               await setDoc(groupDoc('schedule', 'next'), updates, { merge: true });
           }
 
-          // Salvar Location e Group Settings (Guest Fee + Monthly Toggle)
           const groupUpdates = { 
               settings: {
                   hasMonthlyFee: hasMonthlyFee,
@@ -530,6 +631,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           }
 
           await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), groupUpdates);
+          
+          if (hasMonthlyFee) {
+             await saveMonthlyFee(monthlyFee);
+          }
+
           showToast("Definições guardadas!");
       } catch (err) {
           console.error(err);
@@ -588,15 +694,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const saveMatch = async () => {
     if(!scoreA || !scoreB) return showToast("Insere o resultado", "error");
     
-    // Calcular pagamentos
     const gamePayments = {};
     [...teamA, ...teamB].forEach(p => {
-        // Se mensalidades ativas: Só paga quem não é fixo
-        // Se mensalidades inativas: Todos pagam
         const needsToPay = hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true;
-        
         if (needsToPay) {
-            gamePayments[p.id] = false; // false = não pagou ainda
+            gamePayments[p.id] = false; 
         }
     });
 
@@ -606,7 +708,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       mvpVotes: {}, payments: gamePayments, createdAt: serverTimestamp()
     });
     
-    // Update Stats
     const winner = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw');
     const updateStats = (p, result) => {
       const stats = p.stats || { games: 0, wins: 0, draws: 0, losses: 0 };
@@ -681,9 +782,14 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               
               {editLocationUrl && (
                   <div className="flex justify-center mb-6">
-                     <a href={editLocationUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 px-3 py-1.5 rounded-full border border-blue-900/50">
-                        <MapPin size={14}/> Ver Localização <ExternalLink size={12}/>
-                     </a>
+                     <div className="rounded-xl overflow-hidden border border-slate-700 relative h-32 w-full bg-slate-800 group cursor-pointer" onClick={() => window.open(editLocationUrl, '_blank')}>
+                        {/* MAPA PLACEHOLDER SIMPLES */}
+                        <div className="absolute inset-0 bg-slate-800 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]">
+                             <div className="bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform shadow-lg">
+                                <MapPin size={16} className="text-red-500 fill-red-500/20" /> Ver no Mapa
+                             </div>
+                        </div>
+                     </div>
                   </div>
               )}
 
@@ -858,16 +964,32 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                    <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/>
                 </div>
 
-                {/* SETTINGS MENSALIDADE */}
-                {hasMonthlyFee && (
-                    <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-600 mb-4 flex items-center justify-between">
-                       <span className="text-xs text-slate-400">Valor Mensalidade (€)</span>
-                       <div className="flex gap-2">
-                          <input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-16 bg-slate-800 border border-slate-600 rounded text-center text-white text-sm p-1 outline-none"/>
-                          <button onClick={saveMonthlyFee} className="bg-blue-600 p-1.5 rounded text-white hover:bg-blue-500"><Save size={14}/></button>
-                       </div>
+                 {/* DEBT SUMMARY (NEW) */}
+                 <div className="grid grid-cols-1 gap-4 mb-6">
+                    <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <h3 className="font-bold text-white mb-3 flex items-center gap-2">
+                            <AlertCircle size={18} className="text-red-400"/> Resumo de Dívidas
+                        </h3>
+                        <div className="space-y-2">
+                            {players
+                                .map(p => ({ ...p, debt: calculatePlayerDebt(p.id) }))
+                                .filter(p => p.debt > 0)
+                                .sort((a, b) => b.debt - a.debt)
+                                .map(p => (
+                                <div key={p.id} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">
+                                            {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
+                                        </div>
+                                        <span className="text-sm text-slate-200">{p.name}</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-red-400">{p.debt.toFixed(2)}€</span>
+                                </div>
+                            ))}
+                            {players.every(p => calculatePlayerDebt(p.id) === 0) && <div className="text-center text-slate-500 text-xs py-2 italic">Ninguém deve nada! 🎉</div>}
+                        </div>
                     </div>
-                )}
+                 </div>
 
                 {/* FIXED PAYMENTS */}
                 {hasMonthlyFee && (
@@ -891,7 +1013,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 
                 {/* GAME DEBTS */}
                 <div>
-                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Banknote size={16} className="text-orange-400"/> Dívidas de Jogos ({guestFee}€)</h3>
+                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Banknote size={16} className="text-orange-400"/> Detalhe Jogos ({guestFee}€)</h3>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                        {matches.map(m => {
                           const unpaid = Object.entries(m.payments || {}).filter(([_, paid]) => !paid);
@@ -959,12 +1081,102 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               const mvp = getMatchMVP(m);
               return (
                 <div key={m.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm hover:border-slate-600 transition-colors">
-                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider">{new Date(m.date).toLocaleDateString()}</div>
+                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">
+                    {new Date(m.date).toLocaleDateString()}
+                    {amIAdmin && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} 
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1"
+                            title="Apagar Jogo"
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between p-4"><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div><div className="text-[10px] text-slate-500 truncate mt-1">Branco</div></div><div className="text-slate-600 text-sm font-light">X</div><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div><div className="text-[10px] text-slate-500 truncate mt-1">Preto</div></div></div>
                   <div className="bg-slate-900/30 p-2 border-t border-slate-700/50">{mvp ? (<div className="flex items-center justify-center gap-2 text-yellow-500"><Trophy size={14} className="fill-yellow-500" /><span className="text-xs font-bold text-yellow-200">MVP: {mvp.name} ({mvp.votes})</span></div>) : (votingMatchId === m.id ? (<div className="flex gap-2 animate-in fade-in"><select value={mvpSelectedId} onChange={(e) => setMvpSelectedId(e.target.value)} className="flex-1 bg-slate-900 border border-slate-600 rounded text-xs p-1.5 text-white outline-none"><option value="">Quem foi o Craque?</option>{[...(m.teamA || []), ...(m.teamB || [])].map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select><button onClick={() => submitMvpVote(m)} className="bg-yellow-600 text-white px-3 rounded text-xs font-bold">Votar</button></div>) : (!m.mvpVotes?.[currentUser.uid] && (<button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1"><Star size={12} /> Votar Melhor em Campo</button>)))}</div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* TAB CARREIRA / TROFÉUS (NOVO) */}
+        {activeTab === 'trophies' && (
+          <div className="space-y-6 animate-in fade-in">
+             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={120} className="text-yellow-500"/></div>
+                
+                <div className="relative z-10">
+                   <div className="w-20 h-20 mx-auto rounded-full bg-slate-700 border-2 border-slate-500 flex items-center justify-center mb-3 overflow-hidden shadow-xl">
+                      {myPlayerProfile?.photoUrl ? <img src={myPlayerProfile.photoUrl} className="w-full h-full object-cover"/> : <User size={40} className="text-slate-400"/>}
+                   </div>
+                   <h2 className="text-xl font-bold text-white">{myPlayerProfile?.name || "Eu"}</h2>
+                   <p className="text-xs text-slate-400 uppercase tracking-widest mb-6">Estatísticas de Carreira</p>
+                   
+                   {/* STATS GRID */}
+                   <div className={`grid ${amIAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mb-6`}>
+                      <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700">
+                         <div className="text-[10px] text-slate-500 font-bold uppercase">Jogos</div>
+                         <div className="text-lg font-bold text-white">{myPlayerProfile?.stats?.games || 0}</div>
+                      </div>
+                      <div className="bg-emerald-900/20 p-2 rounded-lg border border-emerald-500/20">
+                         <div className="text-[10px] text-emerald-500 font-bold uppercase">Vitórias</div>
+                         <div className="text-lg font-bold text-emerald-400">{myPlayerProfile?.stats?.wins || 0}</div>
+                      </div>
+                      <div className="bg-yellow-900/20 p-2 rounded-lg border border-yellow-500/20">
+                         <div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div>
+                         <div className="text-lg font-bold text-yellow-400">{getMVPCount(myPlayerProfile?.id)}</div>
+                      </div>
+                      {amIAdmin && (
+                        <div className="bg-blue-900/20 p-2 rounded-lg border border-blue-500/20">
+                           <div className="text-[10px] text-blue-500 font-bold uppercase">Rating</div>
+                           <div className="text-lg font-bold text-blue-400">{getAverageRating(myPlayerProfile)}</div>
+                        </div>
+                      )}
+                   </div>
+
+                   {/* BADGES GRID */}
+                   <h3 className="text-left text-sm font-bold text-slate-300 mb-3 flex items-center gap-2"><Award size={16}/> Conquistas</h3>
+                   <div className="grid grid-cols-1 gap-2">
+                      {/* LENDA */}
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 50 ? 'bg-gradient-to-r from-yellow-900/40 to-slate-800 border-yellow-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
+                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Trophy size={18} className="text-yellow-500"/></div>
+                         <div className="text-left">
+                            <div className="text-sm font-bold text-white">Lenda do Clube</div>
+                            <div className="text-[10px] text-slate-400">+50 Jogos realizados</div>
+                         </div>
+                      </div>
+
+                      {/* VETERANO */}
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 10 ? 'bg-gradient-to-r from-blue-900/40 to-slate-800 border-blue-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
+                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Medal size={18} className="text-blue-500"/></div>
+                         <div className="text-left">
+                            <div className="text-sm font-bold text-white">Veterano</div>
+                            <div className="text-[10px] text-slate-400">+10 Jogos realizados</div>
+                         </div>
+                      </div>
+
+                      {/* INVENCIVEL */}
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${(myPlayerProfile?.stats?.wins / myPlayerProfile?.stats?.games > 0.6 && myPlayerProfile?.stats?.games >= 5) ? 'bg-gradient-to-r from-orange-900/40 to-slate-800 border-orange-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
+                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Flame size={18} className="text-orange-500"/></div>
+                         <div className="text-left">
+                            <div className="text-sm font-bold text-white">Imparável</div>
+                            <div className="text-[10px] text-slate-400">+60% Vitórias (min. 5 jogos)</div>
+                         </div>
+                      </div>
+                      
+                      {/* FIXO */}
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${monthlyFixedIds.includes(myPlayerProfile?.id) ? 'bg-gradient-to-r from-emerald-900/40 to-slate-800 border-emerald-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}>
+                         <div className="p-2 bg-slate-900 rounded-full border border-slate-700"><ShieldCheck size={18} className="text-emerald-500"/></div>
+                         <div className="text-left">
+                            <div className="text-sm font-bold text-white">Membro Fixo</div>
+                            <div className="text-[10px] text-slate-400">Inscrito na mensalidade atual</div>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             </div>
           </div>
         )}
 
@@ -986,7 +1198,17 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                       </button>
                    </div>
                    
-                   {/* PREÇO CONVIDADOS */}
+                   {/* VALOR MENSALIDADE */}
+                   {hasMonthlyFee && (
+                       <div>
+                          <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label>
+                          <div className="flex gap-2">
+                             <input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/>
+                          </div>
+                       </div>
+                   )}
+                   
+                   {/* PREÇO JOGO */}
                    <div>
                       <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label>
                       <input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/>
@@ -1006,7 +1228,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
              </div>
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><MapIcon size={18} className="text-emerald-400"/> Localização do Campo</h3>
-                <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/></div>
+                <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">O mapa será atualizado automaticamente com base neste link.</p></div>
              </div>
              <button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button>
              {isOwner && (<div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8"><div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div><p className="text-sm text-red-300">Apagar este grupo irá remover permanentemente todo o histórico.</p><button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button></div>)}
@@ -1019,9 +1241,10 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           <NavButton active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon={CalendarCheck} label="Agenda" />
           <NavButton active={activeTab==='team'} onClick={()=>setActiveTab('team')} icon={Shield} label="Convocatória" />
           {hasMonthlyFee && <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />}
-          {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
           <NavButton active={activeTab==='players'} onClick={()=>setActiveTab('players')} icon={Users} label="Plantel" />
           <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
+          <NavButton active={activeTab==='trophies'} onClick={()=>setActiveTab('trophies')} icon={Trophy} label="Carreira" />
+          {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
           {amIAdmin && <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />}
         </div>
       </div>
@@ -1029,7 +1252,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   );
 };
 
-// --- GROUP SELECTOR ---
+// ... (RESTO DO CÓDIGO IGUAL: GroupSelector, NavButton, App) ...
 const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState('groups');
   const [groups, setGroups] = useState([]);

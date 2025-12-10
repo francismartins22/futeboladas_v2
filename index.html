@@ -1,12 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>futeboladas-v2</title>
+    
+    <!-- Ícone que aparece no separador do browser -->
+    <link rel="icon" type="image/png" href="/pwa-192x192.png" />
+    
+    <!-- Configuração para PWA (Android/PC) -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Configuração para iOS (iPhone/iPad) -->
+    <link rel="apple-touch-icon" href="/pwa-192x192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Futeboladas">
+    
+    <!-- Cor do tema do browser (deve coincidir com o manifest.json) -->
+    <meta name="theme-color" content="#0f172a">
+    
+    <!-- Viewport otimizado para mobile (evita zoom acidental em inputs) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <title>Futeboladas V2</title>
   </head>
-  <body>
+  <body class="bg-slate-900 text-white overscroll-none">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
