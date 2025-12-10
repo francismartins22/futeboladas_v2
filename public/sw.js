@@ -9,6 +9,7 @@ const urlsToCache = [
 
 // Instalar o Service Worker e colocar ficheiros em cache
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Força a ativação imediata
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -21,15 +22,18 @@ self.addEventListener('install', (event) => {
 // Ativar e limpar caches antigas se necessário
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    Promise.all([
+      self.clients.claim(), // Controla a página imediatamente
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+    ])
   );
 });
 
