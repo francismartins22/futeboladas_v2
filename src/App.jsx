@@ -322,7 +322,7 @@ const UserProfile = ({ user, onLogout }) => {
            <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700 text-center"><div className="text-xs text-slate-500 font-bold uppercase mb-1">Jogos</div><div className="text-xl font-bold text-white">{globalStats.games}</div></div>
               <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-500/30 text-center"><div className="text-xs text-emerald-500 font-bold uppercase mb-1">Vitórias</div><div className="text-xl font-bold text-emerald-400">{globalStats.wins}</div></div>
-              <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/20"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
+              <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/20 text-center"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
               <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 text-center"><div className="text-xs text-blue-500 font-bold uppercase mb-1">Win Rate</div><div className="text-xl font-bold text-blue-400">{globalStats.games > 0 ? Math.round((globalStats.wins / globalStats.games) * 100) : 0}%</div></div>
            </div>
         </div>
