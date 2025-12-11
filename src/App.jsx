@@ -12,7 +12,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, updateProfile, signInWithCustomToken, signInAnonymously 
+  onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, updateProfile 
 } from 'firebase/auth';
 import { 
   getFirestore, collection, addDoc, doc, updateDoc, 
@@ -22,7 +22,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.6.5"; // Versão incrementada
+const APP_VERSION = "2.6.5"; // Versão incrementada para forçar limpeza
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -63,8 +63,9 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// --- CONFIGURAÇÃO FIREBASE (Compatível com Canvas e Prod) ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+// --- CONFIGURAÇÃO FIREBASE (PRODUÇÃO REAL) ---
+// Estes dados são fixos para o teu projeto real.
+const firebaseConfig = {
   apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
   authDomain: "futeboladas-v2-dev.firebaseapp.com",
   projectId: "futeboladas-v2-dev",
@@ -76,8 +77,6 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-// ID dinâmico para garantir compatibilidade
-const APP_ID = typeof __app_id !== 'undefined' ? __app_id : "futeboladas-v2";
 
 // --- HELPERS E COMPONENTES VISUAIS ---
 
@@ -214,14 +213,15 @@ const UserProfile = ({ user, onLogout }) => {
   useEffect(() => {
     const fetchProfileAndStats = async () => {
       try {
-        // FIX PATH: public/data/users (compatível com Canvas)
-        const docSnap = await getDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', user.uid));
+        // PROD PATH: users/{uid}
+        const docSnap = await getDoc(doc(db, 'users', user.uid));
         if (docSnap.exists()) {
           const data = docSnap.data();
           if(data.name) setName(data.name);
           if(data.photoUrl) setPhotoUrl(data.photoUrl);
         }
-        const groupsQuery = query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'groups'), where('members', 'array-contains', user.uid));
+        // PROD PATH: groups (na raiz)
+        const groupsQuery = query(collection(db, 'groups'), where('members', 'array-contains', user.uid));
         const groupsSnap = await getDocs(groupsQuery);
         let totalGames = 0, totalWins = 0, totalMvps = 0; 
         for (const groupDocSnapshot of groupsSnap.docs) {
@@ -289,7 +289,8 @@ const UserProfile = ({ user, onLogout }) => {
     try {
       setUploading(true);
       await updateProfile(auth.currentUser, { displayName: name });
-      await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', user.uid), { name: name, photoUrl: photoUrl, updatedAt: serverTimestamp() }, { merge: true });
+      // PROD PATH: users/{uid}
+      await setDoc(doc(db, 'users', user.uid), { name: name, photoUrl: photoUrl, updatedAt: serverTimestamp() }, { merge: true });
       setMsg("Perfil atualizado com sucesso!");
     } catch (e) { setMsg("Erro ao guardar perfil."); console.error(e); } finally { setUploading(false); }
   };
@@ -364,8 +365,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [votingMatchId, setVotingMatchId] = useState(null);
   const [mvpSelectedId, setMvpSelectedId] = useState("");
 
-  const groupRef = (col) => collection(db, 'artifacts', APP_ID, 'public', 'data', 'groups', group.id, col);
-  const groupDoc = (col, id) => doc(db, 'artifacts', APP_ID, 'public', 'data', 'groups', group.id, col, id);
+  // PROD PATH: groups/{id}/...
+  const groupRef = (col) => collection(db, 'groups', group.id, col);
+  const groupDoc = (col, id) => doc(db, 'groups', group.id, col, id);
   
   const isOwner = group.ownerId === currentUser.uid;
   const myPlayerProfile = players.find(p => p.uid === currentUser.uid);
@@ -386,7 +388,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   }, [nextGame, amIAdmin]);
 
   const getMatchMVP = (m) => { 
-      if (!m.mvpVotes) return null; 
+      if(!m.mvpVotes) return null; 
       const c = {}; 
       Object.values(m.mvpVotes).forEach(id => c[id]=(c[id]||0)+1); 
       let max=0, win=null; 
@@ -395,11 +397,10 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       return p ? {...p, votes: max} : null; 
   };
   
-  // FIX: Previne crash se 'p' for undefined e limita a 1 casa decimal
   const getAverageRating = (p) => { 
-      if(!p) return 3;
-      const v = Object.values(p.votes || {}); 
-      return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : 3; 
+    if(!p) return 3;
+    const v = Object.values(p.votes || {}); 
+    return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : 3; 
   };
   const getPlayerRatingValue = (p) => parseFloat(getAverageRating(p));
 
@@ -419,7 +420,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   }, [group.id]);
 
   useEffect(() => {
-    const unsubGroup = onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'groups', group.id), (s) => { if(s.exists()) { const data = s.data(); setEditLocationUrl(data.locationUrl || ""); if (data.settings) { setHasMonthlyFee(data.settings.hasMonthlyFee ?? true); setGuestFee(data.settings.guestFee ?? 4.5); } } });
+    // PROD PATH: groups/{id}
+    const unsubGroup = onSnapshot(doc(db, 'groups', group.id), (s) => { if(s.exists()) { const data = s.data(); setEditLocationUrl(data.locationUrl || ""); if (data.settings) { setHasMonthlyFee(data.settings.hasMonthlyFee ?? true); setGuestFee(data.settings.guestFee ?? 4.5); } } });
     return () => unsubGroup();
   }, [group.id]);
 
@@ -430,7 +432,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   }, [group.id, currentMonth]);
 
   useEffect(() => {
-    if (players.length > 0) { const syncProfile = async () => { const myPlayer = players.find(p => p.uid === currentUser.uid); if (myPlayer) { try { const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', currentUser.uid)); if (userDoc.exists()) { const userData = userDoc.data(); const latestPhoto = userData.photoUrl || currentUser.photoURL; const latestName = userData.name || currentUser.displayName; const updates = {}; if (myPlayer.photoUrl !== latestPhoto) updates.photoUrl = latestPhoto; if (myPlayer.name !== latestName) updates.name = latestName; if (Object.keys(updates).length > 0) await updateDoc(groupDoc('players', myPlayer.id), updates); } } catch(e) { console.error("Erro sync:", e); } } }; syncProfile(); }
+    if (players.length > 0) { const syncProfile = async () => { const myPlayer = players.find(p => p.uid === currentUser.uid); if (myPlayer) { try { const userDoc = await getDoc(doc(db, 'users', currentUser.uid)); if (userDoc.exists()) { const userData = userDoc.data(); const latestPhoto = userData.photoUrl || currentUser.photoURL; const latestName = userData.name || currentUser.displayName; const updates = {}; if (myPlayer.photoUrl !== latestPhoto) updates.photoUrl = latestPhoto; if (myPlayer.name !== latestName) updates.name = latestName; if (Object.keys(updates).length > 0) await updateDoc(groupDoc('players', myPlayer.id), updates); } } catch(e) { console.error("Erro sync:", e); } } }; syncProfile(); }
   }, [players.length, currentUser.uid]); 
 
   useEffect(() => {
@@ -442,11 +444,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const toggleSchedule = async (status) => { const newResponses = { ...nextGame?.responses, [currentUser.uid]: status }; await setDoc(groupDoc('schedule', 'next'), { date: nextGame?.date || new Date().toISOString(), responses: newResponses }, { merge: true }); showToast(status === 'going' ? "Confirmado!" : "Removido"); };
   
   const addPlayer = async () => { if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error"); let finalName = newPlayerName; if (addPlayerType === 'guest') { const host = players.find(p => p.id === guestHostId); if (host) { const hostFirstName = host.name.split(' ')[0]; finalName = `${newPlayerName} (C - ${hostFirstName})`; } } await addDoc(groupRef('players'), { name: finalName, type: addPlayerType, hostId: addPlayerType === 'guest' ? guestHostId : null, stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); setNewPlayerName(''); showToast("Adicionado!"); };
-  const joinAsPlayer = async () => { const already = players.find(p => p.uid === currentUser.uid); if(already) return showToast("Já estás no plantel!", "error"); let photo = currentUser.photoURL; try { const ud = await getDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'users', currentUser.uid)); if(ud.exists()) photo = ud.data().photoUrl || photo; } catch(e){} await addDoc(groupRef('players'), { name: currentUser.displayName || "Eu", uid: currentUser.uid, type: 'member', stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste!"); };
+  const joinAsPlayer = async () => { const already = players.find(p => p.uid === currentUser.uid); if(already) return showToast("Já estás no plantel!", "error"); let photo = currentUser.photoURL; try { const ud = await getDoc(doc(db, 'users', currentUser.uid)); if(ud.exists()) photo = ud.data().photoUrl || photo; } catch(e){} await addDoc(groupRef('players'), { name: currentUser.displayName || "Eu", uid: currentUser.uid, type: 'member', stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste!"); };
   const deletePlayer = async (id) => { if (!amIAdmin) return; if(window.confirm("Apagar?")) await deleteDoc(groupDoc('players', id)); };
   const deleteMatch = async (id) => { if (!amIAdmin) return; if(window.confirm("Apagar jogo?")) await deleteDoc(groupDoc('matches', id)); };
-  const leaveThisGroup = async () => { if (isOwner) return showToast("Dono não sai.", "error"); if(window.confirm("Sair do grupo?")) { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'groups', group.id), { members: arrayRemove(currentUser.uid) }); onBack(); } };
-  const deleteThisGroup = async () => { if(window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'groups', group.id)); onBack(); } };
+  const leaveThisGroup = async () => { if (isOwner) return showToast("Dono não sai.", "error"); if(window.confirm("Sair do grupo?")) { await updateDoc(doc(db, 'groups', group.id), { members: arrayRemove(currentUser.uid) }); onBack(); } };
+  const deleteThisGroup = async () => { if(window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, 'groups', group.id)); onBack(); } };
   const toggleAdmin = async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc('players', p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); };
   const saveMonthlyFee = async (val) => { await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseInt(val) }, { merge: true }); setMonthlyFee(val); showToast("Guardado"); };
   const toggleMonthlyPayment = async (pid) => { const newP = { ...(monthlyPayments || {}), [pid]: !(monthlyPayments || {})[pid] }; await setDoc(groupDoc('treasury', `month_${currentMonth}`), { payments: newP }, { merge: true }); };
@@ -455,10 +457,10 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const settleMatchPayment = async (mid, pid) => { const newP = { ...matches.find(m=>m.id===mid).payments, [pid]: true }; await updateDoc(groupDoc('matches', mid), { payments: newP }); showToast("Pago!"); };
   
   const getPlayerDebts = (playerId) => { const debts = []; if (hasMonthlyFee && monthlyFixedIds.includes(playerId) && !monthlyPayments[playerId]) { debts.push({ id: 'monthly', desc: 'Mensalidade', amount: monthlyFee, action: () => toggleMonthlyPayment(playerId) }); } matches.forEach(m => { if (m.payments && m.payments[playerId] === false) { debts.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString('pt-PT', {day:'numeric', month:'numeric'})}`, amount: guestFee, action: () => settleMatchPayment(m.id, playerId) }); } }); return debts; };
-  const saveGameSettings = async () => { const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; if(Object.keys(u).length) await setDoc(groupDoc('schedule', 'next'), u, { merge: true }); const gu = { settings: { hasMonthlyFee, guestFee: parseFloat(guestFee) } }; if(editLocationUrl) { const c = getCoordsFromUrl(editLocationUrl); gu.locationUrl = editLocationUrl; if(c) gu.location = c; } await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'groups', group.id), gu); if(hasMonthlyFee) await saveMonthlyFee(monthlyFee); showToast("Guardado!"); };
+  const saveGameSettings = async () => { const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; if(Object.keys(u).length) await setDoc(groupDoc('schedule', 'next'), u, { merge: true }); const gu = { settings: { hasMonthlyFee, guestFee: parseFloat(guestFee) } }; if(editLocationUrl) { const c = getCoordsFromUrl(editLocationUrl); gu.locationUrl = editLocationUrl; if(c) gu.location = c; } await updateDoc(doc(db, 'groups', group.id), gu); if(hasMonthlyFee) await saveMonthlyFee(monthlyFee); showToast("Guardado!"); };
   const submitPlayerVote = async (p, r) => { await updateDoc(groupDoc('players', p.id), { votes: { ...p.votes, [currentUser.uid]: r } }); setExpandedPlayerId(null); showToast("Votado!"); };
   
-  // FIX: Função auxiliar para verificar 48h
+  // FIX: Adicionada lógica de tempo para MVP (48h)
   const isVoteOpen = (matchDate) => {
     if (!matchDate) return false;
     const gameTime = new Date(matchDate).getTime();
@@ -728,22 +730,12 @@ const GroupSelector = ({ user, onLogout }) => {
   const [createError, setCreateError] = useState('');
 
   useEffect(() => {
-    // 1. Inicializar Auth com Token (MANDATORY IN CANVAS)
-    const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
-      }
-    };
-    initAuth();
-
     // 2. Query Firestore
     if (!user) return;
     
-    // FIX PATH: public/data/groups
+    // FIX PATH: groups
     const q = query(
-      collection(db, 'artifacts', APP_ID, 'public', 'data', 'groups'), 
+      collection(db, 'groups'), 
       where('members', 'array-contains', user.uid)
     );
     const unsubscribe = onSnapshot(q, (s) => {
@@ -771,8 +763,8 @@ const GroupSelector = ({ user, onLogout }) => {
     if (!customId) return setCreateError("Nome inválido para criar ID.");
 
     try {
-      // FIX PATH: public/data/groups
-      const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'groups', customId);
+      // FIX PATH: groups
+      const docRef = doc(db, 'groups', customId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -811,8 +803,8 @@ const GroupSelector = ({ user, onLogout }) => {
     if(!joinCode.trim()) return;
     setMsg("");
     try {
-      // FIX PATH: public/data/groups
-      const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'groups', joinCode.trim());
+      // FIX PATH: groups
+      const docRef = doc(db, 'groups', joinCode.trim());
       const docSnap = await getDoc(docRef);
       if(!docSnap.exists()) {
          setMsg("Grupo não encontrado. Verifica o código.");
@@ -926,16 +918,6 @@ const MainApp = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-     // MANDATORY IN CANVAS: Custom Token Auth
-     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
-      }
-    };
-    initAuth();
-    
      const unsubscribe = onAuthStateChanged(auth, u => { 
          setUser(u); 
          setLoading(false); 
