@@ -24,7 +24,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.7.5"; // Versão com melhor deteção de mapas
+const APP_VERSION = "2.7.6"; // Versão com Auto-Join no Plantel
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -92,22 +92,18 @@ const SoccerBall = ({ className = "", size = 24 }) => (
 const getCoordsFromUrl = (url) => {
   if (!url) return null;
   try {
-    // 1. Tenta formato padrão com @ (ex: @38.7,-9.1)
     const regexAt = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
     const matchAt = url.match(regexAt);
     if (matchAt) return { lat: parseFloat(matchAt[1]), lng: parseFloat(matchAt[2]) };
 
-    // 2. Tenta formato de query (ex: ?q=38.7,-9.1)
     const regexQuery = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
     const matchQuery = url.match(regexQuery);
     if (matchQuery) return { lat: parseFloat(matchQuery[1]), lng: parseFloat(matchQuery[2]) };
 
-    // 3. Tenta formato "data" do Google (ex: !3d38.7!4d-9.1)
     const regexData = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
     const matchData = url.match(regexData);
     if (matchData) return { lat: parseFloat(matchData[1]), lng: parseFloat(matchData[2]) };
 
-    // 4. Se for link curto (goo.gl ou maps.app.goo.gl), não dá para ler sem backend
     return null;
   } catch (e) { return null; }
 };
@@ -865,11 +861,25 @@ const createGroup = async (e) => {
       return;
     }
 
+    // Criar o grupo
     await setDoc(docRef, {
       name: newGroup,
       ownerId: user.uid,
       members: [user.uid],
       createdAt: serverTimestamp()
+    });
+
+    // --- NOVO: Adicionar o dono logo ao plantel ---
+    const playersRef = collection(db, 'artifacts', APP_ID, 'groups', customId, 'players');
+    await addDoc(playersRef, {
+        name: user.displayName || "Eu",
+        uid: user.uid,
+        type: 'member',
+        stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
+        isAdmin: true, // Dono é Admin
+        photoUrl: user.photoURL,
+        votes: {},
+        createdAt: serverTimestamp()
     });
      
     const newGroupData = { 
@@ -893,7 +903,8 @@ const createGroup = async (e) => {
     if(!joinCode.trim()) return;
     setMsg("");
     try {
-      const docRef = doc(db, 'artifacts', APP_ID, 'groups', joinCode.trim());
+      const groupId = joinCode.trim();
+      const docRef = doc(db, 'artifacts', APP_ID, 'groups', groupId);
       const docSnap = await getDoc(docRef);
       if(!docSnap.exists()) {
          setMsg("Grupo não encontrado. Verifica o código.");
@@ -906,9 +917,42 @@ const createGroup = async (e) => {
           return;
       }
 
+      // 1. Adicionar aos membros
       await updateDoc(docRef, {
         members: arrayUnion(user.uid)
       });
+
+      // 2. Verificar se já existe como jogador (para não duplicar se estiver a reentrar)
+      const playersRef = collection(db, 'artifacts', APP_ID, 'groups', groupId, 'players');
+      const q = query(playersRef, where('uid', '==', user.uid));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+          // 3. Se não existir, criar o perfil de jogador automaticamente
+          let playerName = user.displayName || "Novo Jogador";
+          let playerPhoto = user.photoURL;
+
+          // Tentar buscar dados mais recentes do perfil global
+          try {
+              const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
+              if(userDoc.exists()) {
+                  const userData = userDoc.data();
+                  if(userData.name) playerName = userData.name;
+                  if(userData.photoUrl) playerPhoto = userData.photoUrl;
+              }
+          } catch(e) { console.log("Erro perfil", e); }
+
+          await addDoc(playersRef, {
+            name: playerName,
+            uid: user.uid,
+            type: 'member',
+            stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
+            isAdmin: false,
+            photoUrl: playerPhoto,
+            votes: {},
+            createdAt: serverTimestamp()
+          });
+      }
        
       const newGroup = { id: docSnap.id, ...groupData, members: [...(groupData.members || []), user.uid] };
       setGroups(prev => {
@@ -916,7 +960,7 @@ const createGroup = async (e) => {
           return [newGroup, ...prev].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       });
 
-      setMsg("Entraste no grupo!");
+      setMsg("Entraste no grupo e no plantel!");
       setJoinCode("");
     } catch(err) {
       console.error(err);
