@@ -22,7 +22,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.6.4"; // Versão incrementada para forçar limpeza
+const APP_VERSION = "2.7.1"; // Versão incrementada para forçar limpeza
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -627,15 +627,20 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         )}
       </div>
 
-      <div className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe z-30">
-        <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center">
             <div className="flex overflow-x-auto items-center p-2 gap-4 px-6 no-scrollbar w-full max-w-3xl md:justify-center">
                 <NavButton active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon={CalendarCheck} label="Agenda" />
-                <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />
+                
+                {/* AQUI ESTÁ A ALTERAÇÃO: Só mostra se hasMonthlyFee for true */}
+                {hasMonthlyFee && (
+                  <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />
+                )}
+
                 <NavButton active={activeTab==='team'} onClick={()=>setActiveTab('team')} icon={Shield} label="Equipa" />
                 <NavButton active={activeTab==='players'} onClick={()=>setActiveTab('players')} icon={Users} label="Plantel" />
                 <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
                 <NavButton active={activeTab==='trophies'} onClick={()=>setActiveTab('trophies')} icon={Trophy} label="Carreira" />
+                
                 {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
                 <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />
             </div>
