@@ -19,46 +19,8 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
 
-// --- 1. CONTROLO DE VERSÃO & LIMPEZA DE CACHE ---
-const APP_VERSION = "2.6.1"; // Auto-update de datas corrigido
-
-try {
-    const currentVersion = localStorage.getItem('app_version');
-    if (currentVersion !== APP_VERSION) {
-        console.log(`Versão nova detetada! Atualizando de ${currentVersion} para ${APP_VERSION}...`);
-        
-        if ('caches' in window) {
-            caches.keys().then((names) => {
-                names.forEach((name) => caches.delete(name));
-            });
-        }
-        
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then((registrations) => {
-                for (let registration of registrations) {
-                    registration.unregister();
-                }
-            }).catch(err => console.warn("SW cleanup error:", err));
-        }
-
-        localStorage.setItem('app_version', APP_VERSION);
-    }
-} catch (e) {
-    console.warn("Erro ao verificar versão:", e);
-}
-
-// --- 2. VACINA CONTRA ERROS DE LOAD ---
-window.addEventListener('error', (event) => {
-  const msg = event?.message?.toLowerCase() || '';
-  if (msg.includes('loading chunk') || msg.includes('unexpected token') || msg.includes('importing a module script failed')) {
-    console.warn('⚠️ Erro de carregamento detetado. Forçando recarga limpa...');
-    const lastReload = sessionStorage.getItem('app_last_rescue_reload');
-    if (!lastReload || Date.now() - parseInt(lastReload) > 10000) {
-        sessionStorage.setItem('app_last_rescue_reload', Date.now().toString());
-        window.location.reload(true);
-    }
-  }
-}, true);
+// --- CONFIGURAÇÃO DA VERSÃO ---
+const APP_VERSION = "2.6.2"; // Incrementei para forçar a limpeza na próxima carga
 
 // --- CONFIGURAÇÃO FIREBASE ---
 const firebaseConfig = {
@@ -129,6 +91,11 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) { return { hasError: true }; }
   componentDidCatch(error, errorInfo) {
     console.error("Crash React:", error, errorInfo);
+    // Verifica se é erro de ChunkLoad
+    const msg = error?.message?.toLowerCase() || "";
+    if (msg.includes('loading chunk') || msg.includes('importing a module')) {
+       window.location.reload();
+    }
     this.setState({ errorInfo: error?.message || "Erro desconhecido" });
   }
   handleHardReset = () => {
@@ -145,9 +112,9 @@ class ErrorBoundary extends React.Component {
                 <Activity size={32} className="text-red-400" />
             </div>
             <h1 className="text-xl font-bold mb-2">Jogo interrompido! 🤕</h1>
-            <p className="text-slate-400 text-xs mb-6">Nova atualização detetada. Precisamos de limpar o campo.</p>
+            <p className="text-slate-400 text-xs mb-6">Nova atualização detetada ou erro de rede.</p>
             <button onClick={this.handleHardReset} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2">
-              <RefreshCw size={18}/> Atualizar App (V{APP_VERSION})
+              <RefreshCw size={18}/> Recarregar App
             </button>
           </div>
         </div>
@@ -344,7 +311,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [matches, setMatches] = useState([]);
   const [nextGame, setNextGame] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
-  const [weather, setWeather] = useState(null);
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editFreq, setEditFreq] = useState("weekly");
@@ -650,11 +616,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       if(!scoreA || !scoreB) return showToast("Insere o resultado", "error");
 
       // --- AUTO-UPDATE SCHEDULE (REFORÇO) ---
-      // Esta lógica garante que a data é atualizada quando o jogo é GUARDADO,
-      // além do useEffect automático que corre ao carregar.
       if (nextGame && nextGame.frequency && nextGame.frequency !== 'once' && nextGame.date) {
           const nextDate = new Date(nextGame.date);
-          // Calcula a próxima data com base na frequência
           if (nextGame.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
           if (nextGame.frequency === 'biweekly') nextDate.setDate(nextDate.getDate() + 14);
           
@@ -1054,7 +1017,44 @@ const GroupSelector = ({ user, onLogout }) => {
 const MainApp = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => onAuthStateChanged(auth, u => { setUser(u); setLoading(false); }), []);
+
+  // Efeito para limpar cache de forma segura APÓS montar o componente
+  useEffect(() => {
+    const handleSafeCleanup = async () => {
+      try {
+         const currentVersion = localStorage.getItem('app_version');
+         if (currentVersion !== APP_VERSION) {
+            console.log(`Versão nova (${APP_VERSION}). A limpar...`);
+            if ('caches' in window) {
+                const names = await caches.keys();
+                names.forEach(name => caches.delete(name));
+            }
+            if ('serviceWorker' in navigator) {
+                // Tenta limpar SWs, mas ignora erros de estado inválido
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                    regs.forEach(reg => reg.unregister());
+                }).catch(e => console.warn("SW cleanup ignored:", e));
+            }
+            localStorage.setItem('app_version', APP_VERSION);
+         }
+      } catch (e) {
+          console.warn("Erro não crítico na limpeza:", e);
+      }
+    };
+    
+    // Pequeno delay para garantir que o browser não está ocupado
+    const t = setTimeout(handleSafeCleanup, 1000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+     const unsubscribe = onAuthStateChanged(auth, u => { 
+         setUser(u); 
+         setLoading(false); 
+     });
+     return () => unsubscribe();
+  }, []);
+
   if(loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-emerald-500"><Loader2 className="animate-spin" size={40}/></div>;
   if(!user) return <AuthScreen />;
   return <GroupSelector user={user} onLogout={() => signOut(auth)} />;
