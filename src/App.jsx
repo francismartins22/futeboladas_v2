@@ -24,7 +24,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.7.4"; // Versão com Meteorologia
+const APP_VERSION = "2.7.5"; // Versão com melhor deteção de mapas
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -88,14 +88,26 @@ const SoccerBall = ({ className = "", size = 24 }) => (
   </svg>
 );
 
+// --- FUNÇÃO DE MAPAS MELHORADA ---
 const getCoordsFromUrl = (url) => {
+  if (!url) return null;
   try {
-    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const match = url.match(regex);
-    if (match) return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const qMatch = url.match(queryRegex);
-    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    // 1. Tenta formato padrão com @ (ex: @38.7,-9.1)
+    const regexAt = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const matchAt = url.match(regexAt);
+    if (matchAt) return { lat: parseFloat(matchAt[1]), lng: parseFloat(matchAt[2]) };
+
+    // 2. Tenta formato de query (ex: ?q=38.7,-9.1)
+    const regexQuery = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const matchQuery = url.match(regexQuery);
+    if (matchQuery) return { lat: parseFloat(matchQuery[1]), lng: parseFloat(matchQuery[2]) };
+
+    // 3. Tenta formato "data" do Google (ex: !3d38.7!4d-9.1)
+    const regexData = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+    const matchData = url.match(regexData);
+    if (matchData) return { lat: parseFloat(matchData[1]), lng: parseFloat(matchData[2]) };
+
+    // 4. Se for link curto (goo.gl ou maps.app.goo.gl), não dá para ler sem backend
     return null;
   } catch (e) { return null; }
 };
@@ -117,7 +129,7 @@ const NavButton = ({ active, onClick, icon: Icon, label }) => (
   </button>
 );
 
-// --- NOVO WIDGET DE METEOROLOGIA ---
+// --- WIDGET DE METEOROLOGIA ---
 const WeatherWidget = ({ date, locationUrl }) => {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
