@@ -19,8 +19,49 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
 
-// --- CONFIGURAÇÃO DA VERSÃO ---
-const APP_VERSION = "2.6.2"; // Incrementei para forçar a limpeza na próxima carga
+// =================================================================================
+// === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
+// =================================================================================
+const APP_VERSION = "2.6.4"; // Versão incrementada para forçar limpeza
+
+if (typeof window !== 'undefined') {
+  // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
+  window.addEventListener('error', (event) => {
+    const msg = event?.message?.toLowerCase() || '';
+    if (msg.includes('loading chunk') || msg.includes('unexpected token') || msg.includes('importing a module') || msg.includes('failed to load resource')) {
+      console.warn('🚨 Erro crítico de ficheiros (404). A tentar recuperar...');
+      const lastRescue = sessionStorage.getItem('app_last_rescue');
+      if (!lastRescue || Date.now() - parseInt(lastRescue) > 10000) {
+          sessionStorage.setItem('app_last_rescue', Date.now().toString());
+          if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(regs => {
+                  regs.forEach(reg => reg.unregister());
+              });
+          }
+          window.location.reload(); 
+      }
+    }
+  }, true);
+
+  // B. LIMPEZA PROATIVA DE VERSÃO
+  try {
+      const storedVersion = localStorage.getItem('app_version');
+      if (storedVersion !== APP_VERSION) {
+          console.log(`♻️ Nova versão ${APP_VERSION} detetada (Era: ${storedVersion}). A limpar lixo...`);
+          if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(registrations => {
+                  for(let registration of registrations) { registration.unregister(); }
+              }).catch(err => console.warn("SW cleanup ignore:", err));
+          }
+          if ('caches' in window) {
+              caches.keys().then(names => { names.forEach(name => caches.delete(name)); });
+          }
+          localStorage.setItem('app_version', APP_VERSION);
+      }
+  } catch (e) {
+      console.warn("Erro não crítico na verificação de versão:", e);
+  }
+}
 
 // --- CONFIGURAÇÃO FIREBASE ---
 const firebaseConfig = {
@@ -57,22 +98,15 @@ const getCoordsFromUrl = (url) => {
   } catch (e) { return null; }
 };
 
-const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(star); }}
-          disabled={readOnly}
-          className={`${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}
-        >
-          <Star size={size} className={`${star <= value ? 'fill-yellow-500 text-yellow-500' : 'text-slate-600'}`} />
-        </button>
-      ))}
-    </div>
-  );
-};
+const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => (
+  <div className="flex gap-1">
+    {[1, 2, 3, 4, 5].map((star) => (
+      <button key={star} onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(star); }} disabled={readOnly} className={`${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}>
+        <Star size={size} className={`${star <= value ? 'fill-yellow-500 text-yellow-500' : 'text-slate-600'}`} />
+      </button>
+    ))}
+  </div>
+);
 
 const NavButton = ({ active, onClick, icon: Icon, label }) => (
   <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[64px] flex-shrink-0 ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -91,11 +125,8 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) { return { hasError: true }; }
   componentDidCatch(error, errorInfo) {
     console.error("Crash React:", error, errorInfo);
-    // Verifica se é erro de ChunkLoad
     const msg = error?.message?.toLowerCase() || "";
-    if (msg.includes('loading chunk') || msg.includes('importing a module')) {
-       window.location.reload();
-    }
+    if (msg.includes('loading chunk') || msg.includes('importing a module')) { window.location.reload(); }
     this.setState({ errorInfo: error?.message || "Erro desconhecido" });
   }
   handleHardReset = () => {
@@ -108,14 +139,10 @@ class ErrorBoundary extends React.Component {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center animate-in fade-in">
           <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl max-w-sm w-full">
-            <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
-                <Activity size={32} className="text-red-400" />
-            </div>
+            <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30"><Activity size={32} className="text-red-400" /></div>
             <h1 className="text-xl font-bold mb-2">Jogo interrompido! 🤕</h1>
             <p className="text-slate-400 text-xs mb-6">Nova atualização detetada ou erro de rede.</p>
-            <button onClick={this.handleHardReset} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2">
-              <RefreshCw size={18}/> Recarregar App
-            </button>
+            <button onClick={this.handleHardReset} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2"><RefreshCw size={18}/> Recarregar App</button>
           </div>
         </div>
       );
@@ -343,69 +370,24 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const myPlayerProfile = players.find(p => p.uid === currentUser.uid);
   const amIAdmin = isOwner || (myPlayerProfile && myPlayerProfile.isAdmin);
 
-  // --- AUTO-UPDATE EFFECT ---
   useEffect(() => {
-    // Verifica se a data do próximo jogo já passou (com 24h de tolerância) e atualiza
     if (nextGame && nextGame.date && nextGame.frequency && nextGame.frequency !== 'once') {
         const gameDate = new Date(nextGame.date);
         const now = new Date();
-        const tolerance = 24 * 60 * 60 * 1000; // 24 horas após o jogo
-        
+        const tolerance = 24 * 60 * 60 * 1000;
         if (now.getTime() > gameDate.getTime() + tolerance && amIAdmin) {
-            // Calcular nova data
             const nextDate = new Date(gameDate);
-            if (nextGame.frequency === 'weekly') {
-                // Avança semanas até ser futuro
-                while (nextDate.getTime() + tolerance < now.getTime()) {
-                    nextDate.setDate(nextDate.getDate() + 7);
-                }
-            } else if (nextGame.frequency === 'biweekly') {
-                 while (nextDate.getTime() + tolerance < now.getTime()) {
-                    nextDate.setDate(nextDate.getDate() + 14);
-                }
-            }
-            
-            if (nextDate.getTime() !== gameDate.getTime()) {
-                console.log("Auto-updating schedule to:", nextDate);
-                setDoc(groupDoc('schedule', 'next'), { 
-                    date: nextDate.toISOString(), 
-                    frequency: nextGame.frequency,
-                    responses: {} 
-                }, { merge: true });
-            }
+            if (nextGame.frequency === 'weekly') { while (nextDate.getTime() + tolerance < now.getTime()) { nextDate.setDate(nextDate.getDate() + 7); } } 
+            else if (nextGame.frequency === 'biweekly') { while (nextDate.getTime() + tolerance < now.getTime()) { nextDate.setDate(nextDate.getDate() + 14); } }
+            if (nextDate.getTime() !== gameDate.getTime()) { setDoc(groupDoc('schedule', 'next'), { date: nextDate.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true }); }
         }
     }
   }, [nextGame, amIAdmin]);
 
-  // --- FUNÇÕES AUXILIARES ---
-  const getMatchMVP = (m) => { 
-      if(!m.mvpVotes) return null; 
-      const c = {}; 
-      Object.values(m.mvpVotes).forEach(id => c[id]=(c[id]||0)+1); 
-      let max=0, win=null; 
-      Object.entries(c).forEach(([id, n]) => { if(n>max){max=n;win=id} }); 
-      const p = players.find(pl=>pl.id===win); 
-      return p ? {...p, votes: max} : null; 
-  };
-
-  const calculatePlayerDebt = (playerId) => {
-    let total = 0;
-    if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) {
-        if (!monthlyPayments[playerId]) total += monthlyFee;
-    }
-    matches.forEach(m => {
-        if (m.payments && m.payments[playerId] === false) total += guestFee;
-    });
-    return total;
-  };
-
+  const getMatchMVP = (m) => { if(!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach(id => c[id]=(c[id]||0)+1); let max=0, win=null; Object.entries(c).forEach(([id, n]) => { if(n>max){max=n;win=id} }); const p = players.find(pl=>pl.id===win); return p ? {...p, votes: max} : null; };
+  const calculatePlayerDebt = (playerId) => { let total = 0; if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) { if (!monthlyPayments[playerId]) total += monthlyFee; } matches.forEach(m => { if (m.payments && m.payments[playerId] === false) total += guestFee; }); return total; };
   const getMVPCount = (pid) => matches.filter(m => getMatchMVP(m)?.id === pid).length;
-
-  const totalGuestRevenue = matches.reduce((sum, m) => {
-    const payingPlayersCount = m.payments ? Object.keys(m.payments).filter(pid => m.payments[pid] === true).length : 0;
-    return sum + (payingPlayersCount * guestFee);
-  }, 0);
-
+  const totalGuestRevenue = matches.reduce((sum, m) => { const payingPlayersCount = m.payments ? Object.keys(m.payments).filter(pid => m.payments[pid] === true).length : 0; return sum + (payingPlayersCount * guestFee); }, 0);
   const totalPendingDebt = players.reduce((sum, p) => sum + calculatePlayerDebt(p.id), 0);
 
   useEffect(() => {
@@ -413,100 +395,36 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     const qMatches = query(groupRef('matches'), orderBy('createdAt', 'desc'));
     const unsubM = onSnapshot(qMatches, s => setMatches(s.docs.map(d => ({id: d.id, ...d.data()}))));
     const unsubG = onSnapshot(groupDoc('schedule', 'next'), s => {
-      if (s.exists()) {
-        const data = s.data();
-        setNextGame(data);
-        if (data.date) {
-            const d = new Date(data.date);
-            setEditDate(d.toISOString().split('T')[0]);
-            setEditTime(d.toTimeString().slice(0,5));
-        }
-        if (data.frequency) setEditFreq(data.frequency);
-      } else { setNextGame({ date: new Date().toISOString(), responses: {} }); }
+      if (s.exists()) { const data = s.data(); setNextGame(data); if (data.date) { const d = new Date(data.date); setEditDate(d.toISOString().split('T')[0]); setEditTime(d.toTimeString().slice(0,5)); } if (data.frequency) setEditFreq(data.frequency); } else { setNextGame({ date: new Date().toISOString(), responses: {} }); }
     });
     return () => { unsubP(); unsubM(); unsubG(); };
   }, [group.id]);
 
   useEffect(() => {
-    const unsubGroup = onSnapshot(doc(db, 'artifacts', APP_ID, 'groups', group.id), (s) => {
-        if(s.exists()) {
-            const data = s.data();
-            setEditLocationUrl(data.locationUrl || "");
-            if (data.settings) { setHasMonthlyFee(data.settings.hasMonthlyFee ?? true); setGuestFee(data.settings.guestFee ?? 4.5); }
-        }
-    });
+    const unsubGroup = onSnapshot(doc(db, 'artifacts', APP_ID, 'groups', group.id), (s) => { if(s.exists()) { const data = s.data(); setEditLocationUrl(data.locationUrl || ""); if (data.settings) { setHasMonthlyFee(data.settings.hasMonthlyFee ?? true); setGuestFee(data.settings.guestFee ?? 4.5); } } });
     return () => unsubGroup();
   }, [group.id]);
 
   useEffect(() => {
     const monthDocRef = groupDoc('treasury', `month_${currentMonth}`);
-    const unsubTreasury = onSnapshot(monthDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setMonthlyFixedIds(Array.isArray(data.fixedIds) ? data.fixedIds : []);
-        setMonthlyPayments(data.payments || {});
-        if (data.monthlyFee) setMonthlyFee(data.monthlyFee); 
-      } else { setMonthlyFixedIds([]); setMonthlyPayments({}); }
-    });
+    const unsubTreasury = onSnapshot(monthDocRef, (docSnap) => { if (docSnap.exists()) { const data = docSnap.data(); setMonthlyFixedIds(Array.isArray(data.fixedIds) ? data.fixedIds : []); setMonthlyPayments(data.payments || {}); if (data.monthlyFee) setMonthlyFee(data.monthlyFee); } else { setMonthlyFixedIds([]); setMonthlyPayments({}); } });
     return () => unsubTreasury();
   }, [group.id, currentMonth]);
 
   useEffect(() => {
-    if (players.length > 0) {
-        const syncProfile = async () => {
-            const myPlayer = players.find(p => p.uid === currentUser.uid);
-            if (myPlayer) {
-                try {
-                    const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid));
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        const latestPhoto = userData.photoUrl || currentUser.photoURL;
-                        const latestName = userData.name || currentUser.displayName;
-                        const updates = {};
-                        if (myPlayer.photoUrl !== latestPhoto) updates.photoUrl = latestPhoto;
-                        if (myPlayer.name !== latestName) updates.name = latestName;
-                        if (Object.keys(updates).length > 0) await updateDoc(groupDoc('players', myPlayer.id), updates);
-                    }
-                } catch(e) { console.error("Erro sync:", e); }
-            }
-        };
-        syncProfile();
-    }
+    if (players.length > 0) { const syncProfile = async () => { const myPlayer = players.find(p => p.uid === currentUser.uid); if (myPlayer) { try { const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid)); if (userDoc.exists()) { const userData = userDoc.data(); const latestPhoto = userData.photoUrl || currentUser.photoURL; const latestName = userData.name || currentUser.displayName; const updates = {}; if (myPlayer.photoUrl !== latestPhoto) updates.photoUrl = latestPhoto; if (myPlayer.name !== latestName) updates.name = latestName; if (Object.keys(updates).length > 0) await updateDoc(groupDoc('players', myPlayer.id), updates); } } catch(e) { console.error("Erro sync:", e); } } }; syncProfile(); }
   }, [players.length, currentUser.uid]); 
 
-  // Pre-select
   useEffect(() => {
-    if (activeTab === 'team' && players.length > 0 && !isGenerated) {
-        const goingUids = Object.entries(nextGame?.responses || {}).filter(([uid, status]) => status === 'going').map(([uid]) => uid);
-        const confirmedPlayerIds = players.filter(p => p.uid && goingUids.includes(p.uid)).map(p => p.id);
-        if (selectedIds.length === 0 && confirmedPlayerIds.length > 0) { setSelectedIds(confirmedPlayerIds); showToast("Jogadores confirmados pré-selecionados!"); }
-    }
+    if (activeTab === 'team' && players.length > 0 && !isGenerated) { const goingUids = Object.entries(nextGame?.responses || {}).filter(([uid, status]) => status === 'going').map(([uid]) => uid); const confirmedPlayerIds = players.filter(p => p.uid && goingUids.includes(p.uid)).map(p => p.id); if (selectedIds.length === 0 && confirmedPlayerIds.length > 0) { setSelectedIds(confirmedPlayerIds); showToast("Jogadores confirmados pré-selecionados!"); } }
   }, [activeTab, players, nextGame, isGenerated]); 
 
   const showToast = (msg, type='success') => { setToast({show: true, msg, type}); setTimeout(() => setToast({show: false, msg: '', type: 'success'}), 3000); };
   const copyInviteCode = () => { navigator.clipboard.writeText(group.id).then(() => { setIsCopied(true); showToast("Copiado!"); setTimeout(() => setIsCopied(false), 2000); }).catch(() => showToast("Erro", "error")); };
   const toggleSchedule = async (status) => { const newResponses = { ...nextGame?.responses, [currentUser.uid]: status }; await setDoc(groupDoc('schedule', 'next'), { date: nextGame?.date || new Date().toISOString(), responses: newResponses }, { merge: true }); showToast(status === 'going' ? "Confirmado!" : "Removido"); };
   
-  const addPlayer = async () => { 
-      if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); 
-      if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error");
-      let finalName = newPlayerName;
-      if (addPlayerType === 'guest') {
-          const host = players.find(p => p.id === guestHostId);
-          if (host) { const hostFirstName = host.name.split(' ')[0]; finalName = `${newPlayerName} (C - ${hostFirstName})`; }
-      }
-      await addDoc(groupRef('players'), { name: finalName, type: addPlayerType, hostId: addPlayerType === 'guest' ? guestHostId : null, stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); 
-      setNewPlayerName(''); showToast("Adicionado!"); 
-  };
-
-  const joinAsPlayer = async () => { 
-      const already = players.find(p => p.uid === currentUser.uid); 
-      if(already) return showToast("Já estás no plantel!", "error");
-      let photo = currentUser.photoURL;
-      try { const ud = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid)); if(ud.exists()) photo = ud.data().photoUrl || photo; } catch(e){}
-      await addDoc(groupRef('players'), { name: currentUser.displayName || "Eu", uid: currentUser.uid, type: 'member', stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() });
-      showToast("Entraste!"); 
-  };
+  const addPlayer = async () => { if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error"); let finalName = newPlayerName; if (addPlayerType === 'guest') { const host = players.find(p => p.id === guestHostId); if (host) { const hostFirstName = host.name.split(' ')[0]; finalName = `${newPlayerName} (C - ${hostFirstName})`; } } await addDoc(groupRef('players'), { name: finalName, type: addPlayerType, hostId: addPlayerType === 'guest' ? guestHostId : null, stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); setNewPlayerName(''); showToast("Adicionado!"); };
+  const joinAsPlayer = async () => { const already = players.find(p => p.uid === currentUser.uid); if(already) return showToast("Já estás no plantel!", "error"); let photo = currentUser.photoURL; try { const ud = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid)); if(ud.exists()) photo = ud.data().photoUrl || photo; } catch(e){} await addDoc(groupRef('players'), { name: currentUser.displayName || "Eu", uid: currentUser.uid, type: 'member', stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste!"); };
   const deletePlayer = async (id) => { if (!amIAdmin) return; if(window.confirm("Apagar?")) await deleteDoc(groupDoc('players', id)); };
   const deleteMatch = async (id) => { if (!amIAdmin) return; if(window.confirm("Apagar jogo?")) await deleteDoc(groupDoc('matches', id)); };
   const leaveThisGroup = async () => { if (isOwner) return showToast("Dono não sai.", "error"); if(window.confirm("Sair do grupo?")) { await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), { members: arrayRemove(currentUser.uid) }); onBack(); } };
@@ -518,132 +436,20 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const selfSignOut = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; const newIds = monthlyFixedIds.filter(id => id !== mp.id); await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Cancelado."); };
   const settleMatchPayment = async (mid, pid) => { const newP = { ...matches.find(m=>m.id===mid).payments, [pid]: true }; await updateDoc(groupDoc('matches', mid), { payments: newP }); showToast("Pago!"); };
   
-  const getPlayerDebts = (playerId) => {
-    const debts = [];
-    if (hasMonthlyFee && monthlyFixedIds.includes(playerId) && !monthlyPayments[playerId]) {
-        debts.push({ id: 'monthly', desc: 'Mensalidade', amount: monthlyFee, action: () => toggleMonthlyPayment(playerId) });
-    }
-    matches.forEach(m => {
-        if (m.payments && m.payments[playerId] === false) {
-            debts.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString('pt-PT', {day:'numeric', month:'numeric'})}`, amount: guestFee, action: () => settleMatchPayment(m.id, playerId) });
-        }
-    });
-    return debts;
-  };
-
-  const saveGameSettings = async () => { 
-      const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; 
-      if(Object.keys(u).length) await setDoc(groupDoc('schedule', 'next'), u, { merge: true });
-      const gu = { settings: { hasMonthlyFee, guestFee: parseFloat(guestFee) } };
-      if(editLocationUrl) { const c = getCoordsFromUrl(editLocationUrl); gu.locationUrl = editLocationUrl; if(c) gu.location = c; }
-      await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), gu);
-      if(hasMonthlyFee) await saveMonthlyFee(monthlyFee);
-      showToast("Guardado!");
-  };
+  const getPlayerDebts = (playerId) => { const debts = []; if (hasMonthlyFee && monthlyFixedIds.includes(playerId) && !monthlyPayments[playerId]) { debts.push({ id: 'monthly', desc: 'Mensalidade', amount: monthlyFee, action: () => toggleMonthlyPayment(playerId) }); } matches.forEach(m => { if (m.payments && m.payments[playerId] === false) { debts.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString('pt-PT', {day:'numeric', month:'numeric'})}`, amount: guestFee, action: () => settleMatchPayment(m.id, playerId) }); } }); return debts; };
+  const saveGameSettings = async () => { const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; if(Object.keys(u).length) await setDoc(groupDoc('schedule', 'next'), u, { merge: true }); const gu = { settings: { hasMonthlyFee, guestFee: parseFloat(guestFee) } }; if(editLocationUrl) { const c = getCoordsFromUrl(editLocationUrl); gu.locationUrl = editLocationUrl; if(c) gu.location = c; } await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), gu); if(hasMonthlyFee) await saveMonthlyFee(monthlyFee); showToast("Guardado!"); };
   const submitPlayerVote = async (p, r) => { await updateDoc(groupDoc('players', p.id), { votes: { ...p.votes, [currentUser.uid]: r } }); setExpandedPlayerId(null); showToast("Votado!"); };
   const getAverageRating = (p) => { const v = Object.values(p.votes || {}); return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : 3; };
   const getPlayerRatingValue = (p) => parseFloat(getAverageRating(p));
 
-  const generateTeams = () => {
-    if (selectedIds.length < 2) return showToast("Mínimo 2 jogadores", "error");
-
-    const selectedPlayers = players.filter(p => selectedIds.includes(p.id));
-    const blocks = {};
-
-    selectedPlayers.forEach(p => {
-      let blockId = p.id;
-      if (p.type === 'guest' && p.hostId && selectedIds.includes(p.hostId)) {
-        blockId = p.hostId;
-      }
-      if (!blocks[blockId]) blocks[blockId] = [];
-      blocks[blockId].push(p);
-    });
-
-    const blockList = Object.values(blocks).map(members => {
-      const rating = members.reduce((sum, p) => sum + getPlayerRatingValue(p), 0);
-      return { members, rating };
-    });
-
-    blockList.sort((a, b) => b.rating - a.rating);
-
-    let teamA = [];
-    let teamB = [];
-    let ratingA = 0;
-    let ratingB = 0;
-
-    blockList.forEach(block => {
-      if (ratingA <= ratingB) {
-        teamA = [...teamA, ...block.members];
-        ratingA += block.rating;
-      } else {
-        teamB = [...teamB, ...block.members];
-        ratingB += block.rating;
-      }
-    });
-
-    setTeamA(teamA);
-    setTeamB(teamB);
-    setIsGenerated(true);
-    showToast("Equipas geradas (Convidados agrupados!)");
-  };
-
-  const shareTeams = () => {
-      const text = `⚽ *Equipas Definidas* ⚽\n\n⚪ *Equipa Branco (${teamA.length})*\n${teamA.map(p => p.name).join('\n')}\n\n⚫ *Equipa Preto (${teamB.length})*\n${teamB.map(p => p.name).join('\n')}`;
-      const copyToClipboard = (txt) => {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(txt).then(() => showToast("Copiado! Cola no WhatsApp.")).catch(() => fallbackCopy(txt));
-          } else {
-              fallbackCopy(txt);
-          }
-      };
-      const fallbackCopy = (txt) => {
-          try {
-              const textArea = document.createElement("textarea");
-              textArea.value = txt;
-              textArea.style.position = "fixed"; textArea.style.left = "0"; textArea.style.top = "0";
-              document.body.appendChild(textArea);
-              textArea.focus(); textArea.select();
-              const res = document.execCommand('copy');
-              document.body.removeChild(textArea);
-              if(res) showToast("Copiado! Cola no WhatsApp.");
-              else showToast("Erro ao copiar", "error");
-          } catch(e) { showToast("Erro ao copiar", "error"); }
-      }
-      copyToClipboard(text);
-  };
-
-  const saveMatch = async () => {
-      if(!scoreA || !scoreB) return showToast("Insere o resultado", "error");
-
-      // --- AUTO-UPDATE SCHEDULE (REFORÇO) ---
-      if (nextGame && nextGame.frequency && nextGame.frequency !== 'once' && nextGame.date) {
-          const nextDate = new Date(nextGame.date);
-          if (nextGame.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-          if (nextGame.frequency === 'biweekly') nextDate.setDate(nextDate.getDate() + 14);
-          
-          await setDoc(groupDoc('schedule', 'next'), { 
-              date: nextDate.toISOString(), 
-              frequency: nextGame.frequency,
-              responses: {} 
-          }, { merge: true });
-      }
-      
-      const pays = {}; [...teamA, ...teamB].forEach(p => { if(hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true) pays[p.id] = false; });
-      await addDoc(groupRef('matches'), { date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB), teamA: teamA.map(p=>({id:p.id, name:p.name})), teamB: teamB.map(p=>({id:p.id, name:p.name})), mvpVotes: {}, payments: pays, createdAt: serverTimestamp() });
-      const w = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw');
-      const upS = (p, res) => { const s = p.stats || {games:0,wins:0,draws:0,losses:0}; s.games++; if(res==='win') s.wins++; else if(res==='draw') s.draws++; else s.losses++; updateDoc(groupDoc('players', p.id), { stats: s }); };
-      teamA.forEach(p => upS(p, w==='A'?'win':(w==='draw'?'draw':'loss'))); teamB.forEach(p => upS(p, w==='B'?'win':(w==='draw'?'draw':'loss')));
-      setIsGenerated(false); setSelectedIds([]); setScoreA(''); setScoreB(''); setActiveTab('history');
-      showToast("Jogo guardado e próxima data atualizada!");
-  };
+  const generateTeams = () => { if (selectedIds.length < 2) return showToast("Mínimo 2 jogadores", "error"); const selectedPlayers = players.filter(p => selectedIds.includes(p.id)); const blocks = {}; selectedPlayers.forEach(p => { let blockId = p.id; if (p.type === 'guest' && p.hostId && selectedIds.includes(p.hostId)) { blockId = p.hostId; } if (!blocks[blockId]) blocks[blockId] = []; blocks[blockId].push(p); }); const blockList = Object.values(blocks).map(members => { const rating = members.reduce((sum, p) => sum + getPlayerRatingValue(p), 0); return { members, rating }; }); blockList.sort((a, b) => b.rating - a.rating); let teamA = []; let teamB = []; let ratingA = 0; let ratingB = 0; blockList.forEach(block => { if (ratingA <= ratingB) { teamA = [...teamA, ...block.members]; ratingA += block.rating; } else { teamB = [...teamB, ...block.members]; ratingB += block.rating; } }); setTeamA(teamA); setTeamB(teamB); setIsGenerated(true); showToast("Equipas geradas (Convidados agrupados!)"); };
+  const shareTeams = () => { const text = `⚽ *Equipas Definidas* ⚽\n\n⚪ *Equipa Branco (${teamA.length})*\n${teamA.map(p => p.name).join('\n')}\n\n⚫ *Equipa Preto (${teamB.length})*\n${teamB.map(p => p.name).join('\n')}`; const copyToClipboard = (txt) => { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(() => showToast("Copiado! Cola no WhatsApp.")).catch(() => fallbackCopy(txt)); } else { fallbackCopy(txt); } }; const fallbackCopy = (txt) => { try { const textArea = document.createElement("textarea"); textArea.value = txt; textArea.style.position = "fixed"; textArea.style.left = "0"; textArea.style.top = "0"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); const res = document.execCommand('copy'); document.body.removeChild(textArea); if(res) showToast("Copiado! Cola no WhatsApp."); else showToast("Erro ao copiar", "error"); } catch(e) { showToast("Erro ao copiar", "error"); } }; copyToClipboard(text); };
+  const saveMatch = async () => { if(!scoreA || !scoreB) return showToast("Insere o resultado", "error"); if (nextGame && nextGame.frequency && nextGame.frequency !== 'once' && nextGame.date) { const nextDate = new Date(nextGame.date); if (nextGame.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7); if (nextGame.frequency === 'biweekly') nextDate.setDate(nextDate.getDate() + 14); await setDoc(groupDoc('schedule', 'next'), { date: nextDate.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true }); } const pays = {}; [...teamA, ...teamB].forEach(p => { if(hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true) pays[p.id] = false; }); await addDoc(groupRef('matches'), { date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB), teamA: teamA.map(p=>({id:p.id, name:p.name})), teamB: teamB.map(p=>({id:p.id, name:p.name})), mvpVotes: {}, payments: pays, createdAt: serverTimestamp() }); const w = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw'); const upS = (p, res) => { const s = p.stats || {games:0,wins:0,draws:0,losses:0}; s.games++; if(res==='win') s.wins++; else if(res==='draw') s.draws++; else s.losses++; updateDoc(groupDoc('players', p.id), { stats: s }); }; teamA.forEach(p => upS(p, w==='A'?'win':(w==='draw'?'draw':'loss'))); teamB.forEach(p => upS(p, w==='B'?'win':(w==='draw'?'draw':'loss'))); setIsGenerated(false); setSelectedIds([]); setScoreA(''); setScoreB(''); setActiveTab('history'); showToast("Jogo guardado e próxima data atualizada!"); };
   const submitMvpVote = async (m) => { if(!mvpSelectedId) return; await updateDoc(groupDoc('matches', m.id), { mvpVotes: { ...m.mvpVotes, [currentUser.uid]: mvpSelectedId } }); setVotingMatchId(null); setMvpSelectedId(""); };
   const toggleSelection = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i=>i!==id) : [...prev, id]);
 
-  // PREPARAÇÃO DADOS ABA CARREIRA
   const myGuestsWithDebt = players.filter(p => p.type === 'guest' && p.hostId === myPlayerProfile?.id).map(p => ({ ...p, currentDebt: calculatePlayerDebt(p.id) })).filter(p => p.currentDebt > 0);
   const totalGuestDebt = myGuestsWithDebt.reduce((acc, p) => acc + p.currentDebt, 0);
-
-  // FILTROS DE LISTAS
   const memberPlayers = players.filter(p => p.type !== 'guest');
   const guestPlayers = players.filter(p => p.type === 'guest');
   const getFilteredSelectionList = (list) => list.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -693,7 +499,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       {toast.show && <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-bold flex items-center gap-2 ${toast.type==='error'?'bg-red-500':'bg-emerald-500'} text-white`}>{toast.msg}</div>}
       
       <div className="flex-1 overflow-y-auto p-4 pb-28 no-scrollbar">
-        
         {activeTab === 'schedule' && (
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center shadow-lg max-w-md mx-auto">
                 <h3 className="text-slate-400 text-xs font-bold uppercase mb-2">Próxima Peladinha</h3>
@@ -703,7 +508,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 <div className="mt-4 pt-4 border-t border-slate-700 text-left"><div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Confirmados ({Object.values(nextGame?.responses||{}).filter(s=>s==='going').length})</div><div className="flex flex-wrap gap-2">{Object.entries(nextGame?.responses||{}).filter(([_,s])=>s==='going').map(([uid]) => { const p = players.find(pl=>pl.uid===uid); return p ? <div key={uid} className="flex items-center gap-2 bg-slate-700/50 px-3 py-1.5 pr-4 rounded-full border border-slate-600"><div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden border border-slate-500 shadow-sm">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-xs text-white font-medium">{p.name}</span></div> : null; })}</div></div>
             </div>
         )}
-
         {activeTab === 'members' && (
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center max-w-md mx-auto">
                 <h3 className="text-white font-bold mb-4 flex justify-center gap-2 text-sm"><ClipboardList size={18} className="text-emerald-400"/> Inscrições Mensais</h3>
@@ -711,7 +515,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 <div className="text-left space-y-2">{monthlyFixedIds.map(pid => { const p = players.find(pl=>pl.id===pid); return p ? <div key={pid} className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden border border-slate-600">{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-sm text-white font-medium">{p.name}</span>{pid === myPlayerProfile?.id && <span className="ml-auto text-[10px] bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Eu</span>}</div> : null; })}</div>
             </div>
         )}
-
         {activeTab === 'players' && (
           <div className="space-y-6 max-w-md mx-auto">
             {!players.find(p => p.uid === currentUser.uid) && (<div onClick={joinAsPlayer} className="bg-emerald-900/30 border border-emerald-500/50 p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-emerald-900/50 transition-colors mb-4 animate-pulse"><div className="flex items-center gap-3"><div className="bg-emerald-600 p-2 rounded-full text-white"><UserPlus size={16}/></div><div><div className="font-bold text-emerald-400 text-sm">Entrar no Plantel</div><div className="text-[10px] text-emerald-200">Adiciona-te como jogador</div></div></div><Plus size={16} className="text-emerald-400"/></div>)}
@@ -720,7 +523,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             {guestPlayers.length > 0 && (<div><h3 className="text-xs font-bold text-slate-500 uppercase mb-2 ml-1 mt-4">Convidados ({guestPlayers.length})</h3><div className="space-y-2">{guestPlayers.map(p => renderPlayerCard(p))}</div></div>)}
           </div>
         )}
-
         {activeTab === 'team' && (
           <div className="space-y-6 max-w-md mx-auto">
             {!isGenerated ? (
@@ -744,7 +546,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             )}
           </div>
         )}
-
         {activeTab === 'history' && (
           <div className="space-y-4 max-w-md mx-auto">
             {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
@@ -760,7 +561,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             })}
           </div>
         )}
-
         {activeTab === 'trophies' && (
           <div className="space-y-6 animate-in fade-in">
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center relative overflow-hidden">
@@ -787,8 +587,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
              </div>
           </div>
         )}
-
-        {/* TAB TREASURY (UNIFICADA) */}
         {activeTab === 'treasury' && amIAdmin && (
           <div className="space-y-6">
              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
@@ -819,7 +617,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
              </div>
           </div>
         )}
-
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-md mx-auto">
              {amIAdmin && (<div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3><div className="space-y-4"><div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600"><div><div className="text-xs font-bold text-white">Mensalidades (Fixos)</div><div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div></div><button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{hasMonthlyFee ? "Ativo" : "Inativo"}</button></div>{hasMonthlyFee && (<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label><div className="flex gap-2"><input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div>)}<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label><input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div></div>)}
@@ -1017,35 +814,6 @@ const GroupSelector = ({ user, onLogout }) => {
 const MainApp = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Efeito para limpar cache de forma segura APÓS montar o componente
-  useEffect(() => {
-    const handleSafeCleanup = async () => {
-      try {
-         const currentVersion = localStorage.getItem('app_version');
-         if (currentVersion !== APP_VERSION) {
-            console.log(`Versão nova (${APP_VERSION}). A limpar...`);
-            if ('caches' in window) {
-                const names = await caches.keys();
-                names.forEach(name => caches.delete(name));
-            }
-            if ('serviceWorker' in navigator) {
-                // Tenta limpar SWs, mas ignora erros de estado inválido
-                navigator.serviceWorker.getRegistrations().then(regs => {
-                    regs.forEach(reg => reg.unregister());
-                }).catch(e => console.warn("SW cleanup ignored:", e));
-            }
-            localStorage.setItem('app_version', APP_VERSION);
-         }
-      } catch (e) {
-          console.warn("Erro não crítico na limpeza:", e);
-      }
-    };
-    
-    // Pequeno delay para garantir que o browser não está ocupado
-    const t = setTimeout(handleSafeCleanup, 1000);
-    return () => clearTimeout(t);
-  }, []);
 
   useEffect(() => {
      const unsubscribe = onAuthStateChanged(auth, u => { 
