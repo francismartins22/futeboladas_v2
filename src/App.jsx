@@ -22,7 +22,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.7.2"; // Versão incrementada
+const APP_VERSION = "2.7.3"; // Versão incrementada
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -550,12 +550,76 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           <div className="space-y-4 max-w-md mx-auto">
             {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
             {matches.map(m => {
-              const mvp = getMatchMVP(m);
+              // --- LÓGICA DE TEMPO MVP (48H) ---
+              // Tenta usar a data de criação (fim do jogo), se não existir, usa a data agendada
+              const gameDate = m.createdAt?.seconds ? new Date(m.createdAt.seconds * 1000) : new Date(m.date);
+              const now = new Date();
+              const diffHours = (now - gameDate) / (1000 * 60 * 60); // Diferença em horas
+              const isVotingOpen = diffHours < 48; // Aberto se for menos de 48h
+              const hoursLeft = Math.max(0, Math.round(48 - diffHours)); // Horas restantes para mostrar
+
+              const mvp = getMatchMVP(m); // Quem vai ganhando (ou ganhou)
+              const myVote = m.mvpVotes?.[currentUser.uid]; // O meu voto
+
               return (
                 <div key={m.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm hover:border-slate-600 transition-colors">
-                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">{new Date(m.date).toLocaleDateString()}{amIAdmin && (<button onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1" title="Apagar Jogo"><Trash2 size={12} /></button>)}</div>
-                  <div className="flex items-center justify-between p-4"><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div><div className="text-[10px] text-slate-500 truncate mt-1">Branco</div></div><div className="text-slate-600 text-sm font-light">X</div><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div><div className="text-[10px] text-slate-500 truncate mt-1">Preto</div></div></div>
-                  <div className="bg-slate-900/30 p-2 border-t border-slate-700/50">{mvp ? (<div className="flex items-center justify-center gap-2 text-yellow-500"><Trophy size={14} className="fill-yellow-500" /><span className="text-xs font-bold text-yellow-200">MVP: {mvp.name} ({mvp.votes})</span></div>) : (votingMatchId === m.id ? (<div className="flex gap-2 animate-in fade-in"><select value={mvpSelectedId} onChange={(e) => setMvpSelectedId(e.target.value)} className="flex-1 bg-slate-900 border border-slate-600 rounded text-xs p-1.5 text-white outline-none"><option value="">Quem foi o Craque?</option>{[...(m.teamA || []), ...(m.teamB || [])].map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select><button onClick={() => submitMvpVote(m)} className="bg-yellow-600 text-white px-3 rounded text-xs font-bold">Votar</button></div>) : (!m.mvpVotes?.[currentUser.uid] && (<button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1"><Star size={12} /> Votar Melhor em Campo</button>)))}</div>
+                  {/* DATA E DELETE */}
+                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">
+                      {gameDate.toLocaleDateString()}
+                      {amIAdmin && (<button onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1" title="Apagar Jogo"><Trash2 size={12} /></button>)}
+                  </div>
+
+                  {/* RESULTADO */}
+                  <div className="flex items-center justify-between p-4">
+                      <div className="text-center w-1/3">
+                          <div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div>
+                          <div className="text-[10px] text-slate-500 truncate mt-1">Branco</div>
+                      </div>
+                      <div className="text-slate-600 text-sm font-light">X</div>
+                      <div className="text-center w-1/3">
+                          <div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div>
+                          <div className="text-[10px] text-slate-500 truncate mt-1">Preto</div>
+                      </div>
+                  </div>
+
+                  {/* ZONA DE VOTAÇÃO MVP */}
+                  <div className="bg-slate-900/30 p-2 border-t border-slate-700/50 min-h-[50px] flex items-center justify-center">
+                    {!isVotingOpen ? (
+                        /* --- CENÁRIO 1: Votação Fechada (>48h) --- */
+                        mvp ? (
+                            <div className="flex items-center justify-center gap-2 text-yellow-500 animate-in zoom-in">
+                                <Trophy size={14} className="fill-yellow-500" />
+                                <span className="text-xs font-bold text-yellow-200">MVP: {mvp.name} ({mvp.votes} votos)</span>
+                            </div>
+                        ) : (
+                            <span className="text-[10px] text-slate-500 italic">Votação encerrada (Sem votos)</span>
+                        )
+                    ) : (
+                        /* --- CENÁRIO 2: Votação Aberta (<48h) --- */
+                       <div className="w-full">
+                           {myVote ? (
+                               <div className="text-center animate-in fade-in">
+                                   <div className="text-[10px] text-emerald-400 font-bold mb-1 flex items-center justify-center gap-1"><Check size={10}/> Voto registado!</div>
+                                   <div className="text-[9px] text-slate-500">Resultados revelados em {hoursLeft}h</div>
+                               </div>
+                           ) : (
+                               votingMatchId === m.id ? (
+                                    <div className="flex gap-2 animate-in fade-in">
+                                        <select value={mvpSelectedId} onChange={(e) => setMvpSelectedId(e.target.value)} className="flex-1 bg-slate-900 border border-slate-600 rounded text-xs p-1.5 text-white outline-none">
+                                            <option value="">Quem foi o Craque?</option>
+                                            {[...(m.teamA || []), ...(m.teamB || [])].map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                                        </select>
+                                        <button onClick={() => submitMvpVote(m)} className="bg-yellow-600 text-white px-3 rounded text-xs font-bold">Votar</button>
+                                    </div>
+                               ) : (
+                                   <button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1 transition-colors">
+                                       <Star size={12} /> Votar MVP (Faltam {hoursLeft}h)
+                                   </button>
+                               )
+                           )}
+                       </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
