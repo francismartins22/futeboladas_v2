@@ -5,7 +5,7 @@ import {
   PlusCircle, Loader2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
   Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser
+  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser, Share2, TrendingUp, TrendingDown
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -20,21 +20,19 @@ import {
 } from 'firebase/firestore';
 
 // --- 1. CONTROLO DE VERSÃO & LIMPEZA DE CACHE (NUCLEAR OPTION) ---
-const APP_VERSION = "2.5.3"; // Versão incrementada para restaurar visual completo
+const APP_VERSION = "2.6"; // Correção de Referências e Cache
 
 try {
     const currentVersion = localStorage.getItem('app_version');
     if (currentVersion !== APP_VERSION) {
         console.log(`Versão nova detetada! Atualizando de ${currentVersion} para ${APP_VERSION}...`);
         
-        // 1. Limpar Cache de Ficheiros
         if ('caches' in window) {
             caches.keys().then((names) => {
                 names.forEach((name) => caches.delete(name));
             });
         }
         
-        // 2. Remover Service Workers Antigos
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then((registrations) => {
                 for (let registration of registrations) {
@@ -43,7 +41,6 @@ try {
             }).catch(err => console.warn("SW cleanup error:", err));
         }
 
-        // 3. Atualizar Versão
         localStorage.setItem('app_version', APP_VERSION);
     }
 } catch (e) {
@@ -55,8 +52,6 @@ window.addEventListener('error', (event) => {
   const msg = event?.message?.toLowerCase() || '';
   if (msg.includes('loading chunk') || msg.includes('unexpected token') || msg.includes('importing a module script failed')) {
     console.warn('⚠️ Erro de carregamento detetado. Forçando recarga limpa...');
-    
-    // Proteção contra loop infinito (máx 1 reload a cada 10s)
     const lastReload = sessionStorage.getItem('app_last_rescue_reload');
     if (!lastReload || Date.now() - parseInt(lastReload) > 10000) {
         sessionStorage.setItem('app_last_rescue_reload', Date.now().toString());
@@ -80,7 +75,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const APP_ID = "futeboladas-v2";
 
-// --- HELPERS E COMPONENTES VISUAIS ---
+// --- HELPERS E COMPONENTES VISUAIS (DEPENDÊNCIAS BASE) ---
+
 const SoccerBall = ({ className = "", size = 24 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="10"/><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z"/><path d="m12 17v5"/><path d="m7.8 14.5-4 2.8"/><path d="m16.2 14.5 4 2.8"/><path d="m9.4 9.4-4.2-2.6"/><path d="m14.6 9.4 4.2-2.6"/>
@@ -116,7 +112,6 @@ const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => {
   );
 };
 
-// --- COMPONENTE NAV BUTTON (AJUSTADO PARA MOBILE) ---
 const NavButton = ({ active, onClick, icon: Icon, label }) => (
   <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[64px] flex-shrink-0 ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
     <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
@@ -124,7 +119,8 @@ const NavButton = ({ active, onClick, icon: Icon, label }) => (
   </button>
 );
 
-// --- ERROR BOUNDARY ---
+// --- COMPONENTES SECUNDÁRIOS ---
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -160,8 +156,6 @@ class ErrorBoundary extends React.Component {
     return this.props.children; 
   }
 }
-
-// --- ECRÃS PRINCIPAIS ---
 
 const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -334,7 +328,7 @@ const UserProfile = ({ user, onLogout }) => {
            <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700 text-center"><div className="text-xs text-slate-500 font-bold uppercase mb-1">Jogos</div><div className="text-xl font-bold text-white">{globalStats.games}</div></div>
               <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-500/30 text-center"><div className="text-xs text-emerald-500 font-bold uppercase mb-1">Vitórias</div><div className="text-xl font-bold text-emerald-400">{globalStats.wins}</div></div>
-              <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/30 text-center"><div className="text-xs text-yellow-500 font-bold uppercase mb-1">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
+              <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/20"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
               <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 text-center"><div className="text-xs text-blue-500 font-bold uppercase mb-1">Win Rate</div><div className="text-xl font-bold text-blue-400">{globalStats.games > 0 ? Math.round((globalStats.wins / globalStats.games) * 100) : 0}%</div></div>
            </div>
         </div>
@@ -462,7 +456,34 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const showToast = (msg, type='success') => { setToast({show: true, msg, type}); setTimeout(() => setToast({show: false, msg: '', type: 'success'}), 3000); };
   const copyInviteCode = () => { navigator.clipboard.writeText(group.id).then(() => { setIsCopied(true); showToast("Copiado!"); setTimeout(() => setIsCopied(false), 2000); }).catch(() => showToast("Erro", "error")); };
   const toggleSchedule = async (status) => { const newResponses = { ...nextGame?.responses, [currentUser.uid]: status }; await setDoc(groupDoc('schedule', 'next'), { date: nextGame?.date || new Date().toISOString(), responses: newResponses }, { merge: true }); showToast(status === 'going' ? "Confirmado!" : "Removido"); };
-  const addPlayer = async () => { if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); await addDoc(groupRef('players'), { name: newPlayerName + (addPlayerType === 'guest' ? ' (C)' : ''), type: addPlayerType, hostId: addPlayerType === 'guest' ? guestHostId : null, stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); setNewPlayerName(''); showToast("Adicionado!"); };
+  
+  // --- ADD PLAYER ---
+  const addPlayer = async () => { 
+      if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); 
+      if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error");
+      
+      let finalName = newPlayerName;
+      if (addPlayerType === 'guest') {
+          const host = players.find(p => p.id === guestHostId);
+          if (host) {
+             const hostFirstName = host.name.split(' ')[0];
+             finalName = `${newPlayerName} (C - ${hostFirstName})`;
+          }
+      }
+
+      await addDoc(groupRef('players'), { 
+          name: finalName, 
+          type: addPlayerType, 
+          hostId: addPlayerType === 'guest' ? guestHostId : null, 
+          stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, 
+          isAdmin: false, 
+          votes: {}, 
+          createdAt: serverTimestamp() 
+      }); 
+      setNewPlayerName(''); 
+      showToast("Adicionado!"); 
+  };
+
   const joinAsPlayer = async () => { 
       const already = players.find(p => p.uid === currentUser.uid); 
       if(already) return showToast("Já estás no plantel!", "error");
@@ -481,8 +502,43 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const selfSignUp = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; if (monthlyFixedIds.includes(mp.id)) return; const newIds = [...monthlyFixedIds, mp.id]; await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Inscrito!"); };
   const selfSignOut = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; const newIds = monthlyFixedIds.filter(id => id !== mp.id); await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Cancelado."); };
   const settleMatchPayment = async (mid, pid) => { const newP = { ...matches.find(m=>m.id===mid).payments, [pid]: true }; await updateDoc(groupDoc('matches', mid), { payments: newP }); showToast("Pago!"); };
-  const calculatePlayerDebt = (pid) => { let t = 0; if (hasMonthlyFee && monthlyFixedIds.includes(pid) && !monthlyPayments[pid]) t += monthlyFee; matches.forEach(m => { if (m.payments && m.payments[pid] === false) t += guestFee; }); return t; };
+  
+  // --- FUNÇÃO PARA OBTER ITENS DE DÍVIDA ---
+  const getPlayerDebts = (playerId) => {
+    const debts = [];
+    if (hasMonthlyFee && monthlyFixedIds.includes(playerId) && !monthlyPayments[playerId]) {
+        debts.push({ id: 'monthly', desc: 'Mensalidade', amount: monthlyFee, action: () => toggleMonthlyPayment(playerId) });
+    }
+    matches.forEach(m => {
+        if (m.payments && m.payments[playerId] === false) {
+            debts.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString('pt-PT', {day:'numeric', month:'numeric'})}`, amount: guestFee, action: () => settleMatchPayment(m.id, playerId) });
+        }
+    });
+    return debts;
+  };
+  
+  // --- FUNÇÃO PARA CALCULAR DÍVIDA TOTAL (PARA CARREIRA) ---
+  const calculatePlayerDebt = (playerId) => {
+    let total = 0;
+    if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) {
+        if (!monthlyPayments[playerId]) total += monthlyFee;
+    }
+    matches.forEach(m => {
+        if (m.payments && m.payments[playerId] === false) total += guestFee;
+    });
+    return total;
+  };
+
   const getMVPCount = (pid) => matches.filter(m => getMatchMVP(m)?.id === pid).length;
+  
+  // --- CÁLCULO DE RECEITA E DÍVIDA TOTAL ---
+  const totalGuestRevenue = matches.reduce((sum, m) => {
+    const payingPlayersCount = m.payments ? Object.keys(m.payments).filter(pid => m.payments[pid] === true).length : 0;
+    return sum + (payingPlayersCount * guestFee);
+  }, 0);
+
+  const totalPendingDebt = players.reduce((sum, p) => sum + calculatePlayerDebt(p.id), 0);
+
   const saveGameSettings = async () => { 
       const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; 
       if(Object.keys(u).length) await setDoc(groupDoc('schedule', 'next'), u, { merge: true });
@@ -494,13 +550,82 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
   const submitPlayerVote = async (p, r) => { await updateDoc(groupDoc('players', p.id), { votes: { ...p.votes, [currentUser.uid]: r } }); setExpandedPlayerId(null); showToast("Votado!"); };
   const getAverageRating = (p) => { const v = Object.values(p.votes || {}); return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : 3; };
+  const getPlayerRatingValue = (p) => parseFloat(getAverageRating(p));
+
   const generateTeams = () => {
-      if(selectedIds.length < 2) return showToast("Min 2 jogadores", "error");
-      const sel = players.filter(p => selectedIds.includes(p.id));
-      const tA = [], tB = []; let sA=0, sB=0;
-      sel.sort((a,b) => parseFloat(getAverageRating(b)) - parseFloat(getAverageRating(a))).forEach((p, i) => { if(i%2===0) { tA.push(p); sA+=parseFloat(getAverageRating(p)); } else { tB.push(p); sB+=parseFloat(getAverageRating(p)); } }); 
-      setTeamA(tA); setTeamB(tB); setIsGenerated(true);
+    if (selectedIds.length < 2) return showToast("Mínimo 2 jogadores", "error");
+
+    const selectedPlayers = players.filter(p => selectedIds.includes(p.id));
+    const blocks = {};
+
+    // 1. Agrupar convidados com anfitriões
+    selectedPlayers.forEach(p => {
+      let blockId = p.id;
+      // Se for convidado e o anfitrião também for jogar, junta-se ao bloco do anfitrião
+      if (p.type === 'guest' && p.hostId && selectedIds.includes(p.hostId)) {
+        blockId = p.hostId;
+      }
+      
+      if (!blocks[blockId]) blocks[blockId] = [];
+      blocks[blockId].push(p);
+    });
+
+    // 2. Calcular rating dos blocos
+    const blockList = Object.values(blocks).map(members => {
+      const rating = members.reduce((sum, p) => sum + getPlayerRatingValue(p), 0);
+      return { members, rating };
+    });
+
+    // 3. Ordenar por rating decrescente
+    blockList.sort((a, b) => b.rating - a.rating);
+
+    // 4. Distribuir
+    let teamA = [];
+    let teamB = [];
+    let ratingA = 0;
+    let ratingB = 0;
+
+    blockList.forEach(block => {
+      if (ratingA <= ratingB) {
+        teamA = [...teamA, ...block.members];
+        ratingA += block.rating;
+      } else {
+        teamB = [...teamB, ...block.members];
+        ratingB += block.rating;
+      }
+    });
+
+    setTeamA(teamA);
+    setTeamB(teamB);
+    setIsGenerated(true);
+    showToast("Equipas geradas (Convidados agrupados!)");
   };
+
+  const shareTeams = () => {
+      const text = `⚽ *Equipas Definidas* ⚽\n\n⚪ *Equipa Branco (${teamA.length})*\n${teamA.map(p => p.name).join('\n')}\n\n⚫ *Equipa Preto (${teamB.length})*\n${teamB.map(p => p.name).join('\n')}`;
+      const copyToClipboard = (txt) => {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(txt).then(() => showToast("Copiado! Cola no WhatsApp.")).catch(() => fallbackCopy(txt));
+          } else {
+              fallbackCopy(txt);
+          }
+      };
+      const fallbackCopy = (txt) => {
+          try {
+              const textArea = document.createElement("textarea");
+              textArea.value = txt;
+              textArea.style.position = "fixed"; textArea.style.left = "0"; textArea.style.top = "0";
+              document.body.appendChild(textArea);
+              textArea.focus(); textArea.select();
+              const res = document.execCommand('copy');
+              document.body.removeChild(textArea);
+              if(res) showToast("Copiado! Cola no WhatsApp.");
+              else showToast("Erro ao copiar", "error");
+          } catch(e) { showToast("Erro ao copiar", "error"); }
+      }
+      copyToClipboard(text);
+  };
+
   const saveMatch = async () => {
       if(!scoreA || !scoreB) return;
       const pays = {}; [...teamA, ...teamB].forEach(p => { if(hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true) pays[p.id] = false; });
@@ -513,6 +638,14 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const submitMvpVote = async (m) => { if(!mvpSelectedId) return; await updateDoc(groupDoc('matches', m.id), { mvpVotes: { ...m.mvpVotes, [currentUser.uid]: mvpSelectedId } }); setVotingMatchId(null); setMvpSelectedId(""); };
   const getMatchMVP = (m) => { if(!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach(id => c[id]=(c[id]||0)+1); let max=0, win=null; Object.entries(c).forEach(([id, n]) => { if(n>max){max=n;win=id} }); const p = players.find(pl=>pl.id===win); return p ? {...p, votes: max} : null; };
   const toggleSelection = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i=>i!==id) : [...prev, id]);
+
+  // --- PREPARAÇÃO DADOS ABA CARREIRA (DÍVIDAS CONVIDADOS) ---
+  const myGuestsWithDebt = players
+    .filter(p => p.type === 'guest' && p.hostId === myPlayerProfile?.id)
+    .map(p => ({ ...p, currentDebt: calculatePlayerDebt(p.id) }))
+    .filter(p => p.currentDebt > 0);
+
+  const totalGuestDebt = myGuestsWithDebt.reduce((acc, p) => acc + p.currentDebt, 0);
 
   return (
     <div className="h-screen flex flex-col bg-slate-900 animate-in fade-in duration-300 relative">
@@ -649,7 +782,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               </>
             ) : (
               <div className="animate-in zoom-in duration-300 space-y-4">
-                <div className="flex justify-between items-center"><h3 className="font-bold text-white text-lg flex items-center gap-2"><SoccerBall size={20} className="text-yellow-500"/> Jogo a Decorrer</h3><button onClick={() => setIsGenerated(false)} className="text-xs text-red-400 hover:underline font-medium">Cancelar</button></div>
+                <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-white text-lg flex items-center gap-2"><SoccerBall size={20} className="text-yellow-500"/> Jogo a Decorrer</h3>
+                    <button onClick={() => setIsGenerated(false)} className="text-xs text-red-400 hover:underline font-medium">Cancelar</button>
+                </div>
+                
+                <button onClick={shareTeams} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/30 py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-600/30 transition-colors mb-2">
+                    <Share2 size={16} /> Partilhar Equipas
+                </button>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-white shadow-lg">
                       <div className="font-bold text-center text-white mb-3 text-sm border-b border-slate-700 pb-2">Equipa Branco ({teamA.length})</div>
@@ -713,6 +854,24 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                    <div className="w-20 h-20 mx-auto rounded-full bg-slate-700 border-2 border-slate-500 flex items-center justify-center mb-3 overflow-hidden shadow-xl">{myPlayerProfile?.photoUrl ? <img src={myPlayerProfile.photoUrl} className="w-full h-full object-cover"/> : <User size={40} className="text-slate-400"/>}</div>
                    <h2 className="text-xl font-bold text-white">{myPlayerProfile?.name || "Eu"}</h2>
                    <p className="text-xs text-slate-400 uppercase tracking-widest mb-6">Estatísticas de Carreira</p>
+                   
+                   {/* SECTOR DE DÍVIDAS DE CONVIDADOS (NOVO) */}
+                   {totalGuestDebt > 0 && (
+                        <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl mb-6 animate-pulse">
+                            <h3 className="text-red-400 font-bold text-sm mb-2 flex items-center justify-center gap-2">
+                                <AlertCircle size={16}/> Dívidas de Convidados ({totalGuestDebt.toFixed(2)}€)
+                            </h3>
+                            <div className="space-y-1">
+                                {myGuestsWithDebt.map(g => (
+                                    <div key={g.id} className="flex justify-between text-xs text-red-200 border-b border-red-500/20 pb-1 last:border-0">
+                                        <span>{g.name}</span>
+                                        <span className="font-bold">{g.currentDebt.toFixed(2)}€</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                   )}
+
                    <div className={`grid ${amIAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mb-6`}>
                       <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700"><div className="text-[10px] text-slate-500 font-bold uppercase">Jogos</div><div className="text-lg font-bold text-white">{myPlayerProfile?.stats?.games || 0}</div></div>
                       <div className="bg-emerald-900/20 p-2 rounded-lg border border-emerald-500/20"><div className="text-[10px] text-emerald-500 font-bold uppercase">Vitórias</div><div className="text-lg font-bold text-emerald-400">{myPlayerProfile?.stats?.wins || 0}</div></div>
@@ -731,59 +890,103 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
-        {/* TAB TREASURY */}
+        {/* TAB TREASURY (UNIFICADA) */}
         {activeTab === 'treasury' && amIAdmin && (
           <div className="space-y-6">
              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
                 <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2><input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/></div>
-                 <div className="grid grid-cols-1 gap-4 mb-6">
-                    <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                        <h3 className="font-bold text-white mb-3 flex items-center gap-2"><AlertCircle size={18} className="text-red-400"/> Resumo de Dívidas</h3>
-                        <div className="space-y-2">
-                            {players.map(p => ({ ...p, debt: calculatePlayerDebt(p.id) })).filter(p => p.debt > 0).sort((a, b) => b.debt - a.debt).map(p => (
-                                <div key={p.id} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
-                                    <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}</div><span className="text-sm text-slate-200">{p.name}</span></div><span className="text-sm font-bold text-red-400">{p.debt.toFixed(2)}€</span>
+                 
+                 {/* NOVO: TOTAL REVENUE & DEBT CARDS */}
+                 <div className="grid grid-cols-2 gap-4 mb-4">
+                     <div className="bg-gradient-to-r from-emerald-900/40 to-slate-900 p-4 rounded-xl border border-emerald-500/20 flex flex-col justify-between">
+                        <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Receita (Convidados)</div>
+                        <div className="text-xl font-bold text-white">{totalGuestRevenue.toFixed(2)}€</div>
+                     </div>
+                     <div className="bg-gradient-to-r from-red-900/40 to-slate-900 p-4 rounded-xl border border-red-500/20 flex flex-col justify-between">
+                        <div className="text-[10px] text-red-400 font-bold uppercase tracking-wider mb-1">Dívida Total</div>
+                        <div className="text-xl font-bold text-white">{totalPendingDebt.toFixed(2)}€</div>
+                     </div>
+                 </div>
+
+                 {/* DÍVIDAS PENDENTES (UNIFICADO) */}
+                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg mb-6">
+                    <h3 className="font-bold text-white mb-4 flex items-center gap-2"><AlertCircle size={18} className="text-red-400"/> Dívidas Pendentes</h3>
+                    
+                    <div className="space-y-4">
+                        {players
+                            .map(p => ({ ...p, debts: getPlayerDebts(p.id) }))
+                            .filter(p => p.debts.length > 0)
+                            .sort((a, b) => b.debts.reduce((s,d)=>s+d.amount,0) - a.debts.reduce((s,d)=>s+d.amount,0))
+                            .map(p => (
+                                <div key={p.id} className="bg-slate-900/50 rounded-lg border border-red-500/20 overflow-hidden">
+                                    {/* CABEÇALHO JOGADOR */}
+                                    <div className="p-3 flex justify-between items-center bg-slate-900/80 border-b border-white/5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">
+                                                {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-bold text-white">{p.name}</div>
+                                                {p.type === 'guest' && <div className="text-[9px] text-slate-500">Convidado</div>}
+                                            </div>
+                                        </div>
+                                        <div className="text-red-400 font-bold text-sm">
+                                            {p.debts.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}€
+                                        </div>
+                                    </div>
+                                    
+                                    {/* LISTA DE ITENS A PAGAR */}
+                                    <div className="p-2 space-y-1">
+                                        {p.debts.map((debt) => (
+                                            <div key={`${p.id}-${debt.id}`} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors group">
+                                                <span className="text-xs text-slate-300 group-hover:text-white transition-colors">{debt.desc}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs text-slate-400">{debt.amount}€</span>
+                                                    <button 
+                                                        onClick={debt.action}
+                                                        className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white p-1.5 rounded transition-all shadow-sm"
+                                                        title="Marcar como Pago"
+                                                    >
+                                                        <CheckCircle size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            ))}
-                            {players.every(p => calculatePlayerDebt(p.id) === 0) && <div className="text-center text-slate-500 text-xs py-2 italic">Ninguém deve nada! 🎉</div>}
-                        </div>
+                            ))
+                        }
+                        {players.every(p => getPlayerDebts(p.id).length === 0) && (
+                            <div className="text-center text-slate-500 py-6 italic flex flex-col items-center gap-2">
+                                <CheckCircle size={32} className="text-slate-600"/>
+                                <span>Tudo regularizado! 🎉</span>
+                            </div>
+                        )}
                     </div>
                  </div>
-                {hasMonthlyFee && (
-                    <div className="space-y-2 mb-6">
-                       <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Mensalidades ({monthlyFixedIds.length})</h3>
-                       {monthlyFixedIds.map(pid => {
-                          const p = players.find(pl => pl.id === pid);
-                          if(!p) return null;
-                          const isPaid = monthlyPayments[pid];
-                          return (
-                             <div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700">
-                                <span className="text-sm text-white">{p.name}</span>
-                                <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>{isPaid ? 'PAGO' : 'FALTA'}</button>
-                             </div>
-                          );
-                       })}
+
+                 {/* CHECKLIST MENSALIDADES (SECUNDÁRIO) */}
+                 {hasMonthlyFee && (
+                    <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 opacity-80 hover:opacity-100 transition-opacity">
+                       <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center justify-between cursor-pointer select-none" onClick={(e) => e.currentTarget.nextSibling.classList.toggle('hidden')}>
+                           <span>Gestão Mensalidades (Checklist)</span>
+                           <span className="text-[10px]">▼</span>
+                       </h3>
+                       <div className="space-y-2 hidden animate-in slide-in-from-top-2">
+                           {monthlyFixedIds.map(pid => {
+                              const p = players.find(pl => pl.id === pid);
+                              if(!p) return null;
+                              const isPaid = monthlyPayments[pid];
+                              return (
+                                 <div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700">
+                                    <span className="text-sm text-white">{p.name}</span>
+                                    <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>{isPaid ? 'PAGO' : 'FALTA'}</button>
+                                 </div>
+                              );
+                           })}
+                       </div>
                     </div>
-                )}
-                <div>
-                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Banknote size={16} className="text-orange-400"/> Detalhe Jogos ({guestFee}€)</h3>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                       {matches.map(m => {
-                          const unpaid = Object.entries(m.payments || {}).filter(([_, paid]) => !paid);
-                          if(unpaid.length === 0) return null;
-                          return unpaid.map(([pid]) => {
-                             const p = players.find(pl => pl.id === pid);
-                             return (
-                                <div key={`${m.id}-${pid}`} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-red-900/30">
-                                   <div><div className="text-[10px] text-slate-500">{new Date(m.date).toLocaleDateString()}</div><div className="text-sm font-bold text-white">{p ? p.name : 'Desconhecido'}</div></div>
-                                   <button onClick={() => settleMatchPayment(m.id, pid)} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">Regularizar</button>
-                                </div>
-                             );
-                          });
-                       })}
-                       {matches.every(m => !m.payments || Object.values(m.payments).every(p => p)) && <div className="text-center text-xs text-slate-500 italic py-2">Tudo pago!</div>}
-                    </div>
-                 </div>
+                 )}
              </div>
           </div>
         )}
