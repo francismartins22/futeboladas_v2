@@ -22,7 +22,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.7.1"; // Versão incrementada para forçar limpeza
+const APP_VERSION = "2.7.2"; // Versão incrementada
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -323,7 +323,6 @@ const UserProfile = ({ user, onLogout }) => {
               <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700 text-center"><div className="text-xs text-slate-500 font-bold uppercase mb-1">Jogos</div><div className="text-xl font-bold text-white">{globalStats.games}</div></div>
               <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-500/30 text-center"><div className="text-xs text-emerald-500 font-bold uppercase mb-1">Vitórias</div><div className="text-xl font-bold text-emerald-400">{globalStats.wins}</div></div>
               <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/20"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
-              <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/20 text-center"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
               <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 text-center"><div className="text-xs text-blue-500 font-bold uppercase mb-1">Win Rate</div><div className="text-xl font-bold text-blue-400">{globalStats.games > 0 ? Math.round((globalStats.wins / globalStats.games) * 100) : 0}%</div></div>
            </div>
         </div>
@@ -423,7 +422,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const showToast = (msg, type='success') => { setToast({show: true, msg, type}); setTimeout(() => setToast({show: false, msg: '', type: 'success'}), 3000); };
   const copyInviteCode = () => { navigator.clipboard.writeText(group.id).then(() => { setIsCopied(true); showToast("Copiado!"); setTimeout(() => setIsCopied(false), 2000); }).catch(() => showToast("Erro", "error")); };
   const toggleSchedule = async (status) => { const newResponses = { ...nextGame?.responses, [currentUser.uid]: status }; await setDoc(groupDoc('schedule', 'next'), { date: nextGame?.date || new Date().toISOString(), responses: newResponses }, { merge: true }); showToast(status === 'going' ? "Confirmado!" : "Removido"); };
-  
+   
   const addPlayer = async () => { if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error"); let finalName = newPlayerName; if (addPlayerType === 'guest') { const host = players.find(p => p.id === guestHostId); if (host) { const hostFirstName = host.name.split(' ')[0]; finalName = `${newPlayerName} (C - ${hostFirstName})`; } } await addDoc(groupRef('players'), { name: finalName, type: addPlayerType, hostId: addPlayerType === 'guest' ? guestHostId : null, stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); setNewPlayerName(''); showToast("Adicionado!"); };
   const joinAsPlayer = async () => { const already = players.find(p => p.uid === currentUser.uid); if(already) return showToast("Já estás no plantel!", "error"); let photo = currentUser.photoURL; try { const ud = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid)); if(ud.exists()) photo = ud.data().photoUrl || photo; } catch(e){} await addDoc(groupRef('players'), { name: currentUser.displayName || "Eu", uid: currentUser.uid, type: 'member', stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste!"); };
   const deletePlayer = async (id) => { if (!amIAdmin) return; if(window.confirm("Apagar?")) await deleteDoc(groupDoc('players', id)); };
@@ -436,7 +435,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const selfSignUp = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; if (monthlyFixedIds.includes(mp.id)) return; const newIds = [...monthlyFixedIds, mp.id]; await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Inscrito!"); };
   const selfSignOut = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; const newIds = monthlyFixedIds.filter(id => id !== mp.id); await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Cancelado."); };
   const settleMatchPayment = async (mid, pid) => { const newP = { ...matches.find(m=>m.id===mid).payments, [pid]: true }; await updateDoc(groupDoc('matches', mid), { payments: newP }); showToast("Pago!"); };
-  
+   
   const getPlayerDebts = (playerId) => { const debts = []; if (hasMonthlyFee && monthlyFixedIds.includes(playerId) && !monthlyPayments[playerId]) { debts.push({ id: 'monthly', desc: 'Mensalidade', amount: monthlyFee, action: () => toggleMonthlyPayment(playerId) }); } matches.forEach(m => { if (m.payments && m.payments[playerId] === false) { debts.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString('pt-PT', {day:'numeric', month:'numeric'})}`, amount: guestFee, action: () => settleMatchPayment(m.id, playerId) }); } }); return debts; };
   const saveGameSettings = async () => { const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; if(Object.keys(u).length) await setDoc(groupDoc('schedule', 'next'), u, { merge: true }); const gu = { settings: { hasMonthlyFee, guestFee: parseFloat(guestFee) } }; if(editLocationUrl) { const c = getCoordsFromUrl(editLocationUrl); gu.locationUrl = editLocationUrl; if(c) gu.location = c; } await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), gu); if(hasMonthlyFee) await saveMonthlyFee(monthlyFee); showToast("Guardado!"); };
   const submitPlayerVote = async (p, r) => { await updateDoc(groupDoc('players', p.id), { votes: { ...p.votes, [currentUser.uid]: r } }); setExpandedPlayerId(null); showToast("Votado!"); };
@@ -498,7 +497,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         <div className="flex gap-2">{isOwner && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded border border-yellow-500/30 flex items-center gap-1"><Crown size={10}/> Dono</span>}<button onClick={copyInviteCode} className="text-[10px] bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1">{isCopied ? <Check size={10}/> : <Copy size={10}/>} {isCopied ? "Copiado" : "Convidar"}</button></div>
       </div>
       {toast.show && <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-bold flex items-center gap-2 ${toast.type==='error'?'bg-red-500':'bg-emerald-500'} text-white`}>{toast.msg}</div>}
-      
+       
       <div className="flex-1 overflow-y-auto p-4 pb-28 no-scrollbar">
         {activeTab === 'schedule' && (
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center shadow-lg max-w-md mx-auto">
@@ -509,7 +508,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                 <div className="mt-4 pt-4 border-t border-slate-700 text-left"><div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Confirmados ({Object.values(nextGame?.responses||{}).filter(s=>s==='going').length})</div><div className="flex flex-wrap gap-2">{Object.entries(nextGame?.responses||{}).filter(([_,s])=>s==='going').map(([uid]) => { const p = players.find(pl=>pl.uid===uid); return p ? <div key={uid} className="flex items-center gap-2 bg-slate-700/50 px-3 py-1.5 pr-4 rounded-full border border-slate-600"><div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden border border-slate-500 shadow-sm">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-xs text-white font-medium">{p.name}</span></div> : null; })}</div></div>
             </div>
         )}
-        {activeTab === 'members' && (
+        {activeTab === 'members' && hasMonthlyFee && (
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center max-w-md mx-auto">
                 <h3 className="text-white font-bold mb-4 flex justify-center gap-2 text-sm"><ClipboardList size={18} className="text-emerald-400"/> Inscrições Mensais</h3>
                 <div className="flex justify-center gap-4 mb-6">{monthlyFixedIds.includes(myPlayerProfile?.id) ? <button onClick={selfSignOut} className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold w-full">Cancelar</button> : <button onClick={selfSignUp} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold w-full">Inscrever</button>}</div>
@@ -627,20 +626,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         )}
       </div>
 
-      <div className="flex items-center justify-center">
+      <div className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe z-30">
+        <div className="flex items-center justify-center">
             <div className="flex overflow-x-auto items-center p-2 gap-4 px-6 no-scrollbar w-full max-w-3xl md:justify-center">
                 <NavButton active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon={CalendarCheck} label="Agenda" />
-                
-                {/* AQUI ESTÁ A ALTERAÇÃO: Só mostra se hasMonthlyFee for true */}
-                {hasMonthlyFee && (
-                  <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />
-                )}
-
+                {hasMonthlyFee && <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />}
                 <NavButton active={activeTab==='team'} onClick={()=>setActiveTab('team')} icon={Shield} label="Equipa" />
                 <NavButton active={activeTab==='players'} onClick={()=>setActiveTab('players')} icon={Users} label="Plantel" />
                 <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
                 <NavButton active={activeTab==='trophies'} onClick={()=>setActiveTab('trophies')} icon={Trophy} label="Carreira" />
-                
                 {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
                 <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />
             </div>
@@ -672,24 +666,19 @@ const GroupSelector = ({ user, onLogout }) => {
     });
   }, [user]);
 
-// Substitui a tua função createGroup atual por esta:
 const createGroup = async (e) => {
   e.preventDefault();
   if(!newGroup.trim()) return;
   setCreateError("");
 
-  // 1. Criar um ID "limpo" baseado no nome (ex: "Futebol de 4ª" vira "futebol-de-4a")
-  // Isto remove acentos, espaços e caracteres especiais para não partir o URL
   const customId = newGroup.trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
-    .replace(/\s+/g, '-') // Troca espaços por hifens
-    .replace(/[^a-z0-9-]/g, ''); // Remove tudo o que não for letra ou número
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+    .replace(/\s+/g, '-') 
+    .replace(/[^a-z0-9-]/g, ''); 
 
-  // Proteção para não criar IDs vazios
   if (!customId) return setCreateError("Nome inválido para criar ID.");
 
   try {
-    // 2. Verificar se já existe um grupo com este ID (para não escrever por cima!)
     const docRef = doc(db, 'artifacts', APP_ID, 'groups', customId);
     const docSnap = await getDoc(docRef);
 
@@ -698,23 +687,21 @@ const createGroup = async (e) => {
       return;
     }
 
-    // 3. Usar setDoc em vez de addDoc
     await setDoc(docRef, {
       name: newGroup,
       ownerId: user.uid,
       members: [user.uid],
       createdAt: serverTimestamp()
     });
-    
-    // Atualizar o estado local
+     
     const newGroupData = { 
-      id: customId, // O ID agora é o nosso nome personalizado
+      id: customId, 
       name: newGroup, 
       ownerId: user.uid, 
       members: [user.uid],
       createdAt: { seconds: Date.now() / 1000 }
     };
-    
+     
     setGroups(prev => [newGroupData, ...prev]);
     setNewGroup('');
   } catch (err) {
@@ -734,7 +721,7 @@ const createGroup = async (e) => {
          setMsg("Grupo não encontrado. Verifica o código.");
          return;
       }
-      
+       
       const groupData = docSnap.data();
       if (groupData.members && groupData.members.includes(user.uid)) {
           setMsg("Já pertences a este grupo!");
@@ -744,7 +731,7 @@ const createGroup = async (e) => {
       await updateDoc(docRef, {
         members: arrayUnion(user.uid)
       });
-      
+       
       const newGroup = { id: docSnap.id, ...groupData, members: [...(groupData.members || []), user.uid] };
       setGroups(prev => {
           if (prev.find(g => g.id === newGroup.id)) return prev;
