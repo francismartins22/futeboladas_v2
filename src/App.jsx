@@ -501,20 +501,20 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                     <div className="flex-1">
                         <div className="font-bold text-sm text-white flex items-center gap-1">{p.name}{p.isAdmin && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1 rounded">Admin</span>}</div>
                         <div className="text-[10px] text-slate-500 flex gap-2 items-center">
-                             {/* FIX: Stats para todos */}
-                             {showStats && (
+                            {/* FIX: Mostrar estatísticas para todos */}
+                            {showStats && (
                                 <span className="text-slate-400 flex gap-2">
                                    <span>🎮 {p.stats?.games || 0}</span>
                                    <span>🏆 {p.stats?.wins || 0}</span>
                                    <span>⭐ {getMVPCount(p.id)}</span>
                                 </span>
                              )}
-                             {/* FIX: Rating condicional */}
-                             {showRating ? (
+                            {/* FIX: Rating condicional */}
+                            {showRating ? (
                                 <span className="text-yellow-500 flex items-center gap-1 font-bold ml-2 border-l border-slate-700 pl-2"><Star size={10} fill="currentColor"/> {getAverageRating(p)}</span>
-                             ) : (
+                            ) : (
                                 myVote ? <span className="text-emerald-500 font-medium ml-2 border-l border-slate-700 pl-2">Avaliado</span> : <span className="ml-2 border-l border-slate-700 pl-2">Toca p/ avaliar</span>
-                             )}
+                            )}
                         </div>
                     </div>
                     <div className={`text-slate-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`}><ArrowRight size={16}/></div>
@@ -630,11 +630,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                                       {[...(m.teamA || []), ...(m.teamB || [])].map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
                                   </select>
                                   <button onClick={() => submitMvpVote(m)} className="bg-yellow-600 text-white px-3 rounded text-xs font-bold">Votar</button>
-                               </div>
+                                </div>
                            ) : (!m.mvpVotes?.[currentUser.uid] && (
                                <button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1">
                                   <Star size={12} /> Votar Melhor em Campo
-                                </button>
+                               </button>
                            ))
                         ) : (
                            <div className="text-center text-[10px] text-slate-600 italic">Votação encerrada</div>
@@ -936,7 +936,7 @@ const MainApp = () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         await signInWithCustomToken(auth, __initial_auth_token);
       } else {
-        await signInAnonymously(auth);
+        // Não forçamos signInAnonymously para permitir o login manual
       }
     };
     initAuth();
