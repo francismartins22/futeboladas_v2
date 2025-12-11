@@ -338,7 +338,9 @@ const UserProfile = ({ user, onLogout }) => {
            <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700 text-center"><div className="text-xs text-slate-500 font-bold uppercase mb-1">Jogos</div><div className="text-xl font-bold text-white">{globalStats.games}</div></div>
               <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-500/30 text-center"><div className="text-xs text-emerald-500 font-bold uppercase mb-1">Vitórias</div><div className="text-xl font-bold text-emerald-400">{globalStats.wins}</div></div>
+              {/* --- FIX: MVP BOX CENTERED --- */}
               <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/20 text-center"><div className="text-xs text-yellow-500 font-bold uppercase mb-1">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
+              {/* --- END FIX --- */}
               <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 text-center"><div className="text-xs text-blue-500 font-bold uppercase mb-1">Win Rate</div><div className="text-xl font-bold text-blue-400">{globalStats.games > 0 ? Math.round((globalStats.wins / globalStats.games) * 100) : 0}%</div></div>
            </div>
         </div>
@@ -632,7 +634,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                            ) : (!m.mvpVotes?.[currentUser.uid] && (
                                <button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1">
                                   <Star size={12} /> Votar Melhor em Campo
-                               </button>
+                                </button>
                            ))
                         ) : (
                            <div className="text-center text-[10px] text-slate-600 italic">Votação encerrada</div>
