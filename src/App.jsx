@@ -5,7 +5,7 @@ import {
   PlusCircle, Loader2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
   Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser, Share2, TrendingUp, TrendingDown
+  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser, Share2, TrendingUp
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -19,8 +19,8 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
 
-// --- 1. CONTROLO DE VERSÃO & LIMPEZA DE CACHE (NUCLEAR OPTION) ---
-const APP_VERSION = "2.6"; // Correção de Referências e Cache
+// --- 1. CONTROLO DE VERSÃO & LIMPEZA DE CACHE ---
+const APP_VERSION = "2.6.1"; // Auto-update de datas corrigido
 
 try {
     const currentVersion = localStorage.getItem('app_version');
@@ -47,7 +47,7 @@ try {
     console.warn("Erro ao verificar versão:", e);
 }
 
-// --- 2. VACINA CONTRA ERROS DE LOAD (GLOBAL) ---
+// --- 2. VACINA CONTRA ERROS DE LOAD ---
 window.addEventListener('error', (event) => {
   const msg = event?.message?.toLowerCase() || '';
   if (msg.includes('loading chunk') || msg.includes('unexpected token') || msg.includes('importing a module script failed')) {
@@ -75,7 +75,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const APP_ID = "futeboladas-v2";
 
-// --- HELPERS E COMPONENTES VISUAIS (DEPENDÊNCIAS BASE) ---
+// --- HELPERS E COMPONENTES VISUAIS ---
 
 const SoccerBall = ({ className = "", size = 24 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -377,6 +377,71 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const myPlayerProfile = players.find(p => p.uid === currentUser.uid);
   const amIAdmin = isOwner || (myPlayerProfile && myPlayerProfile.isAdmin);
 
+  // --- AUTO-UPDATE EFFECT ---
+  useEffect(() => {
+    // Verifica se a data do próximo jogo já passou (com 24h de tolerância) e atualiza
+    if (nextGame && nextGame.date && nextGame.frequency && nextGame.frequency !== 'once') {
+        const gameDate = new Date(nextGame.date);
+        const now = new Date();
+        const tolerance = 24 * 60 * 60 * 1000; // 24 horas após o jogo
+        
+        if (now.getTime() > gameDate.getTime() + tolerance && amIAdmin) {
+            // Calcular nova data
+            const nextDate = new Date(gameDate);
+            if (nextGame.frequency === 'weekly') {
+                // Avança semanas até ser futuro
+                while (nextDate.getTime() + tolerance < now.getTime()) {
+                    nextDate.setDate(nextDate.getDate() + 7);
+                }
+            } else if (nextGame.frequency === 'biweekly') {
+                 while (nextDate.getTime() + tolerance < now.getTime()) {
+                    nextDate.setDate(nextDate.getDate() + 14);
+                }
+            }
+            
+            if (nextDate.getTime() !== gameDate.getTime()) {
+                console.log("Auto-updating schedule to:", nextDate);
+                setDoc(groupDoc('schedule', 'next'), { 
+                    date: nextDate.toISOString(), 
+                    frequency: nextGame.frequency,
+                    responses: {} 
+                }, { merge: true });
+            }
+        }
+    }
+  }, [nextGame, amIAdmin]);
+
+  // --- FUNÇÕES AUXILIARES ---
+  const getMatchMVP = (m) => { 
+      if(!m.mvpVotes) return null; 
+      const c = {}; 
+      Object.values(m.mvpVotes).forEach(id => c[id]=(c[id]||0)+1); 
+      let max=0, win=null; 
+      Object.entries(c).forEach(([id, n]) => { if(n>max){max=n;win=id} }); 
+      const p = players.find(pl=>pl.id===win); 
+      return p ? {...p, votes: max} : null; 
+  };
+
+  const calculatePlayerDebt = (playerId) => {
+    let total = 0;
+    if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) {
+        if (!monthlyPayments[playerId]) total += monthlyFee;
+    }
+    matches.forEach(m => {
+        if (m.payments && m.payments[playerId] === false) total += guestFee;
+    });
+    return total;
+  };
+
+  const getMVPCount = (pid) => matches.filter(m => getMatchMVP(m)?.id === pid).length;
+
+  const totalGuestRevenue = matches.reduce((sum, m) => {
+    const payingPlayersCount = m.payments ? Object.keys(m.payments).filter(pid => m.payments[pid] === true).length : 0;
+    return sum + (payingPlayersCount * guestFee);
+  }, 0);
+
+  const totalPendingDebt = players.reduce((sum, p) => sum + calculatePlayerDebt(p.id), 0);
+
   useEffect(() => {
     const unsubP = onSnapshot(groupRef('players'), s => setPlayers(s.docs.map(d => ({id: d.id, ...d.data()}))));
     const qMatches = query(groupRef('matches'), orderBy('createdAt', 'desc'));
@@ -420,7 +485,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     return () => unsubTreasury();
   }, [group.id, currentMonth]);
 
-  // Sync Profile
   useEffect(() => {
     if (players.length > 0) {
         const syncProfile = async () => {
@@ -457,31 +521,16 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const copyInviteCode = () => { navigator.clipboard.writeText(group.id).then(() => { setIsCopied(true); showToast("Copiado!"); setTimeout(() => setIsCopied(false), 2000); }).catch(() => showToast("Erro", "error")); };
   const toggleSchedule = async (status) => { const newResponses = { ...nextGame?.responses, [currentUser.uid]: status }; await setDoc(groupDoc('schedule', 'next'), { date: nextGame?.date || new Date().toISOString(), responses: newResponses }, { merge: true }); showToast(status === 'going' ? "Confirmado!" : "Removido"); };
   
-  // --- ADD PLAYER ---
   const addPlayer = async () => { 
       if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); 
       if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error");
-      
       let finalName = newPlayerName;
       if (addPlayerType === 'guest') {
           const host = players.find(p => p.id === guestHostId);
-          if (host) {
-             const hostFirstName = host.name.split(' ')[0];
-             finalName = `${newPlayerName} (C - ${hostFirstName})`;
-          }
+          if (host) { const hostFirstName = host.name.split(' ')[0]; finalName = `${newPlayerName} (C - ${hostFirstName})`; }
       }
-
-      await addDoc(groupRef('players'), { 
-          name: finalName, 
-          type: addPlayerType, 
-          hostId: addPlayerType === 'guest' ? guestHostId : null, 
-          stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, 
-          isAdmin: false, 
-          votes: {}, 
-          createdAt: serverTimestamp() 
-      }); 
-      setNewPlayerName(''); 
-      showToast("Adicionado!"); 
+      await addDoc(groupRef('players'), { name: finalName, type: addPlayerType, hostId: addPlayerType === 'guest' ? guestHostId : null, stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); 
+      setNewPlayerName(''); showToast("Adicionado!"); 
   };
 
   const joinAsPlayer = async () => { 
@@ -503,7 +552,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const selfSignOut = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; const newIds = monthlyFixedIds.filter(id => id !== mp.id); await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Cancelado."); };
   const settleMatchPayment = async (mid, pid) => { const newP = { ...matches.find(m=>m.id===mid).payments, [pid]: true }; await updateDoc(groupDoc('matches', mid), { payments: newP }); showToast("Pago!"); };
   
-  // --- FUNÇÃO PARA OBTER ITENS DE DÍVIDA ---
   const getPlayerDebts = (playerId) => {
     const debts = [];
     if (hasMonthlyFee && monthlyFixedIds.includes(playerId) && !monthlyPayments[playerId]) {
@@ -516,28 +564,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     });
     return debts;
   };
-  
-  // --- FUNÇÃO PARA CALCULAR DÍVIDA TOTAL (PARA CARREIRA) ---
-  const calculatePlayerDebt = (playerId) => {
-    let total = 0;
-    if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) {
-        if (!monthlyPayments[playerId]) total += monthlyFee;
-    }
-    matches.forEach(m => {
-        if (m.payments && m.payments[playerId] === false) total += guestFee;
-    });
-    return total;
-  };
-
-  const getMVPCount = (pid) => matches.filter(m => getMatchMVP(m)?.id === pid).length;
-  
-  // --- CÁLCULO DE RECEITA E DÍVIDA TOTAL ---
-  const totalGuestRevenue = matches.reduce((sum, m) => {
-    const payingPlayersCount = m.payments ? Object.keys(m.payments).filter(pid => m.payments[pid] === true).length : 0;
-    return sum + (payingPlayersCount * guestFee);
-  }, 0);
-
-  const totalPendingDebt = players.reduce((sum, p) => sum + calculatePlayerDebt(p.id), 0);
 
   const saveGameSettings = async () => { 
       const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; 
@@ -558,28 +584,22 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     const selectedPlayers = players.filter(p => selectedIds.includes(p.id));
     const blocks = {};
 
-    // 1. Agrupar convidados com anfitriões
     selectedPlayers.forEach(p => {
       let blockId = p.id;
-      // Se for convidado e o anfitrião também for jogar, junta-se ao bloco do anfitrião
       if (p.type === 'guest' && p.hostId && selectedIds.includes(p.hostId)) {
         blockId = p.hostId;
       }
-      
       if (!blocks[blockId]) blocks[blockId] = [];
       blocks[blockId].push(p);
     });
 
-    // 2. Calcular rating dos blocos
     const blockList = Object.values(blocks).map(members => {
       const rating = members.reduce((sum, p) => sum + getPlayerRatingValue(p), 0);
       return { members, rating };
     });
 
-    // 3. Ordenar por rating decrescente
     blockList.sort((a, b) => b.rating - a.rating);
 
-    // 4. Distribuir
     let teamA = [];
     let teamB = [];
     let ratingA = 0;
@@ -627,37 +647,85 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
 
   const saveMatch = async () => {
-      if(!scoreA || !scoreB) return;
+      if(!scoreA || !scoreB) return showToast("Insere o resultado", "error");
+
+      // --- AUTO-UPDATE SCHEDULE (REFORÇO) ---
+      // Esta lógica garante que a data é atualizada quando o jogo é GUARDADO,
+      // além do useEffect automático que corre ao carregar.
+      if (nextGame && nextGame.frequency && nextGame.frequency !== 'once' && nextGame.date) {
+          const nextDate = new Date(nextGame.date);
+          // Calcula a próxima data com base na frequência
+          if (nextGame.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+          if (nextGame.frequency === 'biweekly') nextDate.setDate(nextDate.getDate() + 14);
+          
+          await setDoc(groupDoc('schedule', 'next'), { 
+              date: nextDate.toISOString(), 
+              frequency: nextGame.frequency,
+              responses: {} 
+          }, { merge: true });
+      }
+      
       const pays = {}; [...teamA, ...teamB].forEach(p => { if(hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true) pays[p.id] = false; });
       await addDoc(groupRef('matches'), { date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB), teamA: teamA.map(p=>({id:p.id, name:p.name})), teamB: teamB.map(p=>({id:p.id, name:p.name})), mvpVotes: {}, payments: pays, createdAt: serverTimestamp() });
       const w = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw');
       const upS = (p, res) => { const s = p.stats || {games:0,wins:0,draws:0,losses:0}; s.games++; if(res==='win') s.wins++; else if(res==='draw') s.draws++; else s.losses++; updateDoc(groupDoc('players', p.id), { stats: s }); };
       teamA.forEach(p => upS(p, w==='A'?'win':(w==='draw'?'draw':'loss'))); teamB.forEach(p => upS(p, w==='B'?'win':(w==='draw'?'draw':'loss')));
       setIsGenerated(false); setSelectedIds([]); setScoreA(''); setScoreB(''); setActiveTab('history');
+      showToast("Jogo guardado e próxima data atualizada!");
   };
   const submitMvpVote = async (m) => { if(!mvpSelectedId) return; await updateDoc(groupDoc('matches', m.id), { mvpVotes: { ...m.mvpVotes, [currentUser.uid]: mvpSelectedId } }); setVotingMatchId(null); setMvpSelectedId(""); };
-  const getMatchMVP = (m) => { if(!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach(id => c[id]=(c[id]||0)+1); let max=0, win=null; Object.entries(c).forEach(([id, n]) => { if(n>max){max=n;win=id} }); const p = players.find(pl=>pl.id===win); return p ? {...p, votes: max} : null; };
   const toggleSelection = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i=>i!==id) : [...prev, id]);
 
-  // --- PREPARAÇÃO DADOS ABA CARREIRA (DÍVIDAS CONVIDADOS) ---
-  const myGuestsWithDebt = players
-    .filter(p => p.type === 'guest' && p.hostId === myPlayerProfile?.id)
-    .map(p => ({ ...p, currentDebt: calculatePlayerDebt(p.id) }))
-    .filter(p => p.currentDebt > 0);
-
+  // PREPARAÇÃO DADOS ABA CARREIRA
+  const myGuestsWithDebt = players.filter(p => p.type === 'guest' && p.hostId === myPlayerProfile?.id).map(p => ({ ...p, currentDebt: calculatePlayerDebt(p.id) })).filter(p => p.currentDebt > 0);
   const totalGuestDebt = myGuestsWithDebt.reduce((acc, p) => acc + p.currentDebt, 0);
+
+  // FILTROS DE LISTAS
+  const memberPlayers = players.filter(p => p.type !== 'guest');
+  const guestPlayers = players.filter(p => p.type === 'guest');
+  const getFilteredSelectionList = (list) => list.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const renderPlayerCard = (p) => {
+     const myVote = p.votes?.[currentUser.uid] || 0;
+     const isExpanded = expandedPlayerId === p.id;
+     return (
+        <div key={p.id} onClick={() => { if (isExpanded) setExpandedPlayerId(null); else { setExpandedPlayerId(p.id); setVotingStars(myVote || 3); } }}>
+            <div className={`bg-slate-800/50 p-3 rounded-lg border transition-all cursor-pointer ${isExpanded ? 'border-emerald-500/50 bg-slate-800 shadow-lg' : 'border-slate-700 hover:border-slate-600'}`}>
+                <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border relative overflow-hidden ${p.isAdmin ? 'bg-yellow-900/20 border-yellow-500 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}{p.isAdmin && <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-0.5"><Crown size={6} className="text-black"/></div>}</div>
+                    <div className="flex-1"><div className="font-bold text-sm text-white flex items-center gap-1">{p.name}{p.isAdmin && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1 rounded">Admin</span>}</div><div className="text-[10px] text-slate-500 flex gap-2 items-center">{amIAdmin ? (<span className="text-yellow-500 flex items-center gap-1 font-bold"><Star size={10} fill="currentColor"/> {getAverageRating(p)}</span>) : (myVote ? <span className="text-emerald-500 font-medium">Avaliado</span> : <span>Toca para avaliar</span>)}</div></div>
+                    <div className={`text-slate-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`}><ArrowRight size={16}/></div>
+                </div>
+                {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-slate-700/50 animate-in slide-in-from-top-2 fade-in duration-300">
+                        {p.uid !== currentUser.uid && (<div className="mb-4 text-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/50"><div className="text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Classificar</div><div className="flex justify-center mb-3"><StarRating value={votingStars} onChange={setVotingStars} size={28} /></div><button onClick={(e) => { e.stopPropagation(); submitPlayerVote(p, votingStars); }} className="w-full bg-slate-700 hover:bg-slate-600 text-xs py-2 rounded-lg text-white font-bold transition-colors">Confirmar</button></div>)}
+                        {amIAdmin && (<div className="flex gap-2 pt-2 border-t border-slate-700/50">{isOwner && p.uid !== group.ownerId && (<button onClick={(e) => { e.stopPropagation(); toggleAdmin(p); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold border border-yellow-500/30 text-yellow-400 bg-yellow-900/10 hover:bg-yellow-900/20 flex items-center justify-center gap-1">{p.isAdmin ? "Remover Admin" : "Promover Admin"}</button>)}<button onClick={(e) => { e.stopPropagation(); deletePlayer(p.id); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold border border-red-500/30 text-red-400 bg-red-900/10 hover:bg-red-900/20 flex items-center justify-center gap-1"><Trash2 size={14}/> Eliminar</button></div>)}
+                    </div>
+                )}
+            </div>
+        </div>
+     );
+  };
+
+  const renderSelectionGrid = (list) => {
+      if (list.length === 0) return null;
+      return (
+          <div className="grid grid-cols-2 gap-2">
+            {list.map(p => (
+                <div key={p.id} onClick={() => toggleSelection(p.id)} className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2 ${selectedIds.includes(p.id) ? 'bg-emerald-900/30 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${selectedIds.includes(p.id) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'}`}>{selectedIds.includes(p.id) && <Check size={10} className="text-white"/>}</div>
+                    <div className="truncate"><span className="text-xs font-medium block">{p.name}</span>{amIAdmin && <span className="text-[9px] text-slate-500 flex items-center gap-0.5"><Star size={8} className="fill-slate-500"/> {getAverageRating(p)}</span>}</div>
+                </div>
+            ))}
+          </div>
+      );
+  };
 
   return (
     <div className="h-screen flex flex-col bg-slate-900 animate-in fade-in duration-300 relative">
       <div className="bg-slate-800 p-4 border-b border-slate-700 flex items-center justify-between sticky top-0 z-20 shadow-md">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-2 hover:bg-slate-700 rounded-full text-slate-300"><ArrowLeft size={20} /></button>
-          <h2 className="font-bold text-white text-lg flex items-center gap-2"><Users size={18} className="text-emerald-400"/> {group.name}</h2>
-        </div>
-        <div className="flex gap-2">
-            {isOwner && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded border border-yellow-500/30 flex items-center gap-1"><Crown size={10}/> Dono</span>}
-            <button onClick={copyInviteCode} className="text-[10px] bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1">{isCopied ? <Check size={10}/> : <Copy size={10}/>} {isCopied ? "Copiado" : "Convidar"}</button>
-        </div>
+        <div className="flex items-center gap-3"><button onClick={onBack} className="p-2 hover:bg-slate-700 rounded-full text-slate-300"><ArrowLeft size={20} /></button><h2 className="font-bold text-white text-lg flex items-center gap-2"><Users size={18} className="text-emerald-400"/> {group.name}</h2></div>
+        <div className="flex gap-2">{isOwner && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded border border-yellow-500/30 flex items-center gap-1"><Crown size={10}/> Dono</span>}<button onClick={copyInviteCode} className="text-[10px] bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1">{isCopied ? <Check size={10}/> : <Copy size={10}/>} {isCopied ? "Copiado" : "Convidar"}</button></div>
       </div>
       {toast.show && <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-bold flex items-center gap-2 ${toast.type==='error'?'bg-red-500':'bg-emerald-500'} text-white`}>{toast.msg}</div>}
       
@@ -667,36 +735,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center shadow-lg max-w-md mx-auto">
                 <h3 className="text-slate-400 text-xs font-bold uppercase mb-2">Próxima Peladinha</h3>
                 <div className="text-2xl font-bold text-white mb-4">{nextGame?.date ? new Date(nextGame.date).toLocaleDateString('pt-PT', {weekday: 'long', day: 'numeric', month: 'long', hour:'2-digit', minute:'2-digit'}) : 'A definir'}</div>
-                {editLocationUrl && (
-                  <div className="flex justify-center mb-6">
-                     <div className="rounded-xl overflow-hidden border border-slate-700 relative h-32 w-full bg-slate-800 group cursor-pointer" onClick={() => window.open(editLocationUrl, '_blank')}>
-                        <div className="absolute inset-0 bg-slate-800 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]">
-                             <div className="bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform shadow-lg">
-                                <MapPin size={16} className="text-red-500 fill-red-500/20" /> Ver no Mapa
-                             </div>
-                        </div>
-                     </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                    <button onClick={()=>toggleSchedule('going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='going'?'bg-emerald-600 border-emerald-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👍 Vou</button>
-                    <button onClick={()=>toggleSchedule('not_going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='not_going'?'bg-red-600 border-red-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👎 Não Vou</button>
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-700 text-left">
-                    <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Confirmados ({Object.values(nextGame?.responses||{}).filter(s=>s==='going').length})</div>
-                    <div className="flex flex-wrap gap-2">{Object.entries(nextGame?.responses||{}).filter(([_,s])=>s==='going').map(([uid]) => { 
-                        const p = players.find(pl=>pl.uid===uid); 
-                        if(!p) return null;
-                        return (
-                            <div key={uid} className="flex items-center gap-2 bg-slate-700/50 px-3 py-1.5 pr-4 rounded-full border border-slate-600">
-                                <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden border border-slate-500 shadow-sm">
-                                    {p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
-                                </div>
-                                <span className="text-xs text-white font-medium">{p.name}</span>
-                            </div>
-                        );
-                    })}</div>
-                </div>
+                {editLocationUrl && <div className="flex justify-center mb-6"><div className="rounded-xl overflow-hidden border border-slate-700 relative h-32 w-full bg-slate-800 group cursor-pointer" onClick={() => window.open(editLocationUrl, '_blank')}><div className="absolute inset-0 bg-slate-800 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]"><div className="bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform shadow-lg"><MapPin size={16} className="text-red-500 fill-red-500/20" /> Ver no Mapa</div></div></div></div>}
+                <div className="grid grid-cols-2 gap-4"><button onClick={()=>toggleSchedule('going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='going'?'bg-emerald-600 border-emerald-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👍 Vou</button><button onClick={()=>toggleSchedule('not_going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='not_going'?'bg-red-600 border-red-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👎 Não Vou</button></div>
+                <div className="mt-4 pt-4 border-t border-slate-700 text-left"><div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Confirmados ({Object.values(nextGame?.responses||{}).filter(s=>s==='going').length})</div><div className="flex flex-wrap gap-2">{Object.entries(nextGame?.responses||{}).filter(([_,s])=>s==='going').map(([uid]) => { const p = players.find(pl=>pl.uid===uid); return p ? <div key={uid} className="flex items-center gap-2 bg-slate-700/50 px-3 py-1.5 pr-4 rounded-full border border-slate-600"><div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden border border-slate-500 shadow-sm">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-xs text-white font-medium">{p.name}</span></div> : null; })}</div></div>
             </div>
         )}
 
@@ -704,62 +745,16 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center max-w-md mx-auto">
                 <h3 className="text-white font-bold mb-4 flex justify-center gap-2 text-sm"><ClipboardList size={18} className="text-emerald-400"/> Inscrições Mensais</h3>
                 <div className="flex justify-center gap-4 mb-6">{monthlyFixedIds.includes(myPlayerProfile?.id) ? <button onClick={selfSignOut} className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold w-full">Cancelar</button> : <button onClick={selfSignUp} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold w-full">Inscrever</button>}</div>
-                <div className="text-left space-y-2">{monthlyFixedIds.map(pid => { 
-                    const p = players.find(pl=>pl.id===pid); 
-                    if(!p) return null;
-                    return (
-                        <div key={pid} className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
-                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden border border-slate-600">
-                                {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
-                            </div>
-                            <span className="text-sm text-white font-medium">{p.name}</span>
-                            {pid === myPlayerProfile?.id && <span className="ml-auto text-[10px] bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Eu</span>}
-                        </div>
-                    );
-                })}</div>
+                <div className="text-left space-y-2">{monthlyFixedIds.map(pid => { const p = players.find(pl=>pl.id===pid); return p ? <div key={pid} className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden border border-slate-600">{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-sm text-white font-medium">{p.name}</span>{pid === myPlayerProfile?.id && <span className="ml-auto text-[10px] bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Eu</span>}</div> : null; })}</div>
             </div>
         )}
 
         {activeTab === 'players' && (
-          <div className="space-y-4 max-w-md mx-auto">
-            {!players.find(p => p.uid === currentUser.uid) && (
-              <div onClick={joinAsPlayer} className="bg-emerald-900/30 border border-emerald-500/50 p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-emerald-900/50 transition-colors mb-4 animate-pulse">
-                <div className="flex items-center gap-3"><div className="bg-emerald-600 p-2 rounded-full text-white"><UserPlus size={16}/></div><div><div className="font-bold text-emerald-400 text-sm">Entrar no Plantel</div><div className="text-[10px] text-emerald-200">Adiciona-te como jogador</div></div></div><Plus size={16} className="text-emerald-400"/>
-              </div>
-            )}
-            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
-              <div className="flex justify-between items-center mb-3">
-                 <h3 className="font-bold text-white text-sm flex items-center gap-2"><UserPlus size={16} className="text-emerald-400"/> Novo Jogador</h3>
-                 <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-600"><button onClick={() => setAddPlayerType('guest')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'guest' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Convidado</button><button onClick={() => setAddPlayerType('member')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'member' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Membro</button></div>
-              </div>
-              <div className="space-y-3">
-                <input type="text" value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Nome..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none transition-colors" />
-                {addPlayerType === 'guest' && <select value={guestHostId} onChange={e => setGuestHostId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none"><option value="">Quem convidou?</option>{players.filter(p => p.type !== 'guest').map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>}
-                <button onClick={addPlayer} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Adicionar</button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {players.map(p => {
-                const myVote = p.votes?.[currentUser.uid] || 0;
-                return (
-                  <div key={p.id} onClick={() => { if (expandedPlayerId === p.id) setExpandedPlayerId(null); else { setExpandedPlayerId(p.id); setVotingStars(myVote || 3); } }}>
-                    <div className={`bg-slate-800/50 p-3 rounded-lg border transition-all cursor-pointer ${expandedPlayerId === p.id ? 'border-emerald-500/50 bg-slate-800 shadow-lg' : 'border-slate-700 hover:border-slate-600'}`}>
-                       <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border relative overflow-hidden ${p.isAdmin ? 'bg-yellow-900/20 border-yellow-500 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div>
-                          <div className="flex-1"><div className="font-bold text-sm text-white flex items-center gap-1">{p.name}{p.isAdmin && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1 rounded">Admin</span>}</div><div className="text-[10px] text-slate-500 flex gap-2 items-center">{amIAdmin ? (<span className="text-yellow-500 flex items-center gap-1 font-bold"><Star size={10} fill="currentColor"/> {getAverageRating(p)}</span>) : (myVote ? <span className="text-emerald-500 font-medium">Avaliado</span> : <span>Toca para avaliar</span>)}</div></div>
-                          <div className={`text-slate-600 transition-transform ${expandedPlayerId === p.id ? 'rotate-90' : ''}`}><ArrowRight size={16}/></div>
-                       </div>
-                       {expandedPlayerId === p.id && (
-                         <div className="mt-4 pt-4 border-t border-slate-700/50 animate-in slide-in-from-top-2 fade-in duration-300">
-                            {p.uid !== currentUser.uid && (<div className="mb-4 text-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/50"><div className="text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Classificar</div><div className="flex justify-center mb-3"><StarRating value={votingStars} onChange={setVotingStars} size={28} /></div><button onClick={(e) => { e.stopPropagation(); submitPlayerVote(p, votingStars); }} className="w-full bg-slate-700 hover:bg-slate-600 text-xs py-2 rounded-lg text-white font-bold transition-colors">Confirmar</button></div>)}
-                            {amIAdmin && (<div className="flex gap-2 pt-2 border-t border-slate-700/50">{isOwner && p.uid !== group.ownerId && (<button onClick={(e) => { e.stopPropagation(); toggleAdmin(p); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold border border-yellow-500/30 text-yellow-400 bg-yellow-900/10 hover:bg-yellow-900/20 flex items-center justify-center gap-1">{p.isAdmin ? "Remover Admin" : "Promover Admin"}</button>)}<button onClick={(e) => { e.stopPropagation(); deletePlayer(p.id); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold border border-red-500/30 text-red-400 bg-red-900/10 hover:bg-red-900/20 flex items-center justify-center gap-1"><Trash2 size={14}/> Eliminar</button></div>)}
-                         </div>
-                       )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="space-y-6 max-w-md mx-auto">
+            {!players.find(p => p.uid === currentUser.uid) && (<div onClick={joinAsPlayer} className="bg-emerald-900/30 border border-emerald-500/50 p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-emerald-900/50 transition-colors mb-4 animate-pulse"><div className="flex items-center gap-3"><div className="bg-emerald-600 p-2 rounded-full text-white"><UserPlus size={16}/></div><div><div className="font-bold text-emerald-400 text-sm">Entrar no Plantel</div><div className="text-[10px] text-emerald-200">Adiciona-te como jogador</div></div></div><Plus size={16} className="text-emerald-400"/></div>)}
+            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm"><div className="flex justify-between items-center mb-3"><h3 className="font-bold text-white text-sm flex items-center gap-2"><UserPlus size={16} className="text-emerald-400"/> Novo Jogador</h3><div className="flex bg-slate-900 p-1 rounded-lg border border-slate-600"><button onClick={() => setAddPlayerType('guest')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'guest' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Convidado</button><button onClick={() => setAddPlayerType('member')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'member' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Membro</button></div></div><div className="space-y-3"><input type="text" value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Nome..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none transition-colors" />{addPlayerType === 'guest' && <select value={guestHostId} onChange={e => setGuestHostId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none"><option value="">Quem convidou?</option>{players.filter(p => p.type !== 'guest').map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>}<button onClick={addPlayer} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Adicionar</button></div></div>
+            {memberPlayers.length > 0 && (<div><h3 className="text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Membros ({memberPlayers.length})</h3><div className="space-y-2">{memberPlayers.map(p => renderPlayerCard(p))}</div></div>)}
+            {guestPlayers.length > 0 && (<div><h3 className="text-xs font-bold text-slate-500 uppercase mb-2 ml-1 mt-4">Convidados ({guestPlayers.length})</h3><div className="space-y-2">{guestPlayers.map(p => renderPlayerCard(p))}</div></div>)}
           </div>
         )}
 
@@ -767,65 +762,26 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           <div className="space-y-6 max-w-md mx-auto">
             {!isGenerated ? (
               <>
-                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 sticky top-0 z-10 shadow-lg">
-                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-white text-sm">Selecionar ({selectedIds.length})</h3><button onClick={generateTeams} className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold hover:bg-emerald-500 flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-900/20"><Shuffle size={14}/> Criar Equipas</button></div>
-                  <input type="text" placeholder="Procurar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition-colors"/>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {players.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
-                    <div key={p.id} onClick={() => toggleSelection(p.id)} className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2 ${selectedIds.includes(p.id) ? 'bg-emerald-900/30 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${selectedIds.includes(p.id) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'}`}>{selectedIds.includes(p.id) && <Check size={10} className="text-white"/>}</div>
-                      <div className="truncate"><span className="text-xs font-medium block">{p.name}</span>{amIAdmin && <span className="text-[9px] text-slate-500 flex items-center gap-0.5"><Star size={8} className="fill-slate-500"/> {getAverageRating(p)}</span>}</div>
-                    </div>
-                  ))}
+                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 sticky top-0 z-10 shadow-lg"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-white text-sm">Selecionar ({selectedIds.length})</h3><button onClick={generateTeams} className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold hover:bg-emerald-500 flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-900/20"><Shuffle size={14}/> Criar Equipas</button></div><input type="text" placeholder="Procurar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition-colors"/></div>
+                <div className="space-y-4">
+                    {getFilteredSelectionList(memberPlayers).length > 0 && (<div><div className="text-xs font-bold text-slate-500 uppercase mb-2">Membros</div>{renderSelectionGrid(getFilteredSelectionList(memberPlayers))}</div>)}
+                    {getFilteredSelectionList(guestPlayers).length > 0 && (<div><div className="text-xs font-bold text-slate-500 uppercase mb-2">Convidados</div>{renderSelectionGrid(getFilteredSelectionList(guestPlayers))}</div>)}
                 </div>
               </>
             ) : (
               <div className="animate-in zoom-in duration-300 space-y-4">
-                <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-white text-lg flex items-center gap-2"><SoccerBall size={20} className="text-yellow-500"/> Jogo a Decorrer</h3>
-                    <button onClick={() => setIsGenerated(false)} className="text-xs text-red-400 hover:underline font-medium">Cancelar</button>
-                </div>
-                
-                <button onClick={shareTeams} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/30 py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-600/30 transition-colors mb-2">
-                    <Share2 size={16} /> Partilhar Equipas
-                </button>
-
+                <div className="flex justify-between items-center"><h3 className="font-bold text-white text-lg flex items-center gap-2"><SoccerBall size={20} className="text-yellow-500"/> Jogo a Decorrer</h3><button onClick={() => setIsGenerated(false)} className="text-xs text-red-400 hover:underline font-medium">Cancelar</button></div>
+                <button onClick={shareTeams} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/30 py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-600/30 transition-colors mb-2"><Share2 size={16} /> Partilhar Equipas</button>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-white shadow-lg">
-                      <div className="font-bold text-center text-white mb-3 text-sm border-b border-slate-700 pb-2">Equipa Branco ({teamA.length})</div>
-                      <ul className="text-xs text-slate-300 space-y-1.5">{teamA.map(p => (
-                          <li key={p.id} className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-500 overflow-hidden flex items-center justify-center text-[8px] font-bold text-white">
-                                  {p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
-                              </div>
-                              {p.name}
-                          </li>
-                      ))}</ul>
-                  </div>
-                  <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-slate-950 shadow-lg">
-                      <div className="font-bold text-center text-slate-400 mb-3 text-sm border-b border-slate-700 pb-2">Equipa Preto ({teamB.length})</div>
-                      <ul className="text-xs text-slate-300 space-y-1.5">{teamB.map(p => (
-                          <li key={p.id} className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-500 overflow-hidden flex items-center justify-center text-[8px] font-bold text-white">
-                                  {p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}
-                              </div>
-                              {p.name}
-                          </li>
-                      ))}</ul>
-                  </div>
+                  <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-white shadow-lg"><div className="font-bold text-center text-white mb-3 text-sm border-b border-slate-700 pb-2">Equipa Branco ({teamA.length})</div><ul className="text-xs text-slate-300 space-y-1.5">{teamA.map(p => (<li key={p.id} className="flex items-center gap-2"><div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-500 overflow-hidden flex items-center justify-center text-[8px] font-bold text-white">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div>{p.name}</li>))}</ul></div>
+                  <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-slate-950 shadow-lg"><div className="font-bold text-center text-slate-400 mb-3 text-sm border-b border-slate-700 pb-2">Equipa Preto ({teamB.length})</div><ul className="text-xs text-slate-300 space-y-1.5">{teamB.map(p => (<li key={p.id} className="flex items-center gap-2"><div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-500 overflow-hidden flex items-center justify-center text-[8px] font-bold text-white">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div>{p.name}</li>))}</ul></div>
                 </div>
-                <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 mt-4 shadow-lg">
-                  <div className="text-center text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">Resultado Final</div>
-                  <div className="flex justify-center items-center gap-4 mb-4"><input type="number" min="0" value={scoreA} onChange={e=>setScoreA(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/><span className="text-slate-500 font-light text-2xl">X</span><input type="number" min="0" value={scoreB} onChange={e=>setScoreB(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/></div>
-                  <button onClick={saveMatch} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-900/20">Terminar Jogo</button>
-                </div>
+                <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 mt-4 shadow-lg"><div className="text-center text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">Resultado Final</div><div className="flex justify-center items-center gap-4 mb-4"><input type="number" min="0" value={scoreA} onChange={e=>setScoreA(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/><span className="text-slate-500 font-light text-2xl">X</span><input type="number" min="0" value={scoreB} onChange={e=>setScoreB(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/></div><button onClick={saveMatch} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-900/20">Terminar Jogo</button></div>
               </div>
             )}
           </div>
         )}
 
-        {/* TAB HISTORY */}
         {activeTab === 'history' && (
           <div className="space-y-4 max-w-md mx-auto">
             {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
@@ -833,10 +789,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
               const mvp = getMatchMVP(m);
               return (
                 <div key={m.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm hover:border-slate-600 transition-colors">
-                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">
-                    {new Date(m.date).toLocaleDateString()}
-                    {amIAdmin && (<button onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1" title="Apagar Jogo"><Trash2 size={12} /></button>)}
-                  </div>
+                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">{new Date(m.date).toLocaleDateString()}{amIAdmin && (<button onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1" title="Apagar Jogo"><Trash2 size={12} /></button>)}</div>
                   <div className="flex items-center justify-between p-4"><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div><div className="text-[10px] text-slate-500 truncate mt-1">Branco</div></div><div className="text-slate-600 text-sm font-light">X</div><div className="text-center w-1/3"><div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div><div className="text-[10px] text-slate-500 truncate mt-1">Preto</div></div></div>
                   <div className="bg-slate-900/30 p-2 border-t border-slate-700/50">{mvp ? (<div className="flex items-center justify-center gap-2 text-yellow-500"><Trophy size={14} className="fill-yellow-500" /><span className="text-xs font-bold text-yellow-200">MVP: {mvp.name} ({mvp.votes})</span></div>) : (votingMatchId === m.id ? (<div className="flex gap-2 animate-in fade-in"><select value={mvpSelectedId} onChange={(e) => setMvpSelectedId(e.target.value)} className="flex-1 bg-slate-900 border border-slate-600 rounded text-xs p-1.5 text-white outline-none"><option value="">Quem foi o Craque?</option>{[...(m.teamA || []), ...(m.teamB || [])].map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select><button onClick={() => submitMvpVote(m)} className="bg-yellow-600 text-white px-3 rounded text-xs font-bold">Votar</button></div>) : (!m.mvpVotes?.[currentUser.uid] && (<button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1"><Star size={12} /> Votar Melhor em Campo</button>)))}</div>
                 </div>
@@ -845,7 +798,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           </div>
         )}
 
-        {/* TAB TROPHIES */}
         {activeTab === 'trophies' && (
           <div className="space-y-6 animate-in fade-in">
              <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center relative overflow-hidden">
@@ -854,24 +806,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                    <div className="w-20 h-20 mx-auto rounded-full bg-slate-700 border-2 border-slate-500 flex items-center justify-center mb-3 overflow-hidden shadow-xl">{myPlayerProfile?.photoUrl ? <img src={myPlayerProfile.photoUrl} className="w-full h-full object-cover"/> : <User size={40} className="text-slate-400"/>}</div>
                    <h2 className="text-xl font-bold text-white">{myPlayerProfile?.name || "Eu"}</h2>
                    <p className="text-xs text-slate-400 uppercase tracking-widest mb-6">Estatísticas de Carreira</p>
-                   
-                   {/* SECTOR DE DÍVIDAS DE CONVIDADOS (NOVO) */}
-                   {totalGuestDebt > 0 && (
-                        <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl mb-6 animate-pulse">
-                            <h3 className="text-red-400 font-bold text-sm mb-2 flex items-center justify-center gap-2">
-                                <AlertCircle size={16}/> Dívidas de Convidados ({totalGuestDebt.toFixed(2)}€)
-                            </h3>
-                            <div className="space-y-1">
-                                {myGuestsWithDebt.map(g => (
-                                    <div key={g.id} className="flex justify-between text-xs text-red-200 border-b border-red-500/20 pb-1 last:border-0">
-                                        <span>{g.name}</span>
-                                        <span className="font-bold">{g.currentDebt.toFixed(2)}€</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                   )}
-
+                   {totalGuestDebt > 0 && (<div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl mb-6 animate-pulse"><h3 className="text-red-400 font-bold text-sm mb-2 flex items-center justify-center gap-2"><AlertCircle size={16}/> Dívidas de Convidados ({totalGuestDebt.toFixed(2)}€)</h3><div className="space-y-1">{myGuestsWithDebt.map(g => (<div key={g.id} className="flex justify-between text-xs text-red-200 border-b border-red-500/20 pb-1 last:border-0"><span>{g.name}</span><span className="font-bold">{g.currentDebt.toFixed(2)}€</span></div>))}</div></div>)}
                    <div className={`grid ${amIAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mb-6`}>
                       <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700"><div className="text-[10px] text-slate-500 font-bold uppercase">Jogos</div><div className="text-lg font-bold text-white">{myPlayerProfile?.stats?.games || 0}</div></div>
                       <div className="bg-emerald-900/20 p-2 rounded-lg border border-emerald-500/20"><div className="text-[10px] text-emerald-500 font-bold uppercase">Vitórias</div><div className="text-lg font-bold text-emerald-400">{myPlayerProfile?.stats?.wins || 0}</div></div>
@@ -895,96 +830,27 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           <div className="space-y-6">
              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
                 <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2><input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/></div>
-                 
-                 {/* NOVO: TOTAL REVENUE & DEBT CARDS */}
                  <div className="grid grid-cols-2 gap-4 mb-4">
-                     <div className="bg-gradient-to-r from-emerald-900/40 to-slate-900 p-4 rounded-xl border border-emerald-500/20 flex flex-col justify-between">
-                        <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Receita (Convidados)</div>
-                        <div className="text-xl font-bold text-white">{totalGuestRevenue.toFixed(2)}€</div>
-                     </div>
-                     <div className="bg-gradient-to-r from-red-900/40 to-slate-900 p-4 rounded-xl border border-red-500/20 flex flex-col justify-between">
-                        <div className="text-[10px] text-red-400 font-bold uppercase tracking-wider mb-1">Dívida Total</div>
-                        <div className="text-xl font-bold text-white">{totalPendingDebt.toFixed(2)}€</div>
-                     </div>
+                     <div className="bg-gradient-to-r from-emerald-900/40 to-slate-900 p-4 rounded-xl border border-emerald-500/20 flex flex-col justify-between"><div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Receita de Jogos (Convidados)</div><div className="text-xl font-bold text-white">{totalGuestRevenue.toFixed(2)}€</div></div>
+                     <div className="bg-gradient-to-r from-red-900/40 to-slate-900 p-4 rounded-xl border border-red-500/20 flex flex-col justify-between"><div className="text-[10px] text-red-400 font-bold uppercase tracking-wider mb-1">Dívida Total</div><div className="text-xl font-bold text-white">{totalPendingDebt.toFixed(2)}€</div></div>
                  </div>
-
-                 {/* DÍVIDAS PENDENTES (UNIFICADO) */}
                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg mb-6">
                     <h3 className="font-bold text-white mb-4 flex items-center gap-2"><AlertCircle size={18} className="text-red-400"/> Dívidas Pendentes</h3>
-                    
                     <div className="space-y-4">
-                        {players
-                            .map(p => ({ ...p, debts: getPlayerDebts(p.id) }))
-                            .filter(p => p.debts.length > 0)
-                            .sort((a, b) => b.debts.reduce((s,d)=>s+d.amount,0) - a.debts.reduce((s,d)=>s+d.amount,0))
-                            .map(p => (
+                        {players.map(p => ({ ...p, debts: getPlayerDebts(p.id) })).filter(p => p.debts.length > 0).sort((a, b) => b.debts.reduce((s,d)=>s+d.amount,0) - a.debts.reduce((s,d)=>s+d.amount,0)).map(p => (
                                 <div key={p.id} className="bg-slate-900/50 rounded-lg border border-red-500/20 overflow-hidden">
-                                    {/* CABEÇALHO JOGADOR */}
-                                    <div className="p-3 flex justify-between items-center bg-slate-900/80 border-b border-white/5">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">
-                                                {p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-bold text-white">{p.name}</div>
-                                                {p.type === 'guest' && <div className="text-[9px] text-slate-500">Convidado</div>}
-                                            </div>
-                                        </div>
-                                        <div className="text-red-400 font-bold text-sm">
-                                            {p.debts.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}€
-                                        </div>
-                                    </div>
-                                    
-                                    {/* LISTA DE ITENS A PAGAR */}
-                                    <div className="p-2 space-y-1">
-                                        {p.debts.map((debt) => (
-                                            <div key={`${p.id}-${debt.id}`} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors group">
-                                                <span className="text-xs text-slate-300 group-hover:text-white transition-colors">{debt.desc}</span>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-xs text-slate-400">{debt.amount}€</span>
-                                                    <button 
-                                                        onClick={debt.action}
-                                                        className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white p-1.5 rounded transition-all shadow-sm"
-                                                        title="Marcar como Pago"
-                                                    >
-                                                        <CheckCircle size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <div className="p-3 flex justify-between items-center bg-slate-900/80 border-b border-white/5"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}</div><div><div className="text-sm font-bold text-white">{p.name}</div>{p.type === 'guest' && <div className="text-[9px] text-slate-500">Convidado</div>}</div></div><div className="text-red-400 font-bold text-sm">{p.debts.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}€</div></div>
+                                    <div className="p-2 space-y-1">{p.debts.map((debt) => (<div key={`${p.id}-${debt.id}`} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors group"><span className="text-xs text-slate-300 group-hover:text-white transition-colors">{debt.desc}</span><div className="flex items-center gap-3"><span className="text-xs text-slate-400">{debt.amount}€</span><button onClick={debt.action} className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white p-1.5 rounded transition-all shadow-sm" title="Marcar como Pago"><CheckCircle size={14} /></button></div></div>))}</div>
                                 </div>
                             ))
                         }
-                        {players.every(p => getPlayerDebts(p.id).length === 0) && (
-                            <div className="text-center text-slate-500 py-6 italic flex flex-col items-center gap-2">
-                                <CheckCircle size={32} className="text-slate-600"/>
-                                <span>Tudo regularizado! 🎉</span>
-                            </div>
-                        )}
+                        {players.every(p => getPlayerDebts(p.id).length === 0) && (<div className="text-center text-slate-500 py-6 italic flex flex-col items-center gap-2"><CheckCircle size={32} className="text-slate-600"/><span>Tudo regularizado! 🎉</span></div>)}
                     </div>
                  </div>
-
-                 {/* CHECKLIST MENSALIDADES (SECUNDÁRIO) */}
                  {hasMonthlyFee && (
                     <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 opacity-80 hover:opacity-100 transition-opacity">
-                       <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center justify-between cursor-pointer select-none" onClick={(e) => e.currentTarget.nextSibling.classList.toggle('hidden')}>
-                           <span>Gestão Mensalidades (Checklist)</span>
-                           <span className="text-[10px]">▼</span>
-                       </h3>
-                       <div className="space-y-2 hidden animate-in slide-in-from-top-2">
-                           {monthlyFixedIds.map(pid => {
-                              const p = players.find(pl => pl.id === pid);
-                              if(!p) return null;
-                              const isPaid = monthlyPayments[pid];
-                              return (
-                                 <div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700">
-                                    <span className="text-sm text-white">{p.name}</span>
-                                    <button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>{isPaid ? 'PAGO' : 'FALTA'}</button>
-                                 </div>
-                              );
-                           })}
-                       </div>
+                       <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center justify-between cursor-pointer select-none" onClick={(e) => e.currentTarget.nextSibling.classList.toggle('hidden')}><span>Gestão Mensalidades (Checklist)</span><span className="text-[10px]">▼</span></h3>
+                       <div className="space-y-2 hidden animate-in slide-in-from-top-2">{monthlyFixedIds.map(pid => { const p = players.find(pl => pl.id === pid); if(!p) return null; const isPaid = monthlyPayments[pid]; return (<div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700"><span className="text-sm text-white">{p.name}</span><button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>{isPaid ? 'PAGO' : 'FALTA'}</button></div>); })}</div>
                     </div>
                  )}
              </div>
@@ -993,49 +859,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-md mx-auto">
-             {amIAdmin && (
-             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3>
-                <div className="space-y-4">
-                   <div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600"><div><div className="text-xs font-bold text-white">Mensalidades (Fixos)</div><div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div></div><button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{hasMonthlyFee ? "Ativo" : "Inativo"}</button></div>
-                   {hasMonthlyFee && (<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label><div className="flex gap-2"><input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div>)}
-                   <div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label><input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div>
-                </div>
-             </div>
-             )}
-             {amIAdmin && (
-             <>
-             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Clock size={18} className="text-blue-400"/> Próximo Jogo</h3>
-                <div className="space-y-3">
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Data</label><input type="date" value={editDate} onChange={e=>setEditDate(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div>
-                      <div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Hora</label><input type="time" value={editTime} onChange={e=>setEditTime(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div>
-                   </div>
-                   <div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Periodicidade</label><select value={editFreq} onChange={e=>setEditFreq(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select></div>
-                </div>
-             </div>
-             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><MapIcon size={18} className="text-emerald-400"/> Localização do Campo</h3>
-                <div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">A meteorologia será atualizada automaticamente com base neste link.</p></div>
-             </div>
-             <button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button>
-             </>
-             )}
-             <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8">
-                <div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div>
-                {isOwner ? (
-                    <>
-                      <p className="text-sm text-red-300">Como dono, podes apagar este grupo permanentemente. Esta ação é irreversível.</p>
-                      <button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button>
-                    </>
-                ) : (
-                    <>
-                      <p className="text-sm text-red-300">Se saíres do grupo, deixarás de receber notificações e convocatórias. O teu histórico de jogos neste grupo será mantido.</p>
-                      <button onClick={leaveThisGroup} className="w-full bg-red-600/80 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><LogOut size={18} /> Sair do Grupo</button>
-                    </>
-                )}
-             </div>
+             {amIAdmin && (<div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3><div className="space-y-4"><div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600"><div><div className="text-xs font-bold text-white">Mensalidades (Fixos)</div><div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div></div><button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{hasMonthlyFee ? "Ativo" : "Inativo"}</button></div>{hasMonthlyFee && (<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label><div className="flex gap-2"><input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div>)}<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label><input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div></div>)}
+             {amIAdmin && (<><div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Clock size={18} className="text-blue-400"/> Próximo Jogo</h3><div className="space-y-3"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Data</label><input type="date" value={editDate} onChange={e=>setEditDate(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Hora</label><input type="time" value={editTime} onChange={e=>setEditTime(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Periodicidade</label><select value={editFreq} onChange={e=>setEditFreq(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select></div></div></div><div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><MapIcon size={18} className="text-emerald-400"/> Localização do Campo</h3><div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">A meteorologia será atualizada automaticamente com base neste link.</p></div></div><button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button></>)}
+             <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8"><div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div>{isOwner ? (<><p className="text-sm text-red-300">Como dono, podes apagar este grupo permanentemente. Esta ação é irreversível.</p><button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button></>) : (<><p className="text-sm text-red-300">Se saíres do grupo, deixarás de receber notificações e convocatórias. O teu histórico de jogos neste grupo será mantido.</p><button onClick={leaveThisGroup} className="w-full bg-red-600/80 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><LogOut size={18} /> Sair do Grupo</button></>)}</div>
           </div>
         )}
       </div>
