@@ -666,36 +666,56 @@ const GroupSelector = ({ user, onLogout }) => {
     });
   }, [user]);
 
-  const createGroup = async (e) => {
-    e.preventDefault();
-    if(!newGroup.trim()) return;
-    setCreateError("");
-    try {
-      const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'groups'), {
-        name: newGroup,
-        ownerId: user.uid,
-        members: [user.uid],
-        createdAt: serverTimestamp()
-      });
-      
-      const newGroupData = { 
-        id: docRef.id, 
-        name: newGroup, 
-        ownerId: user.uid, 
-        members: [user.uid],
-        createdAt: { seconds: Date.now() / 1000 }
-      };
-      
-      setGroups(prev => {
-          if (prev.find(g => g.id === docRef.id)) return prev;
-          return [newGroupData, ...prev];
-      });
-      setNewGroup('');
-    } catch (err) {
-      console.error(err);
-      setCreateError("Erro de permissão. Verifica as Regras na Firebase.");
+// Substitui a tua função createGroup atual por esta:
+const createGroup = async (e) => {
+  e.preventDefault();
+  if(!newGroup.trim()) return;
+  setCreateError("");
+
+  // 1. Criar um ID "limpo" baseado no nome (ex: "Futebol de 4ª" vira "futebol-de-4a")
+  // Isto remove acentos, espaços e caracteres especiais para não partir o URL
+  const customId = newGroup.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .replace(/\s+/g, '-') // Troca espaços por hifens
+    .replace(/[^a-z0-9-]/g, ''); // Remove tudo o que não for letra ou número
+
+  // Proteção para não criar IDs vazios
+  if (!customId) return setCreateError("Nome inválido para criar ID.");
+
+  try {
+    // 2. Verificar se já existe um grupo com este ID (para não escrever por cima!)
+    const docRef = doc(db, 'artifacts', APP_ID, 'groups', customId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      setCreateError("Já existe um grupo com esse nome/ID. Tenta outro.");
+      return;
     }
-  };
+
+    // 3. Usar setDoc em vez de addDoc
+    await setDoc(docRef, {
+      name: newGroup,
+      ownerId: user.uid,
+      members: [user.uid],
+      createdAt: serverTimestamp()
+    });
+    
+    // Atualizar o estado local
+    const newGroupData = { 
+      id: customId, // O ID agora é o nosso nome personalizado
+      name: newGroup, 
+      ownerId: user.uid, 
+      members: [user.uid],
+      createdAt: { seconds: Date.now() / 1000 }
+    };
+    
+    setGroups(prev => [newGroupData, ...prev]);
+    setNewGroup('');
+  } catch (err) {
+    console.error(err);
+    setCreateError("Erro ao criar grupo.");
+  }
+};
 
   const joinGroup = async (e) => {
     e.preventDefault();
