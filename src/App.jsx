@@ -5,7 +5,9 @@ import {
   PlusCircle, Loader2, Globe, User, Camera, Save,
   ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
   Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser, Share2, TrendingUp
+  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser, Share2, TrendingUp,
+  // --- ÍCONES METEOROLOGIA ---
+  Cloud, CloudRain, CloudSun, CloudLightning, Snowflake, CloudFog, Thermometer, Droplets, Wind, Sun
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -22,7 +24,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.7.3"; // Versão incrementada
+const APP_VERSION = "2.7.4"; // Versão com Meteorologia
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -114,6 +116,112 @@ const NavButton = ({ active, onClick, icon: Icon, label }) => (
     <span className="text-[10px] font-medium mt-1">{label}</span>
   </button>
 );
+
+// --- NOVO WIDGET DE METEOROLOGIA ---
+const WeatherWidget = ({ date, locationUrl }) => {
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const getWeatherInfo = (code) => {
+    if (code === 0) return { icon: Sun, label: "Céu Limpo", color: "text-yellow-400" };
+    if ([1, 2, 3].includes(code)) return { icon: CloudSun, label: "Parcialmente Nublado", color: "text-blue-300" };
+    if ([45, 48].includes(code)) return { icon: CloudFog, label: "Nevoeiro", color: "text-slate-400" };
+    if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { icon: CloudRain, label: "Chuva", color: "text-blue-400" };
+    if ([71, 73, 75, 77, 85, 86].includes(code)) return { icon: Snowflake, label: "Neve", color: "text-white" };
+    if ([95, 96, 99].includes(code)) return { icon: CloudLightning, label: "Trovoada", color: "text-purple-400" };
+    return { icon: Cloud, label: "Nublado", color: "text-slate-300" };
+  };
+
+  useEffect(() => {
+    if (!date || !locationUrl) return;
+
+    const coords = getCoordsFromUrl(locationUrl);
+    if (!coords) {
+      setError("Localização inválida no mapa");
+      return;
+    }
+
+    const fetchWeather = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const gameDate = new Date(date);
+        const today = new Date();
+        const diffDays = Math.ceil((gameDate - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 14) {
+          setError("Previsão disponível 14 dias antes");
+          setLoading(false);
+          return;
+        }
+        if (diffDays < 0) {
+            setError("Dados históricos não disponíveis");
+            setLoading(false);
+            return;
+        }
+
+        const dateStr = date.split('T')[0];
+        const hour = new Date(date).getHours();
+        
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&hourly=temperature_2m,precipitation_probability,weathercode,windspeed_10m&start_date=${dateStr}&end_date=${dateStr}`;
+        
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.hourly) {
+          const index = hour; 
+          setWeather({
+            temp: Math.round(data.hourly.temperature_2m[index]),
+            precip: data.hourly.precipitation_probability[index],
+            code: data.hourly.weathercode[index],
+            wind: Math.round(data.hourly.windspeed_10m[index])
+          });
+        }
+      } catch (err) {
+        console.error("Erro tempo", err);
+        setError("Erro ao carregar meteorologia");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWeather();
+  }, [date, locationUrl]);
+
+  if (!locationUrl) return null;
+
+  if (loading) return <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={14}/> A ver o tempo...</div>;
+  
+  if (error) return <div className="p-3 text-center text-[10px] text-slate-500 italic bg-slate-900/30 rounded-lg mx-4 mb-4 border border-slate-700/50">{error}</div>;
+
+  if (!weather) return null;
+
+  const info = getWeatherInfo(weather.code);
+  const Icon = info.icon;
+
+  return (
+    <div className="mx-4 mb-4 bg-gradient-to-r from-slate-900 to-slate-800 p-3 rounded-xl border border-slate-700 flex items-center justify-between shadow-inner">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-full bg-slate-800 border border-slate-600 ${info.color}`}>
+           <Icon size={24} />
+        </div>
+        <div>
+           <div className={`text-sm font-bold ${info.color}`}>{info.label}</div>
+           <div className="text-[10px] text-slate-400 flex items-center gap-2">
+              <span className="flex items-center gap-1"><Wind size={10}/> {weather.wind} km/h</span>
+              {weather.precip > 0 && <span className="flex items-center gap-1 text-blue-400"><Droplets size={10}/> {weather.precip}%</span>}
+           </div>
+        </div>
+      </div>
+      <div className="text-right">
+         <div className="text-2xl font-bold text-white flex items-start justify-end leading-none">
+            {weather.temp}<span className="text-xs text-slate-500 mt-1">°C</span>
+         </div>
+      </div>
+    </div>
+  );
+};
 
 // --- COMPONENTES SECUNDÁRIOS ---
 
@@ -503,6 +611,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center shadow-lg max-w-md mx-auto">
                 <h3 className="text-slate-400 text-xs font-bold uppercase mb-2">Próxima Peladinha</h3>
                 <div className="text-2xl font-bold text-white mb-4">{nextGame?.date ? new Date(nextGame.date).toLocaleDateString('pt-PT', {weekday: 'long', day: 'numeric', month: 'long', hour:'2-digit', minute:'2-digit'}) : 'A definir'}</div>
+                {nextGame?.date && (
+                    <WeatherWidget date={nextGame.date} locationUrl={editLocationUrl} />
+                )}
                 {editLocationUrl && <div className="flex justify-center mb-6"><div className="rounded-xl overflow-hidden border border-slate-700 relative h-32 w-full bg-slate-800 group cursor-pointer" onClick={() => window.open(editLocationUrl, '_blank')}><div className="absolute inset-0 bg-slate-800 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]"><div className="bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform shadow-lg"><MapPin size={16} className="text-red-500 fill-red-500/20" /> Ver no Mapa</div></div></div></div>}
                 <div className="grid grid-cols-2 gap-4"><button onClick={()=>toggleSchedule('going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='going'?'bg-emerald-600 border-emerald-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👍 Vou</button><button onClick={()=>toggleSchedule('not_going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='not_going'?'bg-red-600 border-red-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👎 Não Vou</button></div>
                 <div className="mt-4 pt-4 border-t border-slate-700 text-left"><div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Confirmados ({Object.values(nextGame?.responses||{}).filter(s=>s==='going').length})</div><div className="flex flex-wrap gap-2">{Object.entries(nextGame?.responses||{}).filter(([_,s])=>s==='going').map(([uid]) => { const p = players.find(pl=>pl.uid===uid); return p ? <div key={uid} className="flex items-center gap-2 bg-slate-700/50 px-3 py-1.5 pr-4 rounded-full border border-slate-600"><div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden border border-slate-500 shadow-sm">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-xs text-white font-medium">{p.name}</span></div> : null; })}</div></div>
@@ -550,26 +661,21 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
           <div className="space-y-4 max-w-md mx-auto">
             {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
             {matches.map(m => {
-              // --- LÓGICA DE TEMPO MVP (48H) ---
-              // Tenta usar a data de criação (fim do jogo), se não existir, usa a data agendada
               const gameDate = m.createdAt?.seconds ? new Date(m.createdAt.seconds * 1000) : new Date(m.date);
               const now = new Date();
-              const diffHours = (now - gameDate) / (1000 * 60 * 60); // Diferença em horas
-              const isVotingOpen = diffHours < 48; // Aberto se for menos de 48h
-              const hoursLeft = Math.max(0, Math.round(48 - diffHours)); // Horas restantes para mostrar
+              const diffHours = (now - gameDate) / (1000 * 60 * 60); 
+              const isVotingOpen = diffHours < 48;
+              const hoursLeft = Math.max(0, Math.round(48 - diffHours)); 
 
-              const mvp = getMatchMVP(m); // Quem vai ganhando (ou ganhou)
-              const myVote = m.mvpVotes?.[currentUser.uid]; // O meu voto
+              const mvp = getMatchMVP(m);
+              const myVote = m.mvpVotes?.[currentUser.uid];
 
               return (
                 <div key={m.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm hover:border-slate-600 transition-colors">
-                  {/* DATA E DELETE */}
                   <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">
                       {gameDate.toLocaleDateString()}
                       {amIAdmin && (<button onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1" title="Apagar Jogo"><Trash2 size={12} /></button>)}
                   </div>
-
-                  {/* RESULTADO */}
                   <div className="flex items-center justify-between p-4">
                       <div className="text-center w-1/3">
                           <div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div>
@@ -581,11 +687,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                           <div className="text-[10px] text-slate-500 truncate mt-1">Preto</div>
                       </div>
                   </div>
-
-                  {/* ZONA DE VOTAÇÃO MVP */}
                   <div className="bg-slate-900/30 p-2 border-t border-slate-700/50 min-h-[50px] flex items-center justify-center">
                     {!isVotingOpen ? (
-                        /* --- CENÁRIO 1: Votação Fechada (>48h) --- */
                         mvp ? (
                             <div className="flex items-center justify-center gap-2 text-yellow-500 animate-in zoom-in">
                                 <Trophy size={14} className="fill-yellow-500" />
@@ -595,7 +698,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
                             <span className="text-[10px] text-slate-500 italic">Votação encerrada (Sem votos)</span>
                         )
                     ) : (
-                        /* --- CENÁRIO 2: Votação Aberta (<48h) --- */
                        <div className="w-full">
                            {myVote ? (
                                <div className="text-center animate-in fade-in">
