@@ -24,7 +24,7 @@ import {
 // =================================================================================
 // === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
 // =================================================================================
-const APP_VERSION = "2.7.6"; // Versão com Auto-Join no Plantel
+const APP_VERSION = "2.7.7"; // Versão com decimais na Tesouraria
 
 if (typeof window !== 'undefined') {
   // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
@@ -546,7 +546,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const leaveThisGroup = async () => { if (isOwner) return showToast("Dono não sai.", "error"); if(window.confirm("Sair do grupo?")) { await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), { members: arrayRemove(currentUser.uid) }); onBack(); } };
   const deleteThisGroup = async () => { if(window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id)); onBack(); } };
   const toggleAdmin = async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc('players', p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); };
-  const saveMonthlyFee = async (val) => { await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseInt(val) }, { merge: true }); setMonthlyFee(val); showToast("Guardado"); };
+  const saveMonthlyFee = async (val) => { await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseFloat(val) }, { merge: true }); setMonthlyFee(val); showToast("Guardado"); };
   const toggleMonthlyPayment = async (pid) => { const newP = { ...(monthlyPayments || {}), [pid]: !(monthlyPayments || {})[pid] }; await setDoc(groupDoc('treasury', `month_${currentMonth}`), { payments: newP }, { merge: true }); };
   const selfSignUp = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; if (monthlyFixedIds.includes(mp.id)) return; const newIds = [...monthlyFixedIds, mp.id]; await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Inscrito!"); };
   const selfSignOut = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; const newIds = monthlyFixedIds.filter(id => id !== mp.id); await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Cancelado."); };
@@ -793,7 +793,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         )}
         {activeTab === 'settings' && (
           <div className="space-y-6 max-w-md mx-auto">
-             {amIAdmin && (<div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3><div className="space-y-4"><div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600"><div><div className="text-xs font-bold text-white">Mensalidades (Fixos)</div><div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div></div><button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{hasMonthlyFee ? "Ativo" : "Inativo"}</button></div>{hasMonthlyFee && (<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label><div className="flex gap-2"><input type="number" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div>)}<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label><input type="number" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div></div>)}
+             {amIAdmin && (<div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3><div className="space-y-4"><div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600"><div><div className="text-xs font-bold text-white">Mensalidades (Fixos)</div><div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div></div><button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{hasMonthlyFee ? "Ativo" : "Inativo"}</button></div>{hasMonthlyFee && (<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label><div className="flex gap-2"><input type="number" step="0.10" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div>)}<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label><input type="number" step="0.10" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div></div>)}
              {amIAdmin && (<><div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Clock size={18} className="text-blue-400"/> Próximo Jogo</h3><div className="space-y-3"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Data</label><input type="date" value={editDate} onChange={e=>setEditDate(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Hora</label><input type="time" value={editTime} onChange={e=>setEditTime(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Periodicidade</label><select value={editFreq} onChange={e=>setEditFreq(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select></div></div></div><div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><MapIcon size={18} className="text-emerald-400"/> Localização do Campo</h3><div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">A meteorologia será atualizada automaticamente com base neste link.</p></div></div><button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button></>)}
              <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8"><div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div>{isOwner ? (<><p className="text-sm text-red-300">Como dono, podes apagar este grupo permanentemente. Esta ação é irreversível.</p><button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button></>) : (<><p className="text-sm text-red-300">Se saíres do grupo, deixarás de receber notificações e convocatórias. O teu histórico de jogos neste grupo será mantido.</p><button onClick={leaveThisGroup} className="w-full bg-red-600/80 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><LogOut size={18} /> Sair do Grupo</button></>)}</div>
           </div>
@@ -861,7 +861,6 @@ const createGroup = async (e) => {
       return;
     }
 
-    // Criar o grupo
     await setDoc(docRef, {
       name: newGroup,
       ownerId: user.uid,
@@ -869,7 +868,6 @@ const createGroup = async (e) => {
       createdAt: serverTimestamp()
     });
 
-    // --- NOVO: Adicionar o dono logo ao plantel ---
     const playersRef = collection(db, 'artifacts', APP_ID, 'groups', customId, 'players');
     await addDoc(playersRef, {
         name: user.displayName || "Eu",
@@ -917,22 +915,18 @@ const createGroup = async (e) => {
           return;
       }
 
-      // 1. Adicionar aos membros
       await updateDoc(docRef, {
         members: arrayUnion(user.uid)
       });
 
-      // 2. Verificar se já existe como jogador (para não duplicar se estiver a reentrar)
       const playersRef = collection(db, 'artifacts', APP_ID, 'groups', groupId, 'players');
       const q = query(playersRef, where('uid', '==', user.uid));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-          // 3. Se não existir, criar o perfil de jogador automaticamente
           let playerName = user.displayName || "Novo Jogador";
           let playerPhoto = user.photoURL;
 
-          // Tentar buscar dados mais recentes do perfil global
           try {
               const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
               if(userDoc.exists()) {
