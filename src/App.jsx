@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Users, CalendarCheck, Shield, History as HistoryIcon, UserPlus, Plus, Trash2, 
-  Shuffle, Check, ArrowLeft, ArrowRight, LogOut, LayoutGrid, 
-  PlusCircle, Loader2, Globe, User, Camera, Save,
-  ShieldCheck, Crown, ShieldAlert, Settings, Copy, Star, Trophy, AlertCircle,
-  Link as LinkIcon, Clock, Map as MapIcon, MapPin, ExternalLink,
-  Wallet, ClipboardList, CheckCircle, Banknote, X, Award, Flame, Medal, Activity, RefreshCw, Eraser, Share2, TrendingUp,
-  // --- ÍCONES METEOROLOGIA ---
-  Cloud, CloudRain, CloudSun, CloudLightning, Snowflake, CloudFog, Thermometer, Droplets, Wind, Sun
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import {
+  Users, CalendarCheck, Shield, History as HistoryIcon, UserPlus, Plus, Trash2,
+  Shuffle, Check, ArrowLeft, ArrowRight, LogOut, LayoutGrid, Loader2, Globe,
+  User, Camera, Save, Crown, ShieldAlert, Settings, Copy, Star, Trophy,
+  AlertCircle, Clock, Map as MapIcon, MapPin, Wallet, ClipboardList,
+  CheckCircle, Award, Flame, Medal, Share2, ShieldCheck, Wind, Droplets,
+  CloudSun, Sun, CloudRain, Cloud, MessageSquare, Send, Minus, RotateCcw, Pencil,
+} from "lucide-react";
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
@@ -21,1046 +19,1070 @@ import {
   onSnapshot, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove 
 } from 'firebase/firestore';
 
-// =================================================================================
-// === 1. ZONA DE EMERGÊNCIA (EXECUTA ANTES DE TUDO) ===
-// =================================================================================
-const APP_VERSION = "2.7.7"; // Versão com decimais na Tesouraria
 
-if (typeof window !== 'undefined') {
-  // A. VACINA CONTRA ERROS DE LOAD (404 / CHUNK ERROR)
-  window.addEventListener('error', (event) => {
-    const msg = event?.message?.toLowerCase() || '';
-    if (msg.includes('loading chunk') || msg.includes('unexpected token') || msg.includes('importing a module') || msg.includes('failed to load resource')) {
-      console.warn('🚨 Erro crítico de ficheiros (404). A tentar recuperar...');
-      const lastRescue = sessionStorage.getItem('app_last_rescue');
-      if (!lastRescue || Date.now() - parseInt(lastRescue) > 10000) {
-          sessionStorage.setItem('app_last_rescue', Date.now().toString());
-          if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.getRegistrations().then(regs => {
-                  regs.forEach(reg => reg.unregister());
-              });
-          }
-          window.location.reload(); 
-      }
-    }
-  }, true);
 
-  // B. LIMPEZA PROATIVA DE VERSÃO
-  try {
-      const storedVersion = localStorage.getItem('app_version');
-      if (storedVersion !== APP_VERSION) {
-          console.log(`♻️ Nova versão ${APP_VERSION} detetada (Era: ${storedVersion}). A limpar lixo...`);
-          if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.getRegistrations().then(registrations => {
-                  for(let registration of registrations) { registration.unregister(); }
-              }).catch(err => console.warn("SW cleanup ignore:", err));
-          }
-          if ('caches' in window) {
-              caches.keys().then(names => { names.forEach(name => caches.delete(name)); });
-          }
-          localStorage.setItem('app_version', APP_VERSION);
-      }
-  } catch (e) {
-      console.warn("Erro não crítico na verificação de versão:", e);
-  }
+/* ----------------------------- Design tokens ---------------------------- */
+const STYLES = `
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap');
+
+.ft {
+  --bg:#0a0f0e; --panel:#0d1411; --card:#111b16; --raised:#16221c;
+  --line:#22312b; --line-soft:rgba(255,255,255,.06);
+  --text:#e9f0eb; --dim:#90a69b; --faint:#637a71;
+  --grass:#16a34a; --grass-2:#22c55e; --grass-bright:#4ade80;
+  --lime:#c6f24a; --gold:#f5c542; --chalk:#f5f8f6; --ink:#080b0a;
+  --danger:#f0563a; --blue:#6aa9e0;
+  font-family:'Inter',system-ui,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(34,197,94,.10), transparent 60%),
+    radial-gradient(900px 500px at 90% 110%, rgba(34,197,94,.05), transparent 55%),
+    var(--bg);
+  min-height:100%;
+  -webkit-font-smoothing:antialiased;
 }
+.ft *{box-sizing:border-box;}
+.ft ::-webkit-scrollbar{display:none;}
+.ft .num{font-family:'Anton',Impact,sans-serif;letter-spacing:.5px;font-weight:400;}
+.ft .eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);font-weight:700;}
 
-// --- CONFIGURAÇÃO FIREBASE ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
-  authDomain: "futeboladas-v2-dev.firebaseapp.com",
-  projectId: "futeboladas-v2-dev",
-  storageBucket: "futeboladas-v2-dev.firebasestorage.app",
-  messagingSenderId: "899361657772",
-  appId: "1:899361657772:web:cdd265c50fc9574119e009"
+.ft-card{background:var(--card);border:1px solid var(--line);border-radius:20px;}
+.ft-raised{background:var(--raised);border:1px solid var(--line);}
+
+.ft-btn{border:none;cursor:pointer;font-family:inherit;border-radius:14px;font-weight:700;
+  transition:transform .12s ease,background .15s ease,opacity .15s; display:inline-flex;
+  align-items:center;justify-content:center;gap:8px;}
+.ft-btn:active{transform:scale(.96);}
+.ft-btn:disabled{opacity:.45;cursor:not-allowed;}
+.ft-grass{background:linear-gradient(135deg,var(--grass-2),var(--grass));color:#04130a;
+  box-shadow:0 8px 24px -10px rgba(34,197,94,.6);}
+.ft-grass:hover{background:linear-gradient(135deg,var(--grass-bright),var(--grass-2));}
+.ft-ghost{background:var(--raised);color:var(--text);border:1px solid var(--line);}
+.ft-ghost:hover{border-color:#33473f;}
+.ft-danger{background:rgba(240,86,58,.12);color:#ff9684;border:1px solid rgba(240,86,58,.3);}
+.ft-danger:hover{background:rgba(240,86,58,.2);}
+
+.ft-input{width:100%;background:#0a120f;border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;
+  transition:border-color .15s;}
+.ft-input::placeholder{color:#46584f;}
+.ft-input:focus{border-color:var(--grass);}
+
+.pitch{position:relative;overflow:hidden;border-radius:22px;border:1px solid var(--line);
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(34,197,94,.22), transparent 60%),
+    linear-gradient(180deg,#0f2017,#0a1611);}
+.pitch .lines{position:absolute;inset:0;opacity:.5;pointer-events:none;}
+.pitch .stripe{position:absolute;inset:0;background:repeating-linear-gradient(
+  90deg, rgba(255,255,255,.018) 0 38px, transparent 38px 76px);pointer-events:none;}
+
+.bib{width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:800;}
+.bib-white{background:var(--chalk);color:#0b0b0b;}
+.bib-black{background:#0c0f0e;color:#cfe8da;border:1px solid #2a3a33;}
+
+.tab-ico{transition:transform .15s ease;}
+.navbtn[data-active="true"] .tab-ico{transform:translateY(-2px) scale(1.08);}
+
+@keyframes ftin{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.ft-in{animation:ftin .35s cubic-bezier(.2,.7,.3,1) both;}
+@keyframes ftpop{from{opacity:0;transform:scale(.9);}to{opacity:1;transform:scale(1);}}
+.ft-pop{animation:ftpop .25s ease both;}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.ft-in,.ft-pop{animation:none;}}
+`;
+
+/* ------------------------------ Mock data -------------------------------- */
+const ME = { uid: "me", displayName: "Francisco", photoURL: null };
+
+const seedPlayers = [
+  { id: "p1", uid: "me", name: "Francisco", type: "member", isAdmin: true, stats: { games: 38, wins: 21, draws: 7, losses: 10 }, votes: { u2: 4, u3: 5, u4: 4 } },
+  { id: "p2", uid: "u2", name: "Tiago", type: "member", isAdmin: true, stats: { games: 41, wins: 19, draws: 9, losses: 13 }, votes: { me: 4, u3: 4 } },
+  { id: "p3", uid: "u3", name: "Ruben", type: "member", isAdmin: false, stats: { games: 52, wins: 30, draws: 8, losses: 14 }, votes: { me: 5, u2: 4, u4: 5 } },
+  { id: "p4", uid: "u4", name: "Nuno", type: "member", isAdmin: false, stats: { games: 12, wins: 5, draws: 2, losses: 5 }, votes: { me: 3, u2: 3 } },
+  { id: "p5", uid: "u5", name: "Diogo", type: "member", isAdmin: false, stats: { games: 9, wins: 3, draws: 1, losses: 5 }, votes: { me: 2, u2: 3 } },
+  { id: "p6", uid: "u6", name: "Andre", type: "member", isAdmin: false, stats: { games: 24, wins: 14, draws: 4, losses: 6 }, votes: { me: 4, u3: 3 } },
+  { id: "p7", uid: "u7", name: "Bruno", type: "member", isAdmin: false, stats: { games: 31, wins: 20, draws: 5, losses: 6 }, votes: { me: 4, u2: 4, u3: 4 } },
+  { id: "g1", uid: null, name: "Joao (C - Ruben)", type: "guest", hostId: "p3", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, votes: { me: 3 } },
+  { id: "g2", uid: null, name: "Pedro (C - Tiago)", type: "guest", hostId: "p2", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, votes: {} },
+];
+
+const inDays = (d) => { const x = new Date(); x.setDate(x.getDate() + d); x.setHours(21, 0, 0, 0); return x.toISOString(); };
+const agoDays = (d) => { const x = new Date(); x.setDate(x.getDate() - d); return x.toISOString(); };
+
+const seedMatches = [
+  {
+    id: "m1", date: agoDays(0.3), scoreA: 6, scoreB: 4,
+    teamA: [{ id: "p1", name: "Francisco" }, { id: "p3", name: "Ruben" }, { id: "p6", name: "Andre" }],
+    teamB: [{ id: "p2", name: "Tiago" }, { id: "p7", name: "Bruno" }, { id: "p4", name: "Nuno" }],
+    mvpVotes: { me: "p3", u2: "p3", u6: "p1" },
+    goals: { p1: { g: 2, a: 1 }, p3: { g: 3, a: 1 }, p6: { g: 1, a: 0 }, p2: { g: 2, a: 1 }, p7: { g: 2, a: 0 }, p4: { g: 0, a: 1 } },
+    payments: { g1: false }, createdAtMs: Date.now() - 0.3 * 864e5,
+  },
+  {
+    id: "m2", date: agoDays(7), scoreA: 3, scoreB: 3,
+    teamA: [{ id: "p1", name: "Francisco" }, { id: "p7", name: "Bruno" }],
+    teamB: [{ id: "p3", name: "Ruben" }, { id: "p6", name: "Andre" }],
+    mvpVotes: { me: "p7", u3: "p7", u6: "p7" },
+    goals: { p1: { g: 1, a: 1 }, p7: { g: 2, a: 0 }, p3: { g: 2, a: 1 }, p6: { g: 1, a: 0 } },
+    payments: {}, createdAtMs: Date.now() - 7 * 864e5,
+  },
+];
+
+const seedMessages = [
+  { id: "c1", uid: "u3", name: "Ruben", text: "Malta, quem confirma para quinta?", ts: Date.now() - 3600e3 * 5 },
+  { id: "c2", uid: "u2", name: "Tiago", text: "Eu vou! Levo o Pedro de convidado.", ts: Date.now() - 3600e3 * 4.5 },
+  { id: "c3", uid: "me", name: "Francisco", text: "Confirmado. Faltam balizas?", ts: Date.now() - 3600e3 * 4 },
+  { id: "c4", uid: "u6", name: "Andre", text: "Tenho eu. Levo coletes tambem.", ts: Date.now() - 3600e3 * 2 },
+];
+
+const seedGroup = { id: "peladas-de-quinta", name: "Peladas de Quinta", ownerId: "me" };
+
+/* ------------------------------ Helpers ---------------------------------- */
+const firstName = (n) => (n || "").replace(/\s*\(.*$/, "").split(" ")[0];
+const avatarHue = (name) => { let h = 0; for (const c of name || "") h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const initials = (n) => (n || "?").replace(/\(.*$/, "").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+const timeStr = (ts) => new Date(ts).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+
+const Avatar = ({ name, photo, size = 36, ring }) => {
+  const hue = avatarHue(name);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontWeight: 800, fontSize: size * 0.36, color: "#04130a",
+      background: photo ? "none" : `linear-gradient(135deg,hsl(${hue} 55% 55%),hsl(${(hue + 40) % 360} 55% 42%))`,
+      border: ring ? "2px solid var(--gold)" : "1px solid rgba(255,255,255,.12)",
+    }}>
+      {photo ? <img src={photo} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials(name)}
+    </div>
+  );
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const APP_ID = "futeboladas-v2";
-
-// --- HELPERS E COMPONENTES VISUAIS ---
-
-const SoccerBall = ({ className = "", size = 24 }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <circle cx="12" cy="12" r="10"/><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z"/><path d="m12 17v5"/><path d="m7.8 14.5-4 2.8"/><path d="m16.2 14.5 4 2.8"/><path d="m9.4 9.4-4.2-2.6"/><path d="m14.6 9.4 4.2-2.6"/>
+const SoccerBall = ({ size = 24, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M12 17l-4.2-2.5 1.6-5.1h5.2l1.6 5.1z" />
+    <path d="M12 17v5" /><path d="M7.8 14.5l-4 2.8" /><path d="M16.2 14.5l4 2.8" />
+    <path d="M9.4 9.4l-4.2-2.6" /><path d="M14.6 9.4l4.2-2.6" />
   </svg>
 );
 
-// --- FUNÇÃO DE MAPAS MELHORADA ---
-const getCoordsFromUrl = (url) => {
-  if (!url) return null;
-  try {
-    const regexAt = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const matchAt = url.match(regexAt);
-    if (matchAt) return { lat: parseFloat(matchAt[1]), lng: parseFloat(matchAt[2]) };
+const TacticIcon = ({ size = 22, strokeWidth = 2 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="12" x2="21" y2="12" /><circle cx="12" cy="12" r="3" />
+  </svg>
+);
 
-    const regexQuery = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const matchQuery = url.match(regexQuery);
-    if (matchQuery) return { lat: parseFloat(matchQuery[1]), lng: parseFloat(matchQuery[2]) };
+const PitchLines = () => (
+  <svg className="lines" viewBox="0 0 320 180" preserveAspectRatio="none">
+    <g fill="none" stroke="rgba(245,248,246,.28)" strokeWidth="1.2">
+      <line x1="160" y1="0" x2="160" y2="180" />
+      <circle cx="160" cy="90" r="34" />
+      <circle cx="160" cy="90" r="2.5" fill="rgba(245,248,246,.5)" stroke="none" />
+      <rect x="0" y="55" width="42" height="70" />
+      <rect x="278" y="55" width="42" height="70" />
+    </g>
+  </svg>
+);
 
-    const regexData = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
-    const matchData = url.match(regexData);
-    if (matchData) return { lat: parseFloat(matchData[1]), lng: parseFloat(matchData[2]) };
-
-    return null;
-  } catch (e) { return null; }
-};
-
-const StarRating = ({ value, onChange, readOnly = false, size = 14 }) => (
-  <div className="flex gap-1">
-    {[1, 2, 3, 4, 5].map((star) => (
-      <button key={star} onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(star); }} disabled={readOnly} className={`${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}>
-        <Star size={size} className={`${star <= value ? 'fill-yellow-500 text-yellow-500' : 'text-slate-600'}`} />
+const StarRating = ({ value, onChange, readOnly, size = 16 }) => (
+  <div style={{ display: "inline-flex", gap: 4 }}>
+    {[1, 2, 3, 4, 5].map((s) => (
+      <button key={s} onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(s); }}
+        disabled={readOnly} className="ft-btn" style={{ background: "none", padding: 0, borderRadius: 4 }}>
+        <Star size={size} style={{ fill: s <= value ? "var(--gold)" : "none", color: s <= value ? "var(--gold)" : "#3a4a43" }} />
       </button>
     ))}
   </div>
 );
 
-const NavButton = ({ active, onClick, icon: Icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[64px] flex-shrink-0 ${active ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}>
-    <Icon size={24} strokeWidth={active ? 2.5 : 2} /> 
-    <span className="text-[10px] font-medium mt-1">{label}</span>
-  </button>
+const Stepper = ({ val, onDec, onInc, color }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <button onClick={onDec} className="ft-btn ft-ghost" style={{ width: 26, height: 26, borderRadius: 8, padding: 0 }}><Minus size={12} /></button>
+    <span className="num" style={{ minWidth: 18, textAlign: "center", fontSize: 16, color: color || "var(--text)" }}>{val}</span>
+    <button onClick={onInc} className="ft-btn ft-ghost" style={{ width: 26, height: 26, borderRadius: 8, padding: 0 }}><Plus size={12} /></button>
+  </div>
 );
 
-// --- WIDGET DE METEOROLOGIA ---
-const WeatherWidget = ({ date, locationUrl }) => {
-  const [weather, setWeather] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const getWeatherInfo = (code) => {
-    if (code === 0) return { icon: Sun, label: "Céu Limpo", color: "text-yellow-400" };
-    if ([1, 2, 3].includes(code)) return { icon: CloudSun, label: "Parcialmente Nublado", color: "text-blue-300" };
-    if ([45, 48].includes(code)) return { icon: CloudFog, label: "Nevoeiro", color: "text-slate-400" };
-    if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { icon: CloudRain, label: "Chuva", color: "text-blue-400" };
-    if ([71, 73, 75, 77, 85, 86].includes(code)) return { icon: Snowflake, label: "Neve", color: "text-white" };
-    if ([95, 96, 99].includes(code)) return { icon: CloudLightning, label: "Trovoada", color: "text-purple-400" };
-    return { icon: Cloud, label: "Nublado", color: "text-slate-300" };
-  };
-
+/* --------------------------- Weather (mock) ------------------------------ */
+const useMockWeather = (date) => {
+  const [w, setW] = useState(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
-    if (!date || !locationUrl) return;
-
-    const coords = getCoordsFromUrl(locationUrl);
-    if (!coords) {
-      setError("Localização inválida no mapa");
-      return;
-    }
-
-    const fetchWeather = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const gameDate = new Date(date);
-        const today = new Date();
-        const diffDays = Math.ceil((gameDate - today) / (1000 * 60 * 60 * 24));
-
-        if (diffDays > 14) {
-          setError("Previsão disponível 14 dias antes");
-          setLoading(false);
-          return;
-        }
-        if (diffDays < 0) {
-            setError("Dados históricos não disponíveis");
-            setLoading(false);
-            return;
-        }
-
-        const dateStr = date.split('T')[0];
-        const hour = new Date(date).getHours();
-        
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&hourly=temperature_2m,precipitation_probability,weathercode,windspeed_10m&start_date=${dateStr}&end_date=${dateStr}`;
-        
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.hourly) {
-          const index = hour; 
-          setWeather({
-            temp: Math.round(data.hourly.temperature_2m[index]),
-            precip: data.hourly.precipitation_probability[index],
-            code: data.hourly.weathercode[index],
-            wind: Math.round(data.hourly.windspeed_10m[index])
-          });
-        }
-      } catch (err) {
-        console.error("Erro tempo", err);
-        setError("Erro ao carregar meteorologia");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWeather();
-  }, [date, locationUrl]);
-
-  if (!locationUrl) return null;
-
-  if (loading) return <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={14}/> A ver o tempo...</div>;
-  
-  if (error) return <div className="p-3 text-center text-[10px] text-slate-500 italic bg-slate-900/30 rounded-lg mx-4 mb-4 border border-slate-700/50">{error}</div>;
-
-  if (!weather) return null;
-
-  const info = getWeatherInfo(weather.code);
-  const Icon = info.icon;
-
+    setLoading(true);
+    const t = setTimeout(() => { setW({ temp: 17, precip: 20, code: 2, wind: 12 }); setLoading(false); }, 650);
+    return () => clearTimeout(t);
+  }, [date]);
+  return { w, loading };
+};
+const weatherInfo = (code) => {
+  if (code === 0) return { Icon: Sun, label: "Ceu limpo", color: "var(--gold)" };
+  if ([1, 2, 3].includes(code)) return { Icon: CloudSun, label: "Pouco nublado", color: "var(--blue)" };
+  if ([51, 61, 63, 80, 81].includes(code)) return { Icon: CloudRain, label: "Chuva", color: "var(--blue)" };
+  return { Icon: Cloud, label: "Nublado", color: "var(--dim)" };
+};
+const WeatherStrip = ({ date }) => {
+  const { w, loading } = useMockWeather(date);
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, fontSize: 12, color: "var(--dim)" }}>
+      <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> A consultar o tempo...
+    </div>
+  );
+  if (!w) return null;
+  const { Icon, label, color } = weatherInfo(w.code);
   return (
-    <div className="mx-4 mb-4 bg-gradient-to-r from-slate-900 to-slate-800 p-3 rounded-xl border border-slate-700 flex items-center justify-between shadow-inner">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-full bg-slate-800 border border-slate-600 ${info.color}`}>
-           <Icon size={24} />
-        </div>
+    <div className="ft-raised" style={{ borderRadius: 14, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Icon size={24} style={{ color }} />
         <div>
-           <div className={`text-sm font-bold ${info.color}`}>{info.label}</div>
-           <div className="text-[10px] text-slate-400 flex items-center gap-2">
-              <span className="flex items-center gap-1"><Wind size={10}/> {weather.wind} km/h</span>
-              {weather.precip > 0 && <span className="flex items-center gap-1 text-blue-400"><Droplets size={10}/> {weather.precip}%</span>}
-           </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color }}>{label}</div>
+          <div style={{ fontSize: 11, color: "var(--dim)", display: "flex", gap: 10, marginTop: 2 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Wind size={11} /> {w.wind} km/h</span>
+            {w.precip > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--blue)" }}><Droplets size={11} /> {w.precip}%</span>}
+          </div>
         </div>
       </div>
-      <div className="text-right">
-         <div className="text-2xl font-bold text-white flex items-start justify-end leading-none">
-            {weather.temp}<span className="text-xs text-slate-500 mt-1">°C</span>
-         </div>
+      <div className="num" style={{ fontSize: 30, lineHeight: 1, display: "flex", alignItems: "flex-start" }}>
+        {w.temp}<span style={{ fontSize: 13, color: "var(--faint)", marginTop: 4 }}>C</span>
       </div>
     </div>
   );
 };
 
-// --- COMPONENTES SECUNDÁRIOS ---
+/* ------------------------------ Toast ------------------------------------ */
+const Toast = ({ toast }) => !toast.show ? null : (
+  <div className="ft-pop" style={{
+    position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 80,
+    padding: "12px 18px", borderRadius: 14, fontSize: 13, fontWeight: 700,
+    display: "flex", alignItems: "center", gap: 8, boxShadow: "0 12px 30px -8px rgba(0,0,0,.6)",
+    background: toast.type === "error" ? "var(--danger)" : "linear-gradient(135deg,var(--grass-bright),var(--grass-2))",
+    color: toast.type === "error" ? "#fff" : "#04130a",
+  }}>
+    {toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}{toast.msg}
+  </div>
+);
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, errorInfo: null };
-  }
-  static getDerivedStateFromError(error) { return { hasError: true }; }
-  componentDidCatch(error, errorInfo) {
-    console.error("Crash React:", error, errorInfo);
-    const msg = error?.message?.toLowerCase() || "";
-    if (msg.includes('loading chunk') || msg.includes('importing a module')) { window.location.reload(); }
-    this.setState({ errorInfo: error?.message || "Erro desconhecido" });
-  }
-  handleHardReset = () => {
-    if ('caches' in window) { caches.keys().then((names) => { names.forEach((name) => { caches.delete(name); }); }); }
-    window.location.href = window.location.href;
-    window.location.reload(true);
-  };
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center animate-in fade-in">
-          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl max-w-sm w-full">
-            <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30"><Activity size={32} className="text-red-400" /></div>
-            <h1 className="text-xl font-bold mb-2">Jogo interrompido! 🤕</h1>
-            <p className="text-slate-400 text-xs mb-6">Nova atualização detetada ou erro de rede.</p>
-            <button onClick={this.handleHardReset} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center justify-center gap-2"><RefreshCw size={18}/> Recarregar App</button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children; 
-  }
-}
+/* ------------------------------ Nav -------------------------------------- */
+const NavButton = ({ active, onClick, icon: Icon, label }) => (
+  <button onClick={onClick} data-active={active} className="navbtn ft-btn" style={{
+    background: "none", flexDirection: "column", minWidth: 58, padding: "6px 4px", borderRadius: 14,
+    color: active ? "var(--grass-bright)" : "var(--faint)",
+  }}>
+    <Icon size={22} className="tab-ico" strokeWidth={active ? 2.5 : 2} />
+    <span style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>{label}</span>
+  </button>
+);
+const BottomNav = ({ items }) => (
+  <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40,
+    background: "rgba(10,15,14,.92)", backdropFilter: "blur(12px)", borderTop: "1px solid var(--line)" }}>
+    <div style={{ display: "flex", overflowX: "auto", justifyContent: "flex-start", gap: 2, padding: "8px 10px", maxWidth: 760, margin: "0 auto" }}>
+      {items.map((it) => <NavButton key={it.id} active={it.active} onClick={it.onClick} icon={it.icon} label={it.label} />)}
+    </div>
+  </div>
+);
 
-const AuthScreen = () => {
+/* ============================ AUTH SCREEN ================================ */
+const AuthScreen = ({ onEnter }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setLoading(true); setError("");
-    try {
-      if (isLogin) await signInWithEmailAndPassword(auth, email, password);
-      else await createUserWithEmailAndPassword(auth, email, password);
-    } catch (err) { setError(err.message); } finally { setLoading(false); }
-  };
-
-  const handleGoogle = async () => {
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); } 
-    catch(e) { setError("Erro Google (Popup bloqueado?)"); }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-900">
-      <div className="w-full max-w-md space-y-8 text-center animate-in fade-in zoom-in duration-300">
-        <div className="flex justify-center mb-6">
-          <div className="w-24 h-24 bg-gradient-to-tr from-emerald-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-2xl rotate-3 border-2 border-white/10 group hover:rotate-6 transition-transform duration-500">
-            <SoccerBall className="text-white drop-shadow-md" size={48} />
+    <div style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div className="ft-in" style={{ width: "100%", maxWidth: 400 }}>
+        <div className="pitch" style={{ padding: "34px 24px 26px", textAlign: "center", marginBottom: 22 }}>
+          <PitchLines /><div className="stripe" />
+          <div style={{ position: "relative" }}>
+            <div style={{
+              width: 76, height: 76, margin: "0 auto 16px", borderRadius: 22, transform: "rotate(-6deg)",
+              background: "linear-gradient(135deg,var(--grass-2),#0c7a3a)", display: "flex", alignItems: "center",
+              justifyContent: "center", boxShadow: "0 16px 40px -12px rgba(34,197,94,.7)", border: "2px solid rgba(255,255,255,.15)",
+            }}>
+              <SoccerBall size={42} color="#fff" />
+            </div>
+            <h1 className="num" style={{ fontSize: 46, lineHeight: .9, margin: 0, color: "var(--chalk)" }}>FUTEBOLADAS</h1>
+            <div style={{ height: 3, width: 64, margin: "10px auto 0", background: "var(--lime)", borderRadius: 2 }} />
+            <p className="eyebrow" style={{ marginTop: 12, color: "var(--grass-bright)" }}>Gestor de peladas - V2</p>
           </div>
         </div>
+        <div className="ft-card" style={{ padding: 24 }}>
+          <h2 style={{ textAlign: "center", fontSize: 18, fontWeight: 800, margin: "0 0 18px" }}>{isLogin ? "Entrar em campo" : "Criar conta"}</h2>
+          <button onClick={onEnter} className="ft-btn" style={{ width: "100%", background: "#fff", color: "#0b0b0b", padding: "12px", marginBottom: 14 }}><Globe size={18} /> Continuar com Google</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "8px 0 14px" }}>
+            <div style={{ flex: 1, height: 1, background: "var(--line)" }} /><span className="eyebrow">ou email</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <input className="ft-input" placeholder="Email" type="email" />
+            <input className="ft-input" placeholder="Palavra-passe" type="password" />
+            <button onClick={onEnter} className="ft-btn ft-grass" style={{ padding: 13, marginTop: 4 }}>{isLogin ? "Entrar" : "Registar"}</button>
+          </div>
+          <button onClick={() => setIsLogin(!isLogin)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--grass-bright)", fontSize: 13, marginTop: 18, width: "100%" }}>
+            {isLogin ? "Ainda nao tens conta? Cria gratis" : "Ja tens conta? Faz login"}
+          </button>
+        </div>
+        <p style={{ textAlign: "center", fontSize: 11, color: "var(--faint)", marginTop: 16 }}>Pre-visualizacao - qualquer botao entra na demo</p>
+      </div>
+    </div>
+  );
+};
+
+/* ============================ GROUP SELECTOR ============================= */
+const GroupSelector = ({ onOpen, onProfile }) => {
+  const [groups] = useState([seedGroup, { id: "domingos", name: "Liga dos Domingos", ownerId: "u2" }]);
+  return (
+    <div className="ft-in" style={{ minHeight: "100%", padding: "20px 16px 110px", maxWidth: 880, margin: "0 auto" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)", marginBottom: 24 }}>
         <div>
-          <h1 className="text-4xl font-extrabold text-white tracking-tight">Futeboladas</h1>
-          <p className="text-emerald-400 font-medium text-sm uppercase tracking-widest mt-1">Gestor de Equipas V2</p>
+          <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneario</div>
+          <h1 className="num" style={{ fontSize: 30, margin: "2px 0 0", color: "var(--chalk)" }}>OS TEUS GRUPOS</h1>
+          <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Ola, <b style={{ color: "var(--text)" }}>Francisco</b></p>
         </div>
-        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl text-left mt-8">
-          <h2 className="text-xl font-bold mb-6 text-white text-center">{isLogin ? "Entrar em Campo" : "Criar Conta"}</h2>
-          {error && <div className="bg-red-500/10 text-red-400 p-3 rounded mb-4 text-sm border border-red-500/20">{error}</div>}
-          <button onClick={handleGoogle} className="w-full bg-white text-slate-900 py-3 rounded-lg font-bold mb-4 flex justify-center gap-2 items-center hover:bg-slate-100 transition-colors"><Globe size={18}/> Continuar com Google</button>
-          <div className="relative py-2 text-center"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-800 px-2 text-slate-500">Ou usar email</span></div></div>
-          <form onSubmit={handleAuth} className="space-y-4 mt-4">
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-600 rounded text-white focus:border-emerald-500 outline-none transition-colors" placeholder="Email" required />
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-600 rounded text-white focus:border-emerald-500 outline-none transition-colors" placeholder="Password" required />
-            <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50 shadow-lg shadow-emerald-900/20">
-              {loading ? <Loader2 className="animate-spin mx-auto" /> : (isLogin ? "Entrar" : "Registar")}
-            </button>
-          </form>
-          <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-6 text-emerald-400 text-sm hover:underline text-center block">{isLogin ? "Ainda não tens conta? Cria grátis" : "Já tens conta? Faz login"}</button>
+        <button onClick={onProfile} className="ft-btn" style={{ background: "none", padding: 0 }}><Avatar name="Francisco" size={44} /></button>
+      </header>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 14, marginBottom: 26 }}>
+        <div className="ft-card" style={{ padding: 18 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}><Plus size={16} style={{ color: "var(--grass-bright)" }} /> Criar grupo</h2>
+          <div style={{ display: "flex", gap: 10 }}><input className="ft-input" placeholder="Nome do grupo..." /><button className="ft-btn ft-grass" style={{ padding: "0 18px" }}>Criar</button></div>
+        </div>
+        <div className="ft-card" style={{ padding: 18 }}>
+          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}><UserPlus size={16} style={{ color: "var(--blue)" }} /> Entrar com codigo</h2>
+          <div style={{ display: "flex", gap: 10 }}><input className="ft-input" placeholder="Codigo do convite..." /><button className="ft-btn ft-ghost" style={{ padding: "0 18px", color: "var(--blue)" }}>Entrar</button></div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 14 }}>
+        {groups.map((g) => (
+          <button key={g.id} onClick={() => onOpen(g)} className="ft-card ft-btn" style={{ padding: 20, textAlign: "left", alignItems: "stretch", flexDirection: "column", borderRadius: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 16 }}>
+              <div style={{ padding: 12, borderRadius: 14, background: "var(--raised)", color: "var(--grass-bright)" }}><Users size={24} /></div>
+              {g.ownerId === "me" && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "3px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
+            </div>
+            <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{g.name}</h3>
+            <p style={{ fontSize: 12, color: "var(--dim)", margin: "6px 0 0", display: "flex", alignItems: "center", gap: 4 }}>Entrar no grupo <ArrowRight size={12} /></p>
+          </button>
+        ))}
+      </div>
+      <BottomNav items={[
+        { id: "groups", icon: LayoutGrid, label: "Grupos", active: true, onClick: () => { } },
+        { id: "profile", icon: User, label: "Perfil", active: false, onClick: onProfile },
+      ]} />
+    </div>
+  );
+};
+
+/* ============================== PROFILE ================================== */
+const ProfileScreen = ({ onBack }) => {
+  const me = seedPlayers[0]; const games = me.stats.games, wins = me.stats.wins;
+  const Stat = ({ label, value, color }) => (
+    <div className="ft-raised" style={{ borderRadius: 14, padding: 12, textAlign: "center" }}>
+      <div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div>
+      <div className="num" style={{ fontSize: 26, color: color || "var(--text)", marginTop: 2 }}>{value}</div>
+    </div>
+  );
+  return (
+    <div className="ft-in" style={{ minHeight: "100%", padding: "20px 16px 110px", maxWidth: 440, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+        <button onClick={onBack} className="ft-btn ft-ghost" style={{ padding: 10, borderRadius: 12 }}><ArrowLeft size={18} /></button>
+        <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: 0 }}>O MEU PERFIL</h2>
+      </div>
+      <div className="ft-card" style={{ padding: 22, marginBottom: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ position: "relative" }}><Avatar name="Francisco" size={92} /><div style={{ position: "absolute", bottom: -2, right: -2, background: "var(--grass)", padding: 8, borderRadius: "50%", border: "2px solid var(--card)" }}><Camera size={15} color="#04130a" /></div></div>
+          <p style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Toca para alterar a foto</p>
+        </div>
+        <div style={{ marginTop: 16 }}><label className="eyebrow">Nome de jogador</label><input className="ft-input" defaultValue="Francisco" style={{ marginTop: 6 }} /></div>
+        <button className="ft-btn ft-grass" style={{ width: "100%", padding: 13, marginTop: 16 }}><Save size={18} /> Guardar alteracoes</button>
+      </div>
+      <div className="ft-card" style={{ padding: 22 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}><Trophy size={16} style={{ color: "var(--gold)" }} /> Numeros globais</h3>
+        <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>O somatorio da tua carreira em todos os grupos.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Stat label="Jogos" value={games} /><Stat label="Vitorias" value={wins} color="var(--grass-bright)" />
+          <Stat label="MVPs" value={6} color="var(--gold)" /><Stat label="Win rate" value={`${Math.round((wins / games) * 100)}%`} color="var(--blue)" />
+        </div>
+      </div>
+      <button onClick={onBack} className="ft-btn" style={{ width: "100%", background: "none", color: "#ff9684", padding: 14, marginTop: 18 }}><LogOut size={16} /> Terminar sessao</button>
+      <BottomNav items={[
+        { id: "groups", icon: LayoutGrid, label: "Grupos", active: false, onClick: onBack },
+        { id: "profile", icon: User, label: "Perfil", active: true, onClick: () => { } },
+      ]} />
+    </div>
+  );
+};
+
+/* ============================ DASHBOARD ================================== */
+const GroupDashboard = ({ group, onBack }) => {
+  const [tab, setTab] = useState("schedule");
+  const [players, setPlayers] = useState(seedPlayers);
+  const [matches, setMatches] = useState(seedMatches);
+  const [messages, setMessages] = useState(seedMessages);
+  const [next, setNext] = useState({ date: inDays(3), frequency: "weekly", responses: { me: "going", u3: "going", u6: "going", u7: "going", u2: "going" } });
+  const [settings, setSettings] = useState({ paymentModel: "monthly", monthlyFee: 15, seasonFee: 90, guestFee: 4.5 });
+  const [fixedIds, setFixedIds] = useState(["p1", "p2", "p3", "p6", "p7"]);
+  const [payments, setPayments] = useState({ p1: true, p3: true, p6: false, p2: false, p7: false });
+  const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
+  const [copied, setCopied] = useState(false);
+
+  const me = ME;
+  const isOwner = group.ownerId === me.uid;
+  const myProfile = players.find((p) => p.uid === me.uid);
+  const amIAdmin = isOwner || myProfile?.isAdmin;
+  const showToast = (msg, type = "success") => { setToast({ show: true, msg, type }); setTimeout(() => setToast({ show: false, msg: "", type: "success" }), 2400); };
+
+  /* ---- modelo de pagamento ---- */
+  const collectsFixed = settings.paymentModel !== "pergame";
+  const fixedFee = settings.paymentModel === "season" ? Number(settings.seasonFee) || 0 : Number(settings.monthlyFee) || 0;
+  const fixedLabel = settings.paymentModel === "season" ? "Inscricao da epoca" : "Mensalidade";
+  const fee = Number(settings.guestFee) || 0;
+
+  /* ---- derivados ---- */
+  const avg = (p) => { const v = Object.values(p.votes || {}); return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : 3; };
+  const matchMVP = (m) => { if (!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach((id) => (c[id] = (c[id] || 0) + 1)); let mx = 0, win = null; Object.entries(c).forEach(([id, n]) => { if (n > mx) { mx = n; win = id; } }); const p = players.find((pl) => pl.id === win); return p ? { ...p, votes: mx } : null; };
+  const mvpCount = (pid) => matches.filter((m) => matchMVP(m)?.id === pid).length;
+  const playerDebt = (pid) => { let t = 0; if (collectsFixed && fixedIds.includes(pid) && !payments[pid]) t += fixedFee; matches.forEach((m) => { if (m.payments?.[pid] === false) t += fee; }); return t; };
+  const totalDebt = players.reduce((s, p) => s + playerDebt(p.id), 0);
+  const guestRevenue = matches.reduce((s, m) => s + (m.payments ? Object.values(m.payments).filter((v) => v === true).length * fee : 0), 0);
+  const fixedRevenue = collectsFixed ? fixedIds.filter((id) => payments[id]).length * fixedFee : 0;
+  const totalRevenue = guestRevenue + fixedRevenue;
+
+  const members = players.filter((p) => p.type !== "guest");
+  const guests = players.filter((p) => p.type === "guest");
+
+  const TABS = [
+    { id: "schedule", icon: CalendarCheck, label: "Agenda" },
+    { id: "chat", icon: MessageSquare, label: "Chat" },
+    { id: "team", icon: Shield, label: "Equipa" },
+    { id: "tactics", icon: TacticIcon, label: "Tatica" },
+    { id: "players", icon: Users, label: "Plantel" },
+    { id: "history", icon: HistoryIcon, label: "Jogos" },
+    { id: "trophies", icon: Trophy, label: "Carreira" },
+    ...(collectsFixed ? [{ id: "members", icon: ClipboardList, label: "Inscricoes" }] : []),
+    ...(amIAdmin ? [{ id: "treasury", icon: Wallet, label: "Tesouraria" }] : []),
+    { id: "settings", icon: Settings, label: "Definicoes" },
+  ];
+
+  return (
+    <div className="ft-in" style={{ minHeight: "100%", paddingBottom: 96 }}>
+      <Toast toast={toast} />
+      <div style={{ position: "sticky", top: 0, zIndex: 30, background: "rgba(13,20,17,.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={onBack} className="ft-btn ft-ghost" style={{ padding: 9, borderRadius: 12 }}><ArrowLeft size={18} /></button>
+          <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 7 }}><Users size={17} style={{ color: "var(--grass-bright)" }} /> {group.name}</h2>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {isOwner && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "4px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
+          <button onClick={() => { setCopied(true); showToast("Codigo copiado!"); setTimeout(() => setCopied(false), 1800); }} className="ft-btn ft-ghost" style={{ fontSize: 11, padding: "4px 10px" }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copiado" : "Convidar"}</button>
+        </div>
+      </div>
+
+      <div style={{ padding: tab === "chat" || tab === "tactics" ? "0" : 16, maxWidth: tab === "chat" ? 620 : 480, margin: "0 auto" }}>
+        {tab === "schedule" && <ScheduleTab {...{ next, setNext, players, me, showToast }} />}
+        {tab === "chat" && <ChatTab {...{ messages, setMessages, me }} />}
+        {tab === "team" && <TeamTab {...{ players, next, avg, collectsFixed, fixedIds, setMatches, setNext, showToast, setTab }} />}
+        {tab === "tactics" && <TacticsTab {...{ members, showToast }} />}
+        {tab === "players" && <PlayersTab {...{ members, guests, players, setPlayers, me, amIAdmin, isOwner, avg, showToast }} />}
+        {tab === "history" && <HistoryTab {...{ matches, setMatches, matchMVP, amIAdmin, me, showToast }} />}
+        {tab === "trophies" && <TrophiesTab {...{ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, matches }} />}
+        {tab === "members" && collectsFixed && <MembersTab {...{ fixedIds, setFixedIds, players, myProfile, showToast, paymentModel: settings.paymentModel }} />}
+        {tab === "treasury" && amIAdmin && <TreasuryTab {...{ players, matches, setMatches, collectsFixed, fixedIds, payments, setPayments, fixedFee, fee, fixedLabel, totalRevenue, totalDebt, showToast }} />}
+        {tab === "settings" && <SettingsTab {...{ settings, setSettings, next, setNext, isOwner, amIAdmin, showToast, onBack }} />}
+      </div>
+
+      <BottomNav items={TABS.map((t) => ({ ...t, active: tab === t.id, onClick: () => setTab(t.id) }))} />
+    </div>
+  );
+};
+
+/* ----------------------------- Agenda ------------------------------------ */
+const ScheduleTab = ({ next, setNext, players, me, showToast }) => {
+  const date = new Date(next.date);
+  const myResp = next.responses?.[me.uid];
+  const going = Object.entries(next.responses || {}).filter(([, s]) => s === "going");
+  const diffMs = date - new Date();
+  const days = Math.floor(diffMs / 864e5), hrs = Math.floor((diffMs % 864e5) / 36e5);
+  const setResp = (s) => { setNext((n) => ({ ...n, responses: { ...n.responses, [me.uid]: s } })); showToast(s === "going" ? "Confirmado! Bora" : "Removido da convocatoria"); };
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="pitch" style={{ padding: 22 }}>
+        <PitchLines /><div className="stripe" />
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Proxima peladinha</span>
+            {diffMs > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--lime)", border: "1px solid rgba(198,242,74,.3)", background: "rgba(198,242,74,.08)", padding: "4px 10px", borderRadius: 999 }}>{days > 0 ? `faltam ${days}d ${hrs}h` : `hoje - ${hrs}h`}</span>}
+          </div>
+          <div className="num" style={{ fontSize: 40, lineHeight: .95, color: "var(--chalk)", marginTop: 10, textTransform: "capitalize" }}>{date.toLocaleDateString("pt-PT", { weekday: "long" })}</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
+            <span className="num" style={{ fontSize: 22, color: "var(--text)" }}>{date.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 700, color: "var(--grass-bright)" }}><Clock size={14} /> {date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
+          </div>
+        </div>
+      </div>
+      <WeatherStrip date={next.date} />
+      <button onClick={() => showToast("Abre o Google Maps no telemovel")} className="ft-card ft-btn" style={{ padding: 14, justifyContent: "center", gap: 8, color: "var(--grass-bright)", fontWeight: 700 }}><MapPin size={16} style={{ color: "var(--danger)" }} /> Ver campo no mapa</button>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <button onClick={() => setResp("going")} className="ft-btn" style={{ padding: "18px", flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "going" ? "var(--grass-bright)" : "var(--line)", background: myResp === "going" ? "linear-gradient(135deg,var(--grass-2),var(--grass))" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--text)" }}><span style={{ fontSize: 22 }}>?</span><span style={{ fontWeight: 800 }}>Vou jogar</span></button>
+        <button onClick={() => setResp("not_going")} className="ft-btn" style={{ padding: "18px", flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "not_going" ? "var(--danger)" : "var(--line)", background: myResp === "not_going" ? "rgba(240,86,58,.85)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--text)" }}><span style={{ fontSize: 22 }}>?</span><span style={{ fontWeight: 800 }}>Nao vou</span></button>
+      </div>
+      <div className="ft-card" style={{ padding: 16 }}>
+        <div className="eyebrow" style={{ marginBottom: 12 }}>Convocados - {going.length}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {going.map(([uid]) => { const p = players.find((pl) => pl.uid === uid); return p ? (
+            <div key={uid} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "5px 12px 5px 5px" }}><Avatar name={p.name} size={24} /><span style={{ fontSize: 12, fontWeight: 600 }}>{firstName(p.name)}</span></div>) : null; })}
+          {going.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Ainda ninguem confirmou.</span>}
         </div>
       </div>
     </div>
   );
 };
 
-const UserProfile = ({ user, onLogout }) => {
-  const [name, setName] = useState(user.displayName || "");
-  const [photoUrl, setPhotoUrl] = useState(user.photoURL || "");
-  const [uploading, setUploading] = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
-  const [msg, setMsg] = useState("");
-  const [globalStats, setGlobalStats] = useState({ games: 0, wins: 0, mvps: 0 });
-  const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    const fetchProfileAndStats = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if(data.name) setName(data.name);
-          if(data.photoUrl) setPhotoUrl(data.photoUrl);
-        }
-        const groupsQuery = query(collection(db, 'artifacts', APP_ID, 'groups'), where('members', 'array-contains', user.uid));
-        const groupsSnap = await getDocs(groupsQuery);
-        let totalGames = 0, totalWins = 0, totalMvps = 0; 
-        for (const groupDocSnapshot of groupsSnap.docs) {
-           const groupRef = groupDocSnapshot.ref;
-           const playersQuery = query(collection(groupRef, 'players'), where('uid', '==', user.uid));
-           const playersSnap = await getDocs(playersQuery);
-           let myPlayerIdInGroup = null;
-           playersSnap.forEach(pDoc => {
-              const pData = pDoc.data();
-              if (pData.stats) { totalGames += (pData.stats.games || 0); totalWins += (pData.stats.wins || 0); }
-              myPlayerIdInGroup = pDoc.id;
-           });
-           if (myPlayerIdInGroup) {
-               try {
-                   const matchesQuery = query(collection(groupRef, 'matches'));
-                   const matchesSnap = await getDocs(matchesQuery);
-                   matchesSnap.forEach(mDoc => {
-                       const mData = mDoc.data();
-                       if (mData.mvpVotes) {
-                           const counts = {};
-                           Object.values(mData.mvpVotes).forEach(pid => counts[pid] = (counts[pid] || 0) + 1);
-                           let maxVotes = 0; let winnerId = null;
-                           Object.entries(counts).forEach(([pid, count]) => { if (count > maxVotes) { maxVotes = count; winnerId = pid; } });
-                           if (winnerId === myPlayerIdInGroup) totalMvps++;
-                       }
-                   });
-               } catch (err) { console.error("Erro stats", err); }
-           }
-        }
-        setGlobalStats({ games: totalGames, wins: totalWins, mvps: totalMvps });
-      } catch (e) { console.error(e); } finally { setLoadingData(false); }
-    };
-    fetchProfileAndStats();
-  }, [user.uid]);
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return setMsg("Imagem muito grande (Max 5MB)");
-    setUploading(true);
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 512; const MAX_HEIGHT = 512;
-        let width = img.width; let height = img.height;
-        if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } 
-        else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-        setPhotoUrl(compressedBase64);
-        setUploading(false);
-      };
-    };
-  };
-
-  const handleSave = async () => {
-    setMsg("");
-    if (!name.trim()) return setMsg("O nome é obrigatório.");
-    try {
-      setUploading(true);
-      await updateProfile(auth.currentUser, { displayName: name });
-      await setDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid), { name: name, photoUrl: photoUrl, updatedAt: serverTimestamp() }, { merge: true });
-      setMsg("Perfil atualizado com sucesso!");
-    } catch (e) { setMsg("Erro ao guardar perfil."); console.error(e); } finally { setUploading(false); }
-  };
-
-  if(loadingData) return <div className="p-10 text-center text-emerald-500"><Loader2 className="animate-spin mx-auto"/></div>;
-
+/* ------------------------------- Chat ------------------------------------ */
+const ChatTab = ({ messages, setMessages, me }) => {
+  const [text, setText] = useState("");
+  const endRef = useRef(null);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const send = () => { if (!text.trim()) return; setMessages((m) => [...m, { id: "c" + Date.now(), uid: me.uid, name: me.displayName, text: text.trim(), ts: Date.now() }]); setText(""); };
   return (
-    <div className="p-6 max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4">
-      <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><User className="text-emerald-500" /> Meu Perfil</h2>
-      <div className="space-y-6">
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl space-y-6">
-          <div className="flex flex-col items-center">
-            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-              <div className="w-24 h-24 rounded-full bg-slate-700 border-2 border-slate-600 overflow-hidden flex items-center justify-center shadow-lg group-hover:border-emerald-500 transition-colors">
-                {photoUrl ? <img src={photoUrl} alt="Perfil" className="w-full h-full object-cover" /> : <User size={40} className="text-slate-400" />}
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 158px)" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {messages.map((m) => {
+          const mine = m.uid === me.uid;
+          return (
+            <div key={m.id} style={{ display: "flex", gap: 8, flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end" }}>
+              {!mine && <Avatar name={m.name} size={30} />}
+              <div style={{ maxWidth: "74%" }}>
+                {!mine && <div style={{ fontSize: 10, color: "var(--faint)", marginBottom: 3, marginLeft: 4, fontWeight: 700 }}>{firstName(m.name)}</div>}
+                <div style={{ padding: "9px 13px", borderRadius: 16, fontSize: 14, lineHeight: 1.35,
+                  background: mine ? "linear-gradient(135deg,var(--grass-2),var(--grass))" : "var(--raised)",
+                  color: mine ? "#04130a" : "var(--text)", border: mine ? "none" : "1px solid var(--line)",
+                  borderBottomRightRadius: mine ? 4 : 16, borderBottomLeftRadius: mine ? 16 : 4 }}>{m.text}</div>
+                <div style={{ fontSize: 9, color: "var(--faint)", marginTop: 3, textAlign: mine ? "right" : "left", padding: "0 4px" }}>{timeStr(m.ts)}</div>
               </div>
-              <div className="absolute bottom-0 right-0 bg-emerald-600 p-2 rounded-full text-white shadow-lg border border-slate-900 group-hover:scale-110 transition-transform">{uploading ? <Activity className="animate-spin" size={16}/> : <Camera size={16} />}</div>
             </div>
-            <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
-            <p className="text-xs text-slate-500 mt-2">Toque para alterar a foto</p>
-          </div>
-          <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase">Nome de Jogador</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none transition-colors" placeholder="O teu nome..." /></div>
-          {msg && <div className={`text-sm text-center p-2 rounded ${msg.includes('sucesso') ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>{msg}</div>}
-          <button onClick={handleSave} disabled={uploading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">{uploading ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} {uploading ? "A guardar..." : "Guardar Alterações"}</button>
-        </div>
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl relative overflow-hidden">
-           <div className="absolute top-0 right-0 p-4 opacity-5"><Globe size={100} className="text-blue-500"/></div>
-           <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Trophy size={18} className="text-yellow-400"/> Números Globais</h3>
-           <p className="text-xs text-slate-400 mb-4">O somatório da tua carreira em todos os grupos.</p>
-           <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700 text-center"><div className="text-xs text-slate-500 font-bold uppercase mb-1">Jogos</div><div className="text-xl font-bold text-white">{globalStats.games}</div></div>
-              <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-500/30 text-center"><div className="text-xs text-emerald-500 font-bold uppercase mb-1">Vitórias</div><div className="text-xl font-bold text-emerald-400">{globalStats.wins}</div></div>
-              <div className="bg-yellow-900/20 p-3 rounded-xl border border-yellow-500/20"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-xl font-bold text-yellow-400">{globalStats.mvps}</div></div>
-              <div className="bg-blue-900/20 p-3 rounded-xl border border-blue-500/30 text-center"><div className="text-xs text-blue-500 font-bold uppercase mb-1">Win Rate</div><div className="text-xl font-bold text-blue-400">{globalStats.games > 0 ? Math.round((globalStats.wins / globalStats.games) * 100) : 0}%</div></div>
-           </div>
-        </div>
-        <div className="pt-4 border-t border-slate-700"><button onClick={onLogout} className="w-full py-3 text-red-400 hover:bg-red-900/10 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"><LogOut size={16}/> Terminar Sessão</button></div>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+      <div style={{ padding: 12, borderTop: "1px solid var(--line)", display: "flex", gap: 8, background: "var(--panel)" }}>
+        <input className="ft-input" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Escreve uma mensagem..." />
+        <button onClick={send} disabled={!text.trim()} className="ft-btn ft-grass" style={{ width: 46, padding: 0, borderRadius: 12 }}><Send size={18} /></button>
       </div>
     </div>
   );
 };
 
-const GroupDashboard = ({ group, currentUser, onBack }) => {
-  const [activeTab, setActiveTab] = useState('schedule');
-  const [players, setPlayers] = useState([]);
-  const [matches, setMatches] = useState([]);
-  const [nextGame, setNextGame] = useState(null);
-  const [isCopied, setIsCopied] = useState(false);
-  const [editDate, setEditDate] = useState("");
-  const [editTime, setEditTime] = useState("");
-  const [editFreq, setEditFreq] = useState("weekly");
-  const [editLocationUrl, setEditLocationUrl] = useState("");
-  const [hasMonthlyFee, setHasMonthlyFee] = useState(true);
-  const [guestFee, setGuestFee] = useState(4.5);
-  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [monthlyFixedIds, setMonthlyFixedIds] = useState([]); 
-  const [monthlyPayments, setMonthlyPayments] = useState({}); 
-  const [monthlyFee, setMonthlyFee] = useState(0);
-  const [expandedPlayerId, setExpandedPlayerId] = useState(null);
-  const [votingStars, setVotingStars] = useState(3);
-  const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
-  const [newPlayerName, setNewPlayerName] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [addPlayerType, setAddPlayerType] = useState('guest'); 
-  const [guestHostId, setGuestHostId] = useState(''); 
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [teamA, setTeamA] = useState([]);
-  const [teamB, setTeamB] = useState([]);
-  const [isGenerated, setIsGenerated] = useState(false);
-  const [scoreA, setScoreA] = useState('');
-  const [scoreB, setScoreB] = useState('');
-  const [votingMatchId, setVotingMatchId] = useState(null);
-  const [mvpSelectedId, setMvpSelectedId] = useState("");
+/* ------------------------------ Tatica ----------------------------------- */
+const FORMATIONS = {
+  "2-2": [[50, 91], [30, 70], [70, 70], [32, 50], [68, 50]],
+  "Losango": [[50, 91], [50, 72], [27, 55], [73, 55], [50, 40]],
+  "1-2-1": [[50, 91], [50, 74], [28, 58], [72, 58], [50, 42]],
+  "3-1": [[50, 91], [27, 72], [50, 72], [73, 72], [50, 52]],
+};
+const makeTeam = (form, team) => FORMATIONS[form].map((pos, i) => ({
+  id: `${team}${i}`, team, label: i === 0 ? "GR" : String(i),
+  x: team === "black" ? pos[0] : pos[0], y: team === "black" ? 100 - pos[1] : pos[1],
+}));
 
-  const groupRef = (col) => collection(db, 'artifacts', APP_ID, 'groups', group.id, col);
-  const groupDoc = (col, id) => doc(db, 'artifacts', APP_ID, 'groups', group.id, col, id);
-  const isOwner = group.ownerId === currentUser.uid;
-  const myPlayerProfile = players.find(p => p.uid === currentUser.uid);
-  const amIAdmin = isOwner || (myPlayerProfile && myPlayerProfile.isAdmin);
+const TacticsTab = ({ members, showToast }) => {
+  const [form, setForm] = useState("2-2");
+  const [tokens, setTokens] = useState(() => makeTeam("2-2", "white"));
+  const [hasOpp, setHasOpp] = useState(false);
+  const [hasBall, setHasBall] = useState(true);
+  const [ball, setBall] = useState({ x: 50, y: 50 });
+  const [drawMode, setDrawMode] = useState(false);
+  const [strokes, setStrokes] = useState([]);
+  const boardRef = useRef(null);
+  const dragRef = useRef(null);
+  const drawingRef = useRef(false);
 
-  useEffect(() => {
-    if (nextGame && nextGame.date && nextGame.frequency && nextGame.frequency !== 'once') {
-        const gameDate = new Date(nextGame.date);
-        const now = new Date();
-        const tolerance = 24 * 60 * 60 * 1000;
-        if (now.getTime() > gameDate.getTime() + tolerance && amIAdmin) {
-            const nextDate = new Date(gameDate);
-            if (nextGame.frequency === 'weekly') { while (nextDate.getTime() + tolerance < now.getTime()) { nextDate.setDate(nextDate.getDate() + 7); } } 
-            else if (nextGame.frequency === 'biweekly') { while (nextDate.getTime() + tolerance < now.getTime()) { nextDate.setDate(nextDate.getDate() + 14); } }
-            if (nextDate.getTime() !== gameDate.getTime()) { setDoc(groupDoc('schedule', 'next'), { date: nextDate.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true }); }
-        }
-    }
-  }, [nextGame, amIAdmin]);
+  const pct = (e) => { const r = boardRef.current.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }; };
 
-  const getMatchMVP = (m) => { if(!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach(id => c[id]=(c[id]||0)+1); let max=0, win=null; Object.entries(c).forEach(([id, n]) => { if(n>max){max=n;win=id} }); const p = players.find(pl=>pl.id===win); return p ? {...p, votes: max} : null; };
-  const calculatePlayerDebt = (playerId) => { let total = 0; if (hasMonthlyFee && monthlyFixedIds.includes(playerId)) { if (!monthlyPayments[playerId]) total += monthlyFee; } matches.forEach(m => { if (m.payments && m.payments[playerId] === false) total += guestFee; }); return total; };
-  const getMVPCount = (pid) => matches.filter(m => getMatchMVP(m)?.id === pid).length;
-  const totalGuestRevenue = matches.reduce((sum, m) => { const payingPlayersCount = m.payments ? Object.keys(m.payments).filter(pid => m.payments[pid] === true).length : 0; return sum + (payingPlayersCount * guestFee); }, 0);
-  const totalPendingDebt = players.reduce((sum, p) => sum + calculatePlayerDebt(p.id), 0);
+  const applyForm = (f) => { setForm(f); setTokens((prev) => { const w = makeTeam(f, "white"); const b = prev.filter((t) => t.team === "black"); return hasOpp ? [...w, ...makeTeam(f, "black")] : w; }); };
+  const toggleOpp = () => { setHasOpp((o) => { const n = !o; setTokens((prev) => { const w = prev.filter((t) => t.team === "white"); return n ? [...w, ...makeTeam(form, "black")] : w; }); return n; }); };
+  const loadRoster = () => { setTokens((prev) => prev.map((t) => t.team === "white" && t.label !== "GR" ? { ...t, label: initials(members[+t.label]?.name || t.label).slice(0, 3) } : t)); showToast("Nomes do plantel aplicados"); };
+  const reset = () => { setTokens(makeTeam(form, "white")); setHasOpp(false); setStrokes([]); setBall({ x: 50, y: 50 }); showToast("Quadro reposto"); };
 
-  useEffect(() => {
-    const unsubP = onSnapshot(groupRef('players'), s => setPlayers(s.docs.map(d => ({id: d.id, ...d.data()}))));
-    const qMatches = query(groupRef('matches'), orderBy('createdAt', 'desc'));
-    const unsubM = onSnapshot(qMatches, s => setMatches(s.docs.map(d => ({id: d.id, ...d.data()}))));
-    const unsubG = onSnapshot(groupDoc('schedule', 'next'), s => {
-      if (s.exists()) { const data = s.data(); setNextGame(data); if (data.date) { const d = new Date(data.date); setEditDate(d.toISOString().split('T')[0]); setEditTime(d.toTimeString().slice(0,5)); } if (data.frequency) setEditFreq(data.frequency); } else { setNextGame({ date: new Date().toISOString(), responses: {} }); }
-    });
-    return () => { unsubP(); unsubM(); unsubG(); };
-  }, [group.id]);
-
-  useEffect(() => {
-    const unsubGroup = onSnapshot(doc(db, 'artifacts', APP_ID, 'groups', group.id), (s) => { if(s.exists()) { const data = s.data(); setEditLocationUrl(data.locationUrl || ""); if (data.settings) { setHasMonthlyFee(data.settings.hasMonthlyFee ?? true); setGuestFee(data.settings.guestFee ?? 4.5); } } });
-    return () => unsubGroup();
-  }, [group.id]);
-
-  useEffect(() => {
-    const monthDocRef = groupDoc('treasury', `month_${currentMonth}`);
-    const unsubTreasury = onSnapshot(monthDocRef, (docSnap) => { if (docSnap.exists()) { const data = docSnap.data(); setMonthlyFixedIds(Array.isArray(data.fixedIds) ? data.fixedIds : []); setMonthlyPayments(data.payments || {}); if (data.monthlyFee) setMonthlyFee(data.monthlyFee); } else { setMonthlyFixedIds([]); setMonthlyPayments({}); } });
-    return () => unsubTreasury();
-  }, [group.id, currentMonth]);
-
-  useEffect(() => {
-    if (players.length > 0) { const syncProfile = async () => { const myPlayer = players.find(p => p.uid === currentUser.uid); if (myPlayer) { try { const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid)); if (userDoc.exists()) { const userData = userDoc.data(); const latestPhoto = userData.photoUrl || currentUser.photoURL; const latestName = userData.name || currentUser.displayName; const updates = {}; if (myPlayer.photoUrl !== latestPhoto) updates.photoUrl = latestPhoto; if (myPlayer.name !== latestName) updates.name = latestName; if (Object.keys(updates).length > 0) await updateDoc(groupDoc('players', myPlayer.id), updates); } } catch(e) { console.error("Erro sync:", e); } } }; syncProfile(); }
-  }, [players.length, currentUser.uid]); 
-
-  useEffect(() => {
-    if (activeTab === 'team' && players.length > 0 && !isGenerated) { const goingUids = Object.entries(nextGame?.responses || {}).filter(([uid, status]) => status === 'going').map(([uid]) => uid); const confirmedPlayerIds = players.filter(p => p.uid && goingUids.includes(p.uid)).map(p => p.id); if (selectedIds.length === 0 && confirmedPlayerIds.length > 0) { setSelectedIds(confirmedPlayerIds); showToast("Jogadores confirmados pré-selecionados!"); } }
-  }, [activeTab, players, nextGame, isGenerated]); 
-
-  const showToast = (msg, type='success') => { setToast({show: true, msg, type}); setTimeout(() => setToast({show: false, msg: '', type: 'success'}), 3000); };
-  const copyInviteCode = () => { navigator.clipboard.writeText(group.id).then(() => { setIsCopied(true); showToast("Copiado!"); setTimeout(() => setIsCopied(false), 2000); }).catch(() => showToast("Erro", "error")); };
-  const toggleSchedule = async (status) => { const newResponses = { ...nextGame?.responses, [currentUser.uid]: status }; await setDoc(groupDoc('schedule', 'next'), { date: nextGame?.date || new Date().toISOString(), responses: newResponses }, { merge: true }); showToast(status === 'going' ? "Confirmado!" : "Removido"); };
-   
-  const addPlayer = async () => { if(!newPlayerName.trim()) return showToast("Nome inválido", "error"); if (addPlayerType === 'guest' && !guestHostId) return showToast("Selecione quem convidou.", "error"); let finalName = newPlayerName; if (addPlayerType === 'guest') { const host = players.find(p => p.id === guestHostId); if (host) { const hostFirstName = host.name.split(' ')[0]; finalName = `${newPlayerName} (C - ${hostFirstName})`; } } await addDoc(groupRef('players'), { name: finalName, type: addPlayerType, hostId: addPlayerType === 'guest' ? guestHostId : null, stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); setNewPlayerName(''); showToast("Adicionado!"); };
-  const joinAsPlayer = async () => { const already = players.find(p => p.uid === currentUser.uid); if(already) return showToast("Já estás no plantel!", "error"); let photo = currentUser.photoURL; try { const ud = await getDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid)); if(ud.exists()) photo = ud.data().photoUrl || photo; } catch(e){} await addDoc(groupRef('players'), { name: currentUser.displayName || "Eu", uid: currentUser.uid, type: 'member', stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste!"); };
-  const deletePlayer = async (id) => { if (!amIAdmin) return; if(window.confirm("Apagar?")) await deleteDoc(groupDoc('players', id)); };
-  const deleteMatch = async (id) => { if (!amIAdmin) return; if(window.confirm("Apagar jogo?")) await deleteDoc(groupDoc('matches', id)); };
-  const leaveThisGroup = async () => { if (isOwner) return showToast("Dono não sai.", "error"); if(window.confirm("Sair do grupo?")) { await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), { members: arrayRemove(currentUser.uid) }); onBack(); } };
-  const deleteThisGroup = async () => { if(window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id)); onBack(); } };
-  const toggleAdmin = async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc('players', p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); };
-  const saveMonthlyFee = async (val) => { await setDoc(groupDoc('treasury', `month_${currentMonth}`), { monthlyFee: parseFloat(val) }, { merge: true }); setMonthlyFee(val); showToast("Guardado"); };
-  const toggleMonthlyPayment = async (pid) => { const newP = { ...(monthlyPayments || {}), [pid]: !(monthlyPayments || {})[pid] }; await setDoc(groupDoc('treasury', `month_${currentMonth}`), { payments: newP }, { merge: true }); };
-  const selfSignUp = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; if (monthlyFixedIds.includes(mp.id)) return; const newIds = [...monthlyFixedIds, mp.id]; await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Inscrito!"); };
-  const selfSignOut = async () => { const mp = players.find(p => p.uid === currentUser.uid); if (!mp) return; const newIds = monthlyFixedIds.filter(id => id !== mp.id); await setDoc(groupDoc('treasury', `month_${currentMonth}`), { fixedIds: newIds, payments: monthlyPayments }, { merge: true }); showToast("Cancelado."); };
-  const settleMatchPayment = async (mid, pid) => { const newP = { ...matches.find(m=>m.id===mid).payments, [pid]: true }; await updateDoc(groupDoc('matches', mid), { payments: newP }); showToast("Pago!"); };
-   
-  const getPlayerDebts = (playerId) => { const debts = []; if (hasMonthlyFee && monthlyFixedIds.includes(playerId) && !monthlyPayments[playerId]) { debts.push({ id: 'monthly', desc: 'Mensalidade', amount: monthlyFee, action: () => toggleMonthlyPayment(playerId) }); } matches.forEach(m => { if (m.payments && m.payments[playerId] === false) { debts.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString('pt-PT', {day:'numeric', month:'numeric'})}`, amount: guestFee, action: () => settleMatchPayment(m.id, playerId) }); } }); return debts; };
-  const saveGameSettings = async () => { const u = {}; if(editDate && editTime) u.date = `${editDate}T${editTime}:00`; if(editFreq) u.frequency = editFreq; if(Object.keys(u).length) await setDoc(groupDoc('schedule', 'next'), u, { merge: true }); const gu = { settings: { hasMonthlyFee, guestFee: parseFloat(guestFee) } }; if(editLocationUrl) { const c = getCoordsFromUrl(editLocationUrl); gu.locationUrl = editLocationUrl; if(c) gu.location = c; } await updateDoc(doc(db, 'artifacts', APP_ID, 'groups', group.id), gu); if(hasMonthlyFee) await saveMonthlyFee(monthlyFee); showToast("Guardado!"); };
-  const submitPlayerVote = async (p, r) => { await updateDoc(groupDoc('players', p.id), { votes: { ...p.votes, [currentUser.uid]: r } }); setExpandedPlayerId(null); showToast("Votado!"); };
-  const getAverageRating = (p) => { const v = Object.values(p.votes || {}); return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : 3; };
-  const getPlayerRatingValue = (p) => parseFloat(getAverageRating(p));
-
-  const generateTeams = () => { if (selectedIds.length < 2) return showToast("Mínimo 2 jogadores", "error"); const selectedPlayers = players.filter(p => selectedIds.includes(p.id)); const blocks = {}; selectedPlayers.forEach(p => { let blockId = p.id; if (p.type === 'guest' && p.hostId && selectedIds.includes(p.hostId)) { blockId = p.hostId; } if (!blocks[blockId]) blocks[blockId] = []; blocks[blockId].push(p); }); const blockList = Object.values(blocks).map(members => { const rating = members.reduce((sum, p) => sum + getPlayerRatingValue(p), 0); return { members, rating }; }); blockList.sort((a, b) => b.rating - a.rating); let teamA = []; let teamB = []; let ratingA = 0; let ratingB = 0; blockList.forEach(block => { if (ratingA <= ratingB) { teamA = [...teamA, ...block.members]; ratingA += block.rating; } else { teamB = [...teamB, ...block.members]; ratingB += block.rating; } }); setTeamA(teamA); setTeamB(teamB); setIsGenerated(true); showToast("Equipas geradas (Convidados agrupados!)"); };
-  const shareTeams = () => { const text = `⚽ *Equipas Definidas* ⚽\n\n⚪ *Equipa Branco (${teamA.length})*\n${teamA.map(p => p.name).join('\n')}\n\n⚫ *Equipa Preto (${teamB.length})*\n${teamB.map(p => p.name).join('\n')}`; const copyToClipboard = (txt) => { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(() => showToast("Copiado! Cola no WhatsApp.")).catch(() => fallbackCopy(txt)); } else { fallbackCopy(txt); } }; const fallbackCopy = (txt) => { try { const textArea = document.createElement("textarea"); textArea.value = txt; textArea.style.position = "fixed"; textArea.style.left = "0"; textArea.style.top = "0"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); const res = document.execCommand('copy'); document.body.removeChild(textArea); if(res) showToast("Copiado! Cola no WhatsApp."); else showToast("Erro ao copiar", "error"); } catch(e) { showToast("Erro ao copiar", "error"); } }; copyToClipboard(text); };
-  const saveMatch = async () => { if(!scoreA || !scoreB) return showToast("Insere o resultado", "error"); if (nextGame && nextGame.frequency && nextGame.frequency !== 'once' && nextGame.date) { const nextDate = new Date(nextGame.date); if (nextGame.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7); if (nextGame.frequency === 'biweekly') nextDate.setDate(nextDate.getDate() + 14); await setDoc(groupDoc('schedule', 'next'), { date: nextDate.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true }); } const pays = {}; [...teamA, ...teamB].forEach(p => { if(hasMonthlyFee ? !monthlyFixedIds.includes(p.id) : true) pays[p.id] = false; }); await addDoc(groupRef('matches'), { date: new Date().toISOString(), scoreA: parseInt(scoreA), scoreB: parseInt(scoreB), teamA: teamA.map(p=>({id:p.id, name:p.name})), teamB: teamB.map(p=>({id:p.id, name:p.name})), mvpVotes: {}, payments: pays, createdAt: serverTimestamp() }); const w = parseInt(scoreA) > parseInt(scoreB) ? 'A' : (parseInt(scoreB) > parseInt(scoreA) ? 'B' : 'draw'); const upS = (p, res) => { const s = p.stats || {games:0,wins:0,draws:0,losses:0}; s.games++; if(res==='win') s.wins++; else if(res==='draw') s.draws++; else s.losses++; updateDoc(groupDoc('players', p.id), { stats: s }); }; teamA.forEach(p => upS(p, w==='A'?'win':(w==='draw'?'draw':'loss'))); teamB.forEach(p => upS(p, w==='B'?'win':(w==='draw'?'draw':'loss'))); setIsGenerated(false); setSelectedIds([]); setScoreA(''); setScoreB(''); setActiveTab('history'); showToast("Jogo guardado e próxima data atualizada!"); };
-  const submitMvpVote = async (m) => { if(!mvpSelectedId) return; await updateDoc(groupDoc('matches', m.id), { mvpVotes: { ...m.mvpVotes, [currentUser.uid]: mvpSelectedId } }); setVotingMatchId(null); setMvpSelectedId(""); };
-  const toggleSelection = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i=>i!==id) : [...prev, id]);
-
-  const myGuestsWithDebt = players.filter(p => p.type === 'guest' && p.hostId === myPlayerProfile?.id).map(p => ({ ...p, currentDebt: calculatePlayerDebt(p.id) })).filter(p => p.currentDebt > 0);
-  const totalGuestDebt = myGuestsWithDebt.reduce((acc, p) => acc + p.currentDebt, 0);
-  const memberPlayers = players.filter(p => p.type !== 'guest');
-  const guestPlayers = players.filter(p => p.type === 'guest');
-  const getFilteredSelectionList = (list) => list.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-  const renderPlayerCard = (p) => {
-     const myVote = p.votes?.[currentUser.uid] || 0;
-     const isExpanded = expandedPlayerId === p.id;
-     return (
-        <div key={p.id} onClick={() => { if (isExpanded) setExpandedPlayerId(null); else { setExpandedPlayerId(p.id); setVotingStars(myVote || 3); } }}>
-            <div className={`bg-slate-800/50 p-3 rounded-lg border transition-all cursor-pointer ${isExpanded ? 'border-emerald-500/50 bg-slate-800 shadow-lg' : 'border-slate-700 hover:border-slate-600'}`}>
-                <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border relative overflow-hidden ${p.isAdmin ? 'bg-yellow-900/20 border-yellow-500 text-yellow-500' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}{p.isAdmin && <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-0.5"><Crown size={6} className="text-black"/></div>}</div>
-                    <div className="flex-1"><div className="font-bold text-sm text-white flex items-center gap-1">{p.name}{p.isAdmin && <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1 rounded">Admin</span>}</div><div className="text-[10px] text-slate-500 flex gap-2 items-center">{amIAdmin ? (<span className="text-yellow-500 flex items-center gap-1 font-bold"><Star size={10} fill="currentColor"/> {getAverageRating(p)}</span>) : (myVote ? <span className="text-emerald-500 font-medium">Avaliado</span> : <span>Toca para avaliar</span>)}</div></div>
-                    <div className={`text-slate-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`}><ArrowRight size={16}/></div>
-                </div>
-                {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-slate-700/50 animate-in slide-in-from-top-2 fade-in duration-300">
-                        {p.uid !== currentUser.uid && (<div className="mb-4 text-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/50"><div className="text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Classificar</div><div className="flex justify-center mb-3"><StarRating value={votingStars} onChange={setVotingStars} size={28} /></div><button onClick={(e) => { e.stopPropagation(); submitPlayerVote(p, votingStars); }} className="w-full bg-slate-700 hover:bg-slate-600 text-xs py-2 rounded-lg text-white font-bold transition-colors">Confirmar</button></div>)}
-                        {amIAdmin && (<div className="flex gap-2 pt-2 border-t border-slate-700/50">{isOwner && p.uid !== group.ownerId && (<button onClick={(e) => { e.stopPropagation(); toggleAdmin(p); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold border border-yellow-500/30 text-yellow-400 bg-yellow-900/10 hover:bg-yellow-900/20 flex items-center justify-center gap-1">{p.isAdmin ? "Remover Admin" : "Promover Admin"}</button>)}<button onClick={(e) => { e.stopPropagation(); deletePlayer(p.id); }} className="flex-1 py-2.5 rounded-lg text-xs font-bold border border-red-500/30 text-red-400 bg-red-900/10 hover:bg-red-900/20 flex items-center justify-center gap-1"><Trash2 size={14}/> Eliminar</button></div>)}
-                    </div>
-                )}
-            </div>
-        </div>
-     );
+  /* drag de pecas */
+  const onTokenDown = (e, id) => { if (drawMode) return; e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = id; };
+  const onTokenMove = (e, id) => {
+    if (dragRef.current !== id) return;
+    const p = pct(e); const x = Math.max(4, Math.min(96, p.x)), y = Math.max(3, Math.min(97, p.y));
+    if (id === "ball") setBall({ x, y }); else setTokens((ts) => ts.map((t) => t.id === id ? { ...t, x, y } : t));
   };
+  const onTokenUp = (e) => { dragRef.current = null; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { } };
 
-  const renderSelectionGrid = (list) => {
-      if (list.length === 0) return null;
-      return (
-          <div className="grid grid-cols-2 gap-2">
-            {list.map(p => (
-                <div key={p.id} onClick={() => toggleSelection(p.id)} className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center gap-2 ${selectedIds.includes(p.id) ? 'bg-emerald-900/30 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${selectedIds.includes(p.id) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'}`}>{selectedIds.includes(p.id) && <Check size={10} className="text-white"/>}</div>
-                    <div className="truncate"><span className="text-xs font-medium block">{p.name}</span>{amIAdmin && <span className="text-[9px] text-slate-500 flex items-center gap-0.5"><Star size={8} className="fill-slate-500"/> {getAverageRating(p)}</span>}</div>
-                </div>
-            ))}
-          </div>
-      );
-  };
+  /* desenho */
+  const onBoardDown = (e) => { if (!drawMode) return; e.currentTarget.setPointerCapture(e.pointerId); drawingRef.current = true; const p = pct(e); setStrokes((s) => [...s, [p]]); };
+  const onBoardMove = (e) => { if (!drawMode || !drawingRef.current) return; const p = pct(e); setStrokes((s) => { const c = s.slice(); c[c.length - 1] = [...c[c.length - 1], p]; return c; }); };
+  const onBoardUp = () => { drawingRef.current = false; };
+
+  const Token = (t) => (
+    <div key={t.id} onPointerDown={(e) => onTokenDown(e, t.id)} onPointerMove={(e) => onTokenMove(e, t.id)} onPointerUp={onTokenUp}
+      style={{ position: "absolute", left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%,-50%)", touchAction: "none",
+        width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 800, cursor: drawMode ? "crosshair" : "grab", userSelect: "none", zIndex: 5,
+        background: t.team === "white" ? "var(--chalk)" : "#0c0f0e", color: t.team === "white" ? "#0b0b0b" : "#cfe8da",
+        border: t.team === "white" ? "2px solid #0b0b0b" : "2px solid #3a4a43", boxShadow: "0 3px 8px rgba(0,0,0,.4)" }}>{t.label}</div>
+  );
 
   return (
-    <div className="h-screen flex flex-col bg-slate-900 animate-in fade-in duration-300 relative">
-      <div className="bg-slate-800 p-4 border-b border-slate-700 flex items-center justify-between sticky top-0 z-20 shadow-md">
-        <div className="flex items-center gap-3"><button onClick={onBack} className="p-2 hover:bg-slate-700 rounded-full text-slate-300"><ArrowLeft size={20} /></button><h2 className="font-bold text-white text-lg flex items-center gap-2"><Users size={18} className="text-emerald-400"/> {group.name}</h2></div>
-        <div className="flex gap-2">{isOwner && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded border border-yellow-500/30 flex items-center gap-1"><Crown size={10}/> Dono</span>}<button onClick={copyInviteCode} className="text-[10px] bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1">{isCopied ? <Check size={10}/> : <Copy size={10}/>} {isCopied ? "Copiado" : "Convidar"}</button></div>
+    <div className="ft-in" style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><TacticIcon size={18} /> Quadro tatico</h2>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }} title="Desenhar"><Pencil size={16} /></button>
+          <button onClick={reset} className="ft-btn ft-ghost" style={{ padding: 9, borderRadius: 10 }} title="Repor"><RotateCcw size={16} /></button>
+        </div>
       </div>
-      {toast.show && <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-bold flex items-center gap-2 ${toast.type==='error'?'bg-red-500':'bg-emerald-500'} text-white`}>{toast.msg}</div>}
-       
-      <div className="flex-1 overflow-y-auto p-4 pb-28 no-scrollbar">
-        {activeTab === 'schedule' && (
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 text-center shadow-lg max-w-md mx-auto">
-                <h3 className="text-slate-400 text-xs font-bold uppercase mb-2">Próxima Peladinha</h3>
-                <div className="text-2xl font-bold text-white mb-4">{nextGame?.date ? new Date(nextGame.date).toLocaleDateString('pt-PT', {weekday: 'long', day: 'numeric', month: 'long', hour:'2-digit', minute:'2-digit'}) : 'A definir'}</div>
-                {nextGame?.date && (
-                    <WeatherWidget date={nextGame.date} locationUrl={editLocationUrl} />
-                )}
-                {editLocationUrl && <div className="flex justify-center mb-6"><div className="rounded-xl overflow-hidden border border-slate-700 relative h-32 w-full bg-slate-800 group cursor-pointer" onClick={() => window.open(editLocationUrl, '_blank')}><div className="absolute inset-0 bg-slate-800 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]"><div className="bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition-transform shadow-lg"><MapPin size={16} className="text-red-500 fill-red-500/20" /> Ver no Mapa</div></div></div></div>}
-                <div className="grid grid-cols-2 gap-4"><button onClick={()=>toggleSchedule('going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='going'?'bg-emerald-600 border-emerald-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👍 Vou</button><button onClick={()=>toggleSchedule('not_going')} className={`p-4 rounded-xl border ${nextGame?.responses?.[currentUser.uid]==='not_going'?'bg-red-600 border-red-400':'bg-slate-700 border-slate-600'} text-white font-bold`}>👎 Não Vou</button></div>
-                <div className="mt-4 pt-4 border-t border-slate-700 text-left"><div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Confirmados ({Object.values(nextGame?.responses||{}).filter(s=>s==='going').length})</div><div className="flex flex-wrap gap-2">{Object.entries(nextGame?.responses||{}).filter(([_,s])=>s==='going').map(([uid]) => { const p = players.find(pl=>pl.uid===uid); return p ? <div key={uid} className="flex items-center gap-2 bg-slate-700/50 px-3 py-1.5 pr-4 rounded-full border border-slate-600"><div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden border border-slate-500 shadow-sm">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-xs text-white font-medium">{p.name}</span></div> : null; })}</div></div>
-            </div>
-        )}
-        {activeTab === 'members' && hasMonthlyFee && (
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center max-w-md mx-auto">
-                <h3 className="text-white font-bold mb-4 flex justify-center gap-2 text-sm"><ClipboardList size={18} className="text-emerald-400"/> Inscrições Mensais</h3>
-                <div className="flex justify-center gap-4 mb-6">{monthlyFixedIds.includes(myPlayerProfile?.id) ? <button onClick={selfSignOut} className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold w-full">Cancelar</button> : <button onClick={selfSignUp} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold w-full">Inscrever</button>}</div>
-                <div className="text-left space-y-2">{monthlyFixedIds.map(pid => { const p = players.find(pl=>pl.id===pid); return p ? <div key={pid} className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden border border-slate-600">{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div><span className="text-sm text-white font-medium">{p.name}</span>{pid === myPlayerProfile?.id && <span className="ml-auto text-[10px] bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Eu</span>}</div> : null; })}</div>
-            </div>
-        )}
-        {activeTab === 'players' && (
-          <div className="space-y-6 max-w-md mx-auto">
-            {!players.find(p => p.uid === currentUser.uid) && (<div onClick={joinAsPlayer} className="bg-emerald-900/30 border border-emerald-500/50 p-3 rounded-xl flex items-center justify-between cursor-pointer hover:bg-emerald-900/50 transition-colors mb-4 animate-pulse"><div className="flex items-center gap-3"><div className="bg-emerald-600 p-2 rounded-full text-white"><UserPlus size={16}/></div><div><div className="font-bold text-emerald-400 text-sm">Entrar no Plantel</div><div className="text-[10px] text-emerald-200">Adiciona-te como jogador</div></div></div><Plus size={16} className="text-emerald-400"/></div>)}
-            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm"><div className="flex justify-between items-center mb-3"><h3 className="font-bold text-white text-sm flex items-center gap-2"><UserPlus size={16} className="text-emerald-400"/> Novo Jogador</h3><div className="flex bg-slate-900 p-1 rounded-lg border border-slate-600"><button onClick={() => setAddPlayerType('guest')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'guest' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Convidado</button><button onClick={() => setAddPlayerType('member')} className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${addPlayerType === 'member' ? 'bg-slate-700 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>Membro</button></div></div><div className="space-y-3"><input type="text" value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Nome..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none transition-colors" />{addPlayerType === 'guest' && <select value={guestHostId} onChange={e => setGuestHostId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none"><option value="">Quem convidou?</option>{players.filter(p => p.type !== 'guest').map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>}<button onClick={addPlayer} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Adicionar</button></div></div>
-            {memberPlayers.length > 0 && (<div><h3 className="text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Membros ({memberPlayers.length})</h3><div className="space-y-2">{memberPlayers.map(p => renderPlayerCard(p))}</div></div>)}
-            {guestPlayers.length > 0 && (<div><h3 className="text-xs font-bold text-slate-500 uppercase mb-2 ml-1 mt-4">Convidados ({guestPlayers.length})</h3><div className="space-y-2">{guestPlayers.map(p => renderPlayerCard(p))}</div></div>)}
+
+      {/* campo */}
+      <div ref={boardRef} onPointerDown={onBoardDown} onPointerMove={onBoardMove} onPointerUp={onBoardUp}
+        style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: 18, overflow: "hidden", touchAction: "none",
+          border: "1px solid var(--line)", background: "linear-gradient(180deg,#13301f,#0c2016)" }}>
+        <svg viewBox="0 0 100 150" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          <defs><pattern id="grass" width="100" height="12.5" patternUnits="userSpaceOnUse"><rect width="100" height="12.5" fill="rgba(255,255,255,0)" /><rect width="100" height="6.25" fill="rgba(255,255,255,.015)" /></pattern></defs>
+          <rect width="100" height="150" fill="url(#grass)" />
+          <g fill="none" stroke="rgba(245,248,246,.45)" strokeWidth="0.5">
+            <rect x="3" y="3" width="94" height="144" />
+            <line x1="3" y1="75" x2="97" y2="75" />
+            <circle cx="50" cy="75" r="11" /><circle cx="50" cy="75" r="0.9" fill="rgba(245,248,246,.7)" stroke="none" />
+            <rect x="30" y="3" width="40" height="16" /><rect x="40" y="3" width="20" height="7" />
+            <rect x="30" y="131" width="40" height="16" /><rect x="40" y="140" width="20" height="7" />
+            <rect x="42" y="0.5" width="16" height="2.5" stroke="rgba(245,248,246,.7)" />
+            <rect x="42" y="147" width="16" height="2.5" stroke="rgba(245,248,246,.7)" />
+          </g>
+        </svg>
+        {/* desenhos */}
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 3 }}>
+          {strokes.map((s, i) => <polyline key={i} points={s.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="var(--lime)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}
+        </svg>
+        {/* pecas */}
+        {tokens.map(Token)}
+        {hasBall && (
+          <div onPointerDown={(e) => onTokenDown(e, "ball")} onPointerMove={(e) => onTokenMove(e, "ball")} onPointerUp={onTokenUp}
+            style={{ position: "absolute", left: `${ball.x}%`, top: `${ball.y}%`, transform: "translate(-50%,-50%)", touchAction: "none", cursor: drawMode ? "crosshair" : "grab", zIndex: 6 }}>
+            <div style={{ background: "#fff", borderRadius: "50%", padding: 2, boxShadow: "0 2px 6px rgba(0,0,0,.5)" }}><SoccerBall size={18} color="#111" /></div>
           </div>
         )}
-        {activeTab === 'team' && (
-          <div className="space-y-6 max-w-md mx-auto">
-            {!isGenerated ? (
-              <>
-                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 sticky top-0 z-10 shadow-lg"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-white text-sm">Selecionar ({selectedIds.length})</h3><button onClick={generateTeams} className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold hover:bg-emerald-500 flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-900/20"><Shuffle size={14}/> Criar Equipas</button></div><input type="text" placeholder="Procurar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none transition-colors"/></div>
-                <div className="space-y-4">
-                    {getFilteredSelectionList(memberPlayers).length > 0 && (<div><div className="text-xs font-bold text-slate-500 uppercase mb-2">Membros</div>{renderSelectionGrid(getFilteredSelectionList(memberPlayers))}</div>)}
-                    {getFilteredSelectionList(guestPlayers).length > 0 && (<div><div className="text-xs font-bold text-slate-500 uppercase mb-2">Convidados</div>{renderSelectionGrid(getFilteredSelectionList(guestPlayers))}</div>)}
-                </div>
-              </>
-            ) : (
-              <div className="animate-in zoom-in duration-300 space-y-4">
-                <div className="flex justify-between items-center"><h3 className="font-bold text-white text-lg flex items-center gap-2"><SoccerBall size={20} className="text-yellow-500"/> Jogo a Decorrer</h3><button onClick={() => setIsGenerated(false)} className="text-xs text-red-400 hover:underline font-medium">Cancelar</button></div>
-                <button onClick={shareTeams} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/30 py-2 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-600/30 transition-colors mb-2"><Share2 size={16} /> Partilhar Equipas</button>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-white shadow-lg"><div className="font-bold text-center text-white mb-3 text-sm border-b border-slate-700 pb-2">Equipa Branco ({teamA.length})</div><ul className="text-xs text-slate-300 space-y-1.5">{teamA.map(p => (<li key={p.id} className="flex items-center gap-2"><div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-500 overflow-hidden flex items-center justify-center text-[8px] font-bold text-white">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div>{p.name}</li>))}</ul></div>
-                  <div className="bg-slate-800 p-3 rounded-xl border-t-4 border-t-slate-950 shadow-lg"><div className="font-bold text-center text-slate-400 mb-3 text-sm border-b border-slate-700 pb-2">Equipa Preto ({teamB.length})</div><ul className="text-xs text-slate-300 space-y-1.5">{teamB.map(p => (<li key={p.id} className="flex items-center gap-2"><div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-500 overflow-hidden flex items-center justify-center text-[8px] font-bold text-white">{p.photoUrl ? <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover"/> : p.name.substring(0,2).toUpperCase()}</div>{p.name}</li>))}</ul></div>
-                </div>
-                <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 mt-4 shadow-lg"><div className="text-center text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">Resultado Final</div><div className="flex justify-center items-center gap-4 mb-4"><input type="number" min="0" value={scoreA} onChange={e=>setScoreA(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/><span className="text-slate-500 font-light text-2xl">X</span><input type="number" min="0" value={scoreB} onChange={e=>setScoreB(e.target.value)} className="w-16 h-16 text-center text-3xl font-bold bg-slate-900 border border-slate-600 rounded-xl text-white focus:border-emerald-500 outline-none" placeholder="0"/></div><button onClick={saveMatch} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-900/20">Terminar Jogo</button></div>
+        {drawMode && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(198,242,74,.9)", color: "#1a2200", fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 8, zIndex: 7 }}>MODO DESENHO</div>}
+      </div>
+
+      {/* controlos */}
+      <div className="ft-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>Formacao (equipa branca)</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+            {Object.keys(FORMATIONS).map((f) => <button key={f} onClick={() => applyForm(f)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 12, background: form === f ? "var(--grass)" : "var(--raised)", color: form === f ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>{f}</button>)}
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <button onClick={toggleOpp} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasOpp ? "Tirar adversario" : "Adversario (preto)"}</button>
+          <button onClick={() => setHasBall((b) => !b)} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasBall ? "Tirar bola" : "Por bola"}</button>
+          <button onClick={loadRoster} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>Nomes do plantel</button>
+          <button onClick={() => setStrokes([])} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>Limpar desenho</button>
+        </div>
+        <p style={{ fontSize: 11, color: "var(--faint)", margin: 0 }}>Arrasta as pecas e a bola. Ativa o lapis para desenhar movimentos.</p>
+      </div>
+    </div>
+  );
+};
+
+/* ----------------------------- Plantel ----------------------------------- */
+const PlayersTab = ({ members, guests, players, setPlayers, me, amIAdmin, isOwner, avg, showToast }) => {
+  const [name, setName] = useState("");
+  const [type, setType] = useState("guest");
+  const [host, setHost] = useState("");
+  const [expanded, setExpanded] = useState(null);
+  const [stars, setStars] = useState(3);
+  const inRoster = players.some((p) => p.uid === me.uid);
+  const add = () => {
+    if (!name.trim()) return showToast("Nome invalido", "error");
+    if (type === "guest" && !host) return showToast("Escolhe quem convidou", "error");
+    let final = name;
+    if (type === "guest") { const h = players.find((p) => p.id === host); if (h) final = `${name} (C - ${firstName(h.name)})`; }
+    setPlayers((ps) => [...ps, { id: "n" + Date.now(), uid: null, name: final, type, hostId: type === "guest" ? host : null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {} }]);
+    setName(""); showToast("Jogador adicionado!");
+  };
+  const rate = (p) => { setPlayers((ps) => ps.map((x) => x.id === p.id ? { ...x, votes: { ...x.votes, [me.uid]: stars } } : x)); setExpanded(null); showToast("Avaliacao registada!"); };
+  const remove = (p) => { setPlayers((ps) => ps.filter((x) => x.id !== p.id)); showToast("Jogador eliminado"); };
+  const Card = (p) => {
+    const open = expanded === p.id; const myVote = p.votes?.[me.uid] || 0;
+    return (
+      <div key={p.id} onClick={() => { if (open) setExpanded(null); else { setExpanded(p.id); setStars(myVote || 3); } }} className="ft-card" style={{ padding: 12, cursor: "pointer", borderColor: open ? "rgba(34,197,94,.4)" : "var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Avatar name={p.name} size={36} ring={p.isAdmin} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>{p.name}{p.isAdmin && <span style={{ fontSize: 9, fontWeight: 700, color: "var(--gold)", background: "rgba(245,197,66,.15)", padding: "1px 6px", borderRadius: 6 }}>Admin</span>}</div>
+            <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2 }}>{amIAdmin ? <span style={{ color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 700 }}><Star size={11} style={{ fill: "var(--gold)" }} /> {avg(p)}</span> : myVote ? <span style={{ color: "var(--grass-bright)" }}>Avaliado</span> : <span>Toca para avaliar</span>}</div>
+          </div>
+          <ArrowRight size={16} style={{ color: "var(--faint)", transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+        </div>
+        {open && (
+          <div className="ft-in" style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+            {p.uid !== me.uid && (
+              <div className="ft-raised" style={{ borderRadius: 14, padding: 14, textAlign: "center", marginBottom: 10 }}>
+                <div className="eyebrow" style={{ marginBottom: 10 }}>Classificar</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}><StarRating value={stars} onChange={setStars} size={26} /></div>
+                <button onClick={(e) => { e.stopPropagation(); rate(p); }} className="ft-btn ft-grass" style={{ width: "100%", padding: 9, fontSize: 13 }}>Confirmar</button>
               </div>
             )}
-          </div>
-        )}
-        {activeTab === 'history' && (
-          <div className="space-y-4 max-w-md mx-auto">
-            {matches.length === 0 && <div className="text-center text-slate-500 text-sm py-10 italic">Sem jogos registados ainda.</div>}
-            {matches.map(m => {
-              const gameDate = m.createdAt?.seconds ? new Date(m.createdAt.seconds * 1000) : new Date(m.date);
-              const now = new Date();
-              const diffHours = (now - gameDate) / (1000 * 60 * 60); 
-              const isVotingOpen = diffHours < 48;
-              const hoursLeft = Math.max(0, Math.round(48 - diffHours)); 
-
-              const mvp = getMatchMVP(m);
-              const myVote = m.mvpVotes?.[currentUser.uid];
-
-              return (
-                <div key={m.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm hover:border-slate-600 transition-colors">
-                  <div className="bg-slate-900/50 p-2 text-center text-[10px] text-slate-500 border-b border-slate-700 font-medium uppercase tracking-wider relative">
-                      {gameDate.toLocaleDateString()}
-                      {amIAdmin && (<button onClick={(e) => { e.stopPropagation(); deleteMatch(m.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-red-400 p-1" title="Apagar Jogo"><Trash2 size={12} /></button>)}
-                  </div>
-                  <div className="flex items-center justify-between p-4">
-                      <div className="text-center w-1/3">
-                          <div className={`text-3xl font-bold ${m.scoreA > m.scoreB ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreA}</div>
-                          <div className="text-[10px] text-slate-500 truncate mt-1">Branco</div>
-                      </div>
-                      <div className="text-slate-600 text-sm font-light">X</div>
-                      <div className="text-center w-1/3">
-                          <div className={`text-3xl font-bold ${m.scoreB > m.scoreA ? 'text-emerald-400' : 'text-slate-300'}`}>{m.scoreB}</div>
-                          <div className="text-[10px] text-slate-500 truncate mt-1">Preto</div>
-                      </div>
-                  </div>
-                  <div className="bg-slate-900/30 p-2 border-t border-slate-700/50 min-h-[50px] flex items-center justify-center">
-                    {!isVotingOpen ? (
-                        mvp ? (
-                            <div className="flex items-center justify-center gap-2 text-yellow-500 animate-in zoom-in">
-                                <Trophy size={14} className="fill-yellow-500" />
-                                <span className="text-xs font-bold text-yellow-200">MVP: {mvp.name} ({mvp.votes} votos)</span>
-                            </div>
-                        ) : (
-                            <span className="text-[10px] text-slate-500 italic">Votação encerrada (Sem votos)</span>
-                        )
-                    ) : (
-                       <div className="w-full">
-                           {myVote ? (
-                               <div className="text-center animate-in fade-in">
-                                   <div className="text-[10px] text-emerald-400 font-bold mb-1 flex items-center justify-center gap-1"><Check size={10}/> Voto registado!</div>
-                                   <div className="text-[9px] text-slate-500">Resultados revelados em {hoursLeft}h</div>
-                               </div>
-                           ) : (
-                               votingMatchId === m.id ? (
-                                    <div className="flex gap-2 animate-in fade-in">
-                                        <select value={mvpSelectedId} onChange={(e) => setMvpSelectedId(e.target.value)} className="flex-1 bg-slate-900 border border-slate-600 rounded text-xs p-1.5 text-white outline-none">
-                                            <option value="">Quem foi o Craque?</option>
-                                            {[...(m.teamA || []), ...(m.teamB || [])].map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                                        </select>
-                                        <button onClick={() => submitMvpVote(m)} className="bg-yellow-600 text-white px-3 rounded text-xs font-bold">Votar</button>
-                                    </div>
-                               ) : (
-                                   <button onClick={() => setVotingMatchId(m.id)} className="w-full text-center text-xs text-yellow-500/80 hover:text-yellow-400 font-medium flex items-center justify-center gap-1 transition-colors">
-                                       <Star size={12} /> Votar MVP (Faltam {hoursLeft}h)
-                                   </button>
-                               )
-                           )}
-                       </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {activeTab === 'trophies' && (
-          <div className="space-y-6 animate-in fade-in">
-             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg text-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={120} className="text-yellow-500"/></div>
-                <div className="relative z-10">
-                   <div className="w-20 h-20 mx-auto rounded-full bg-slate-700 border-2 border-slate-500 flex items-center justify-center mb-3 overflow-hidden shadow-xl">{myPlayerProfile?.photoUrl ? <img src={myPlayerProfile.photoUrl} className="w-full h-full object-cover"/> : <User size={40} className="text-slate-400"/>}</div>
-                   <h2 className="text-xl font-bold text-white">{myPlayerProfile?.name || "Eu"}</h2>
-                   <p className="text-xs text-slate-400 uppercase tracking-widest mb-6">Estatísticas de Carreira</p>
-                   {totalGuestDebt > 0 && (<div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl mb-6 animate-pulse"><h3 className="text-red-400 font-bold text-sm mb-2 flex items-center justify-center gap-2"><AlertCircle size={16}/> Dívidas de Convidados ({totalGuestDebt.toFixed(2)}€)</h3><div className="space-y-1">{myGuestsWithDebt.map(g => (<div key={g.id} className="flex justify-between text-xs text-red-200 border-b border-red-500/20 pb-1 last:border-0"><span>{g.name}</span><span className="font-bold">{g.currentDebt.toFixed(2)}€</span></div>))}</div></div>)}
-                   <div className={`grid ${amIAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mb-6`}>
-                      <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700"><div className="text-[10px] text-slate-500 font-bold uppercase">Jogos</div><div className="text-lg font-bold text-white">{myPlayerProfile?.stats?.games || 0}</div></div>
-                      <div className="bg-emerald-900/20 p-2 rounded-lg border border-emerald-500/20"><div className="text-[10px] text-emerald-500 font-bold uppercase">Vitórias</div><div className="text-lg font-bold text-emerald-400">{myPlayerProfile?.stats?.wins || 0}</div></div>
-                      <div className="bg-yellow-900/20 p-2 rounded-lg border border-yellow-500/20"><div className="text-[10px] text-yellow-500 font-bold uppercase">MVPs</div><div className="text-lg font-bold text-yellow-400">{getMVPCount(myPlayerProfile?.id)}</div></div>
-                      {amIAdmin && <div className="bg-blue-900/20 p-2 rounded-lg border border-blue-500/20"><div className="text-[10px] text-blue-500 font-bold uppercase">Rating</div><div className="text-lg font-bold text-blue-400">{getAverageRating(myPlayerProfile)}</div></div>}
-                   </div>
-                   <h3 className="text-left text-sm font-bold text-slate-300 mb-3 flex items-center gap-2"><Award size={16}/> Conquistas</h3>
-                   <div className="grid grid-cols-1 gap-2">
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 50 ? 'bg-gradient-to-r from-yellow-900/40 to-slate-800 border-yellow-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Trophy size={18} className="text-yellow-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Lenda do Clube</div><div className="text-[10px] text-slate-400">+50 Jogos realizados</div></div></div>
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${myPlayerProfile?.stats?.games >= 10 ? 'bg-gradient-to-r from-blue-900/40 to-slate-800 border-blue-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Medal size={18} className="text-blue-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Veterano</div><div className="text-[10px] text-slate-400">+10 Jogos realizados</div></div></div>
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${(myPlayerProfile?.stats?.wins / myPlayerProfile?.stats?.games > 0.6 && myPlayerProfile?.stats?.games >= 5) ? 'bg-gradient-to-r from-orange-900/40 to-slate-800 border-orange-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><Flame size={18} className="text-orange-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Imparável</div><div className="text-[10px] text-slate-400">+60% Vitórias (min. 5 jogos)</div></div></div>
-                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${monthlyFixedIds.includes(myPlayerProfile?.id) ? 'bg-gradient-to-r from-emerald-900/40 to-slate-800 border-emerald-600/50' : 'bg-slate-900/50 border-slate-800 opacity-50 grayscale'}`}><div className="p-2 bg-slate-900 rounded-full border border-slate-700"><ShieldCheck size={18} className="text-emerald-500"/></div><div className="text-left"><div className="text-sm font-bold text-white">Membro Fixo</div><div className="text-[10px] text-slate-400">Inscrito na mensalidade atual</div></div></div>
-                   </div>
-                </div>
-             </div>
-          </div>
-        )}
-        {activeTab === 'treasury' && amIAdmin && (
-          <div className="space-y-6">
-             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-                <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-white flex items-center gap-2"><Wallet size={18}/> Tesouraria</h2><input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none"/></div>
-                 <div className="grid grid-cols-2 gap-4 mb-4">
-                     <div className="bg-gradient-to-r from-emerald-900/40 to-slate-900 p-4 rounded-xl border border-emerald-500/20 flex flex-col justify-between"><div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Receita de Jogos (Convidados)</div><div className="text-xl font-bold text-white">{totalGuestRevenue.toFixed(2)}€</div></div>
-                     <div className="bg-gradient-to-r from-red-900/40 to-slate-900 p-4 rounded-xl border border-red-500/20 flex flex-col justify-between"><div className="text-[10px] text-red-400 font-bold uppercase tracking-wider mb-1">Dívida Total</div><div className="text-xl font-bold text-white">{totalPendingDebt.toFixed(2)}€</div></div>
-                 </div>
-                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg mb-6">
-                    <h3 className="font-bold text-white mb-4 flex items-center gap-2"><AlertCircle size={18} className="text-red-400"/> Dívidas Pendentes</h3>
-                    <div className="space-y-4">
-                        {players.map(p => ({ ...p, debts: getPlayerDebts(p.id) })).filter(p => p.debts.length > 0).sort((a, b) => b.debts.reduce((s,d)=>s+d.amount,0) - a.debts.reduce((s,d)=>s+d.amount,0)).map(p => (
-                                <div key={p.id} className="bg-slate-900/50 rounded-lg border border-red-500/20 overflow-hidden">
-                                    <div className="p-3 flex justify-between items-center bg-slate-900/80 border-b border-white/5"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs overflow-hidden">{p.photoUrl ? <img src={p.photoUrl} className="w-full h-full object-cover"/> : p.name.substring(0,2)}</div><div><div className="text-sm font-bold text-white">{p.name}</div>{p.type === 'guest' && <div className="text-[9px] text-slate-500">Convidado</div>}</div></div><div className="text-red-400 font-bold text-sm">{p.debts.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}€</div></div>
-                                    <div className="p-2 space-y-1">{p.debts.map((debt) => (<div key={`${p.id}-${debt.id}`} className="flex justify-between items-center p-2 hover:bg-white/5 rounded transition-colors group"><span className="text-xs text-slate-300 group-hover:text-white transition-colors">{debt.desc}</span><div className="flex items-center gap-3"><span className="text-xs text-slate-400">{debt.amount}€</span><button onClick={debt.action} className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white p-1.5 rounded transition-all shadow-sm" title="Marcar como Pago"><CheckCircle size={14} /></button></div></div>))}</div>
-                                </div>
-                            ))
-                        }
-                        {players.every(p => getPlayerDebts(p.id).length === 0) && (<div className="text-center text-slate-500 py-6 italic flex flex-col items-center gap-2"><CheckCircle size={32} className="text-slate-600"/><span>Tudo regularizado! 🎉</span></div>)}
-                    </div>
-                 </div>
-                 {hasMonthlyFee && (
-                    <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 opacity-80 hover:opacity-100 transition-opacity">
-                       <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center justify-between cursor-pointer select-none" onClick={(e) => e.currentTarget.nextSibling.classList.toggle('hidden')}><span>Gestão Mensalidades (Checklist)</span><span className="text-[10px]">▼</span></h3>
-                       <div className="space-y-2 hidden animate-in slide-in-from-top-2">{monthlyFixedIds.map(pid => { const p = players.find(pl => pl.id === pid); if(!p) return null; const isPaid = monthlyPayments[pid]; return (<div key={pid} className="flex justify-between items-center bg-slate-700/30 p-2 rounded border border-slate-700"><span className="text-sm text-white">{p.name}</span><button onClick={() => toggleMonthlyPayment(pid)} className={`text-[10px] font-bold px-3 py-1 rounded border ${isPaid ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600' : 'bg-red-900/30 text-red-400 border-red-600'}`}>{isPaid ? 'PAGO' : 'FALTA'}</button></div>); })}</div>
-                    </div>
-                 )}
-             </div>
-          </div>
-        )}
-        {activeTab === 'settings' && (
-          <div className="space-y-6 max-w-md mx-auto">
-             {amIAdmin && (<div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Settings size={18} className="text-blue-400"/> Definições do Grupo</h3><div className="space-y-4"><div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-600"><div><div className="text-xs font-bold text-white">Mensalidades (Fixos)</div><div className="text-[10px] text-slate-500">Ativa gestão de membros mensais</div></div><button onClick={() => setHasMonthlyFee(!hasMonthlyFee)} className={`px-3 py-1 rounded text-xs font-bold transition-all ${hasMonthlyFee ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}>{hasMonthlyFee ? "Ativo" : "Inativo"}</button></div>{hasMonthlyFee && (<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor Mensalidade (€)</label><div className="flex gap-2"><input type="number" step="0.10" value={monthlyFee} onChange={e => setMonthlyFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div>)}<div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Preço por Jogo ({hasMonthlyFee ? 'Convidados' : 'Todos'}) (€)</label><input type="number" step="0.10" value={guestFee} onChange={e=>setGuestFee(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div></div>)}
-             {amIAdmin && (<><div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><Clock size={18} className="text-blue-400"/> Próximo Jogo</h3><div className="space-y-3"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Data</label><input type="date" value={editDate} onChange={e=>setEditDate(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Hora</label><input type="time" value={editTime} onChange={e=>setEditTime(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"/></div></div><div><label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Periodicidade</label><select value={editFreq} onChange={e=>setEditFreq(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select></div></div></div><div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><MapIcon size={18} className="text-emerald-400"/> Localização do Campo</h3><div className="space-y-3"><input type="text" value={editLocationUrl} onChange={e=>setEditLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 outline-none placeholder:text-slate-600"/><p className="text-[10px] text-slate-500">A meteorologia será atualizada automaticamente com base neste link.</p></div></div><button onClick={saveGameSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"><Save size={18} /> Guardar Definições</button></>)}
-             <div className="bg-red-900/10 border border-red-500/30 p-6 rounded-xl space-y-4 mt-8"><div className="flex items-center gap-2 text-red-500 font-bold mb-2"><ShieldAlert size={20} /> Zona de Perigo</div>{isOwner ? (<><p className="text-sm text-red-300">Como dono, podes apagar este grupo permanentemente. Esta ação é irreversível.</p><button onClick={deleteThisGroup} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><Trash2 size={18} /> Apagar Grupo</button></>) : (<><p className="text-sm text-red-300">Se saíres do grupo, deixarás de receber notificações e convocatórias. O teu histórico de jogos neste grupo será mantido.</p><button onClick={leaveThisGroup} className="w-full bg-red-600/80 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"><LogOut size={18} /> Sair do Grupo</button></>)}</div>
+            {amIAdmin && <div style={{ display: "flex", gap: 8 }}><button onClick={(e) => { e.stopPropagation(); remove(p); }} className="ft-btn ft-danger" style={{ flex: 1, padding: 10, fontSize: 12 }}><Trash2 size={14} /> Eliminar</button></div>}
           </div>
         )}
       </div>
-
-      <div className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe z-30">
-        <div className="flex items-center justify-center">
-            <div className="flex overflow-x-auto items-center p-2 gap-4 px-6 no-scrollbar w-full max-w-3xl md:justify-center">
-                <NavButton active={activeTab==='schedule'} onClick={()=>setActiveTab('schedule')} icon={CalendarCheck} label="Agenda" />
-                {hasMonthlyFee && <NavButton active={activeTab==='members'} onClick={()=>setActiveTab('members')} icon={ClipboardList} label="Inscrições" />}
-                <NavButton active={activeTab==='team'} onClick={()=>setActiveTab('team')} icon={Shield} label="Equipa" />
-                <NavButton active={activeTab==='players'} onClick={()=>setActiveTab('players')} icon={Users} label="Plantel" />
-                <NavButton active={activeTab==='history'} onClick={()=>setActiveTab('history')} icon={HistoryIcon} label="Jogos" />
-                <NavButton active={activeTab==='trophies'} onClick={()=>setActiveTab('trophies')} icon={Trophy} label="Carreira" />
-                {amIAdmin && <NavButton active={activeTab==='treasury'} onClick={()=>setActiveTab('treasury')} icon={Wallet} label="Tesouraria" />}
-                <NavButton active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} icon={Settings} label="Definições" />
-            </div>
+    );
+  };
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {!inRoster && <button onClick={() => { setPlayers((ps) => [...ps, { id: "me-new", uid: me.uid, name: "Eu", type: "member", isAdmin: isOwner, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, votes: {} }]); showToast("Entraste no plantel!"); }} className="ft-btn" style={{ background: "rgba(34,197,94,.12)", border: "1px solid rgba(34,197,94,.4)", color: "var(--grass-bright)", padding: 14, justifyContent: "space-between" }}><span style={{ display: "flex", alignItems: "center", gap: 10 }}><UserPlus size={18} /> Entrar no plantel</span><Plus size={16} /></button>}
+      <div className="ft-card" style={{ padding: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: 0, alignItems: "center" }}><UserPlus size={16} style={{ color: "var(--grass-bright)" }} /> Novo jogador</h3>
+          <div style={{ display: "flex", background: "#0a120f", borderRadius: 10, padding: 3, border: "1px solid var(--line)" }}>{["guest", "member"].map((t) => <button key={t} onClick={() => setType(t)} className="ft-btn" style={{ fontSize: 10, fontWeight: 700, padding: "5px 10px", background: type === t ? "var(--raised)" : "none", color: type === t ? "var(--text)" : "var(--faint)" }}>{t === "guest" ? "Convidado" : "Membro"}</button>)}</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <input className="ft-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome..." />
+          {type === "guest" && <select className="ft-input" value={host} onChange={(e) => setHost(e.target.value)}><option value="">Quem convidou?</option>{members.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
+          <button onClick={add} className="ft-btn ft-grass" style={{ padding: 11 }}><Plus size={16} /> Adicionar</button>
         </div>
       </div>
+      {members.length > 0 && <div><div className="eyebrow" style={{ marginBottom: 8, marginLeft: 4 }}>Membros - {members.length}</div><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{members.map(Card)}</div></div>}
+      {guests.length > 0 && <div><div className="eyebrow" style={{ marginBottom: 8, marginLeft: 4 }}>Convidados - {guests.length}</div><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{guests.map(Card)}</div></div>}
     </div>
   );
 };
 
-// --- COMPONENTE: GROUP SELECTOR ---
-const GroupSelector = ({ user, onLogout }) => {
-  const [view, setView] = useState('groups');
-  const [groups, setGroups] = useState([]);
-  const [newGroup, setNewGroup] = useState('');
-  const [joinCode, setJoinCode] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState(null);
-  const [msg, setMsg] = useState('');
-  const [createError, setCreateError] = useState('');
+/* ------------------------------ Equipa ----------------------------------- */
+const TeamTab = ({ players, next, avg, collectsFixed, fixedIds, setMatches, setNext, showToast, setTab }) => {
+  const goingIds = useMemo(() => {
+    const uids = Object.entries(next.responses || {}).filter(([, s]) => s === "going").map(([u]) => u);
+    return players.filter((p) => p.uid && uids.includes(p.uid)).map((p) => p.id);
+  }, [next, players]);
+  const [selected, setSelected] = useState(goingIds);
+  const [search, setSearch] = useState("");
+  const [teams, setTeams] = useState(null);
+  const [sa, setSa] = useState(""); const [sb, setSb] = useState("");
+  const [gstats, setGstats] = useState({});
+  const [showStats, setShowStats] = useState(false);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, 'artifacts', APP_ID, 'groups'), 
-      where('members', 'array-contains', user.uid)
-    );
-    return onSnapshot(q, s => {
-      const list = s.docs.map(d => ({id: d.id, ...d.data()}));
-      list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setGroups(list);
-    });
-  }, [user]);
+  const toggle = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  const filt = (list) => list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+  const members = players.filter((p) => p.type !== "guest");
+  const guests = players.filter((p) => p.type === "guest");
 
-const createGroup = async (e) => {
-  e.preventDefault();
-  if(!newGroup.trim()) return;
-  setCreateError("");
-
-  const customId = newGroup.trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-    .replace(/\s+/g, '-') 
-    .replace(/[^a-z0-9-]/g, ''); 
-
-  if (!customId) return setCreateError("Nome inválido para criar ID.");
-
-  try {
-    const docRef = doc(db, 'artifacts', APP_ID, 'groups', customId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      setCreateError("Já existe um grupo com esse nome/ID. Tenta outro.");
-      return;
-    }
-
-    await setDoc(docRef, {
-      name: newGroup,
-      ownerId: user.uid,
-      members: [user.uid],
-      createdAt: serverTimestamp()
-    });
-
-    const playersRef = collection(db, 'artifacts', APP_ID, 'groups', customId, 'players');
-    await addDoc(playersRef, {
-        name: user.displayName || "Eu",
-        uid: user.uid,
-        type: 'member',
-        stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
-        isAdmin: true, // Dono é Admin
-        photoUrl: user.photoURL,
-        votes: {},
-        createdAt: serverTimestamp()
-    });
-     
-    const newGroupData = { 
-      id: customId, 
-      name: newGroup, 
-      ownerId: user.uid, 
-      members: [user.uid],
-      createdAt: { seconds: Date.now() / 1000 }
-    };
-     
-    setGroups(prev => [newGroupData, ...prev]);
-    setNewGroup('');
-  } catch (err) {
-    console.error(err);
-    setCreateError("Erro ao criar grupo.");
-  }
-};
-
-  const joinGroup = async (e) => {
-    e.preventDefault();
-    if(!joinCode.trim()) return;
-    setMsg("");
-    try {
-      const groupId = joinCode.trim();
-      const docRef = doc(db, 'artifacts', APP_ID, 'groups', groupId);
-      const docSnap = await getDoc(docRef);
-      if(!docSnap.exists()) {
-         setMsg("Grupo não encontrado. Verifica o código.");
-         return;
-      }
-       
-      const groupData = docSnap.data();
-      if (groupData.members && groupData.members.includes(user.uid)) {
-          setMsg("Já pertences a este grupo!");
-          return;
-      }
-
-      await updateDoc(docRef, {
-        members: arrayUnion(user.uid)
-      });
-
-      const playersRef = collection(db, 'artifacts', APP_ID, 'groups', groupId, 'players');
-      const q = query(playersRef, where('uid', '==', user.uid));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-          let playerName = user.displayName || "Novo Jogador";
-          let playerPhoto = user.photoURL;
-
-          try {
-              const userDoc = await getDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
-              if(userDoc.exists()) {
-                  const userData = userDoc.data();
-                  if(userData.name) playerName = userData.name;
-                  if(userData.photoUrl) playerPhoto = userData.photoUrl;
-              }
-          } catch(e) { console.log("Erro perfil", e); }
-
-          await addDoc(playersRef, {
-            name: playerName,
-            uid: user.uid,
-            type: 'member',
-            stats: { games: 0, wins: 0, draws: 0, losses: 0, mvps: 0 },
-            isAdmin: false,
-            photoUrl: playerPhoto,
-            votes: {},
-            createdAt: serverTimestamp()
-          });
-      }
-       
-      const newGroup = { id: docSnap.id, ...groupData, members: [...(groupData.members || []), user.uid] };
-      setGroups(prev => {
-          if (prev.find(g => g.id === newGroup.id)) return prev;
-          return [newGroup, ...prev].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      });
-
-      setMsg("Entraste no grupo e no plantel!");
-      setJoinCode("");
-    } catch(err) {
-      console.error(err);
-      setMsg("Erro ao entrar.");
-    }
+  const generate = () => {
+    if (selected.length < 2) return showToast("Minimo 2 jogadores", "error");
+    const chosen = players.filter((p) => selected.includes(p.id));
+    const blocks = {};
+    chosen.forEach((p) => { let b = p.id; if (p.type === "guest" && p.hostId && selected.includes(p.hostId)) b = p.hostId; (blocks[b] ||= []).push(p); });
+    const list = Object.values(blocks).map((mem) => ({ mem, r: mem.reduce((s, p) => s + avg(p), 0) })).sort((a, b) => b.r - a.r);
+    let A = [], B = [], rA = 0, rB = 0;
+    list.forEach((blk) => { const pick = rA < rB || (rA === rB && A.length <= B.length) ? "A" : "B"; if (pick === "A") { A = [...A, ...blk.mem]; rA += blk.r; } else { B = [...B, ...blk.mem]; rB += blk.r; } });
+    const gs = {}; [...A, ...B].forEach((p) => (gs[p.id] = { g: 0, a: 0 }));
+    setGstats(gs); setTeams({ A, B }); showToast("Equipas equilibradas!");
   };
+  const bump = (pid, key, d) => setGstats((g) => ({ ...g, [pid]: { ...g[pid], [key]: Math.max(0, (g[pid]?.[key] || 0) + d) } }));
+  const finish = () => {
+    if (sa === "" || sb === "") return showToast("Insere o resultado", "error");
+    const m = { id: "m" + Date.now(), date: new Date().toISOString(), scoreA: +sa, scoreB: +sb, teamA: teams.A.map((p) => ({ id: p.id, name: p.name })), teamB: teams.B.map((p) => ({ id: p.id, name: p.name })), mvpVotes: {}, goals: gstats, payments: {}, createdAtMs: Date.now() };
+    [...teams.A, ...teams.B].forEach((p) => { if (collectsFixed ? !fixedIds.includes(p.id) : true) m.payments[p.id] = false; });
+    setMatches((ms) => [m, ...ms]);
+    if (next.frequency && next.frequency !== "once") { const d = new Date(next.date); d.setDate(d.getDate() + (next.frequency === "biweekly" ? 14 : 7)); setNext((n) => ({ ...n, date: d.toISOString(), responses: {} })); }
+    showToast("Jogo guardado! Proxima data atualizada."); setTab("history");
+  };
+  const Grid = (list) => list.length === 0 ? null : (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {list.map((p) => { const on = selected.includes(p.id); return (
+        <button key={p.id} onClick={() => toggle(p.id)} className="ft-btn" style={{ justifyContent: "flex-start", gap: 8, padding: 10, border: "1px solid", borderColor: on ? "var(--grass-bright)" : "var(--line)", background: on ? "rgba(34,197,94,.14)" : "var(--card)", color: on ? "var(--text)" : "var(--dim)" }}>
+          <div style={{ width: 16, height: 16, borderRadius: "50%", border: "1px solid", borderColor: on ? "var(--grass-bright)" : "#4a5a52", background: on ? "var(--grass-bright)" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={10} color="#04130a" />}</div>
+          <span style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{firstName(p.name)}</span>
+        </button>); })}
+    </div>
+  );
 
-  if (selectedGroup) {
-    return <GroupDashboard group={selectedGroup} currentUser={user} onBack={() => setSelectedGroup(null)} />;
-  }
-
-  if (view === 'profile') {
+  if (teams) {
     return (
-      <div className="min-h-screen bg-slate-900 pb-20">
-         <UserProfile user={user} onLogout={onLogout} />
-         <div className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe z-30">
-          <div className="flex justify-around items-center p-2 max-w-md mx-auto">
-            <NavButton active={view==='groups'} onClick={()=>setView('groups')} icon={LayoutGrid} label="Grupos" />
-            <NavButton active={view==='profile'} onClick={()=>setView('profile')} icon={User} label="Perfil" />
+      <div className="ft-pop" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ fontSize: 17, fontWeight: 800, display: "flex", gap: 8, margin: 0, alignItems: "center" }}><SoccerBall size={18} color="var(--gold)" /> Jogo a decorrer</h3>
+          <button onClick={() => setTeams(null)} style={{ background: "none", border: "none", color: "#ff9684", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+        </div>
+        <button onClick={() => showToast("Equipas copiadas - cola no WhatsApp!")} className="ft-btn" style={{ background: "rgba(106,169,224,.14)", border: "1px solid rgba(106,169,224,.3)", color: "var(--blue)", padding: 11 }}><Share2 size={16} /> Partilhar equipas</button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[["A", "Branco", "bib-white", teams.A], ["B", "Preto", "bib-black", teams.B]].map(([k, label, bib, listv]) => (
+            <div key={k} className="ft-card" style={{ padding: 12, borderTop: `3px solid ${k === "A" ? "var(--chalk)" : "#1a2620"}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", borderBottom: "1px solid var(--line)", paddingBottom: 8, marginBottom: 8 }}><span className={`bib ${bib}`}>{listv.length}</span><span style={{ fontSize: 13, fontWeight: 800 }}>{label}</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{listv.map((p) => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12 }}><Avatar name={p.name} size={20} /> {firstName(p.name)}</div>)}</div>
+            </div>
+          ))}
+        </div>
+        <div className="ft-card" style={{ padding: 18 }}>
+          <div className="eyebrow" style={{ textAlign: "center", marginBottom: 12 }}>Resultado final</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
+            <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="0" className="num" style={{ width: 64, height: 64, textAlign: "center", fontSize: 30, background: "#0a120f", border: "1px solid var(--line)", borderRadius: 14, color: "var(--chalk)", outline: "none" }} />
+            <span style={{ color: "var(--faint)", fontWeight: 300, fontSize: 22 }}>x</span>
+            <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="0" className="num" style={{ width: 64, height: 64, textAlign: "center", fontSize: 30, background: "#0a120f", border: "1px solid var(--line)", borderRadius: 14, color: "var(--chalk)", outline: "none" }} />
           </div>
         </div>
+        <button onClick={() => setShowStats((s) => !s)} className="ft-btn ft-ghost" style={{ padding: 12, justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><SoccerBall size={15} color="var(--grass-bright)" /> Golos & assistencias (opcional)</span>
+          <span style={{ transform: showStats ? "rotate(90deg)" : "none", transition: "transform .2s" }}><ArrowRight size={16} /></span>
+        </button>
+        {showStats && (
+          <div className="ft-card ft-in" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 28, paddingRight: 4, marginBottom: 4 }}>
+              <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span>
+              <span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span>
+            </div>
+            {[...teams.A, ...teams.B].map((p) => (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderTop: "1px solid var(--line-soft)" }}>
+                <Avatar name={p.name} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                <Stepper val={gstats[p.id]?.g || 0} onDec={() => bump(p.id, "g", -1)} onInc={() => bump(p.id, "g", 1)} color="var(--grass-bright)" />
+                <Stepper val={gstats[p.id]?.a || 0} onDec={() => bump(p.id, "a", -1)} onInc={() => bump(p.id, "a", 1)} color="var(--blue)" />
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={finish} className="ft-btn ft-grass" style={{ width: "100%", padding: 14 }}>Terminar jogo</button>
       </div>
     );
   }
-
   return (
-    <div className="min-h-screen bg-slate-900 p-4 md:p-8 animate-in fade-in duration-300 pb-24">
-      <div className="max-w-4xl mx-auto">
-        <header className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2"><LayoutGrid className="text-emerald-500"/> Meus Grupos</h1>
-            <p className="text-slate-400 text-sm">Olá, <span className="text-white font-medium">{user.displayName || "Jogador"}</span></p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden border border-slate-700" onClick={() => setView('profile')}>
-             {user.photoURL ? <img src={user.photoURL} alt="Eu" className="w-full h-full object-cover" /> : <User className="p-2 text-slate-400 w-full h-full"/>}
-          </div>
-        </header>
-
-        <div className="grid md:grid-cols-2 gap-4 mb-8">
-           <div className="bg-slate-800 p-4 sm:p-6 rounded-xl border border-slate-700 shadow-lg">
-             <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><PlusCircle className="text-emerald-400" size={18}/> Criar Novo Grupo</h2>
-             <form onSubmit={createGroup} className="flex flex-col sm:flex-row gap-3">
-               <input type="text" value={newGroup} onChange={e=>setNewGroup(e.target.value)} placeholder="Nome do grupo..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 sm:py-2 text-white focus:border-emerald-500 outline-none transition-colors"/>
-               <button type="submit" disabled={!newGroup.trim()} className="w-full sm:w-auto bg-emerald-600 text-white px-4 py-3 sm:py-2 rounded-lg font-bold hover:bg-emerald-500 disabled:opacity-50 transition-colors">Criar</button>
-             </form>
-             {createError && <div className="mt-3 text-xs bg-red-900/30 text-red-400 p-2 rounded border border-red-500/30 flex items-center gap-2"><AlertCircle size={12}/> {createError}</div>}
-           </div>
-
-           <div className="bg-slate-800 p-4 sm:p-6 rounded-xl border border-slate-700 shadow-lg">
-             <h2 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><UserPlus className="text-blue-400" size={18}/> Entrar com Código</h2>
-             <form onSubmit={joinGroup} className="flex flex-col sm:flex-row gap-3">
-               <input type="text" value={joinCode} onChange={e=>setJoinCode(e.target.value)} placeholder="Código do convite..." className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 sm:py-2 text-white focus:border-blue-500 outline-none transition-colors"/>
-               <button type="submit" disabled={!joinCode.trim()} className="w-full sm:w-auto bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg font-bold hover:bg-blue-500 disabled:opacity-50 transition-colors">Entrar</button>
-             </form>
-             {msg && <p className="text-xs text-emerald-400 mt-2">{msg}</p>}
-           </div>
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="ft-card" style={{ padding: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>Selecionar - {selected.length}</h3>
+          <button onClick={generate} className="ft-btn ft-grass" style={{ fontSize: 12, padding: "8px 14px" }}><Shuffle size={14} /> Criar equipas</button>
         </div>
+        <input className="ft-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar jogador..." />
+      </div>
+      {filt(members).length > 0 && <div><div className="eyebrow" style={{ marginBottom: 8 }}>Membros</div>{Grid(filt(members))}</div>}
+      {filt(guests).length > 0 && <div><div className="eyebrow" style={{ marginBottom: 8 }}>Convidados</div>{Grid(filt(guests))}</div>}
+    </div>
+  );
+};
 
-        {groups.length === 0 ? (
-          <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-xl"><Users size={48} className="mx-auto text-slate-700 mb-4"/><p className="text-slate-500">Cria um grupo ou pede um código a um amigo!</p></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {groups.map(g => (
-              <div key={g.id} onClick={() => setSelectedGroup(g)} className="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-emerald-500/50 cursor-pointer transition-all hover:translate-y-[-2px] group relative shadow-md">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-slate-900 rounded-lg text-emerald-500 group-hover:text-emerald-400 transition-colors"><Users size={24}/></div>
-                </div>
-                <h3 className="text-lg font-bold text-white mb-1 truncate">{g.name}</h3>
-                <p className="text-xs text-slate-500 flex items-center gap-1 group-hover:text-emerald-400 transition-colors">Entrar no grupo <ArrowRight size={12}/></p>
+/* ------------------------------ Jogos ------------------------------------ */
+const HistoryTab = ({ matches, setMatches, matchMVP, amIAdmin, me, showToast }) => {
+  const [voting, setVoting] = useState(null);
+  const [pick, setPick] = useState("");
+  const vote = (m) => { if (!pick) return; setMatches((ms) => ms.map((x) => x.id === m.id ? { ...x, mvpVotes: { ...x.mvpVotes, [me.uid]: pick } } : x)); setVoting(null); setPick(""); showToast("Voto registado!"); };
+  const del = (id) => { setMatches((ms) => ms.filter((m) => m.id !== id)); showToast("Jogo apagado"); };
+  if (matches.length === 0) return <div style={{ textAlign: "center", color: "var(--faint)", fontStyle: "italic", padding: 40 }}>Sem jogos registados ainda.</div>;
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {matches.map((m) => {
+        const d = m.createdAtMs ? new Date(m.createdAtMs) : new Date(m.date);
+        const hrs = (Date.now() - d.getTime()) / 36e5;
+        const open = hrs < 48; const left = Math.max(0, Math.round(48 - hrs));
+        const mvp = matchMVP(m); const myVote = m.mvpVotes?.[me.uid];
+        const scorers = m.goals ? Object.entries(m.goals).filter(([, v]) => v.g || v.a) : [];
+        const allp = [...(m.teamA || []), ...(m.teamB || [])];
+        return (
+          <div key={m.id} className="ft-card" style={{ overflow: "hidden", padding: 0 }}>
+            <div style={{ background: "rgba(0,0,0,.25)", padding: "7px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="eyebrow">{d.toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}</span>
+              {amIAdmin && <button onClick={() => del(m.id)} className="ft-btn" style={{ background: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={13} /></button>}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "18px 14px 12px" }}>
+              <div style={{ textAlign: "center" }}><span className="bib bib-white" style={{ marginBottom: 6 }}>B</span><div className="num" style={{ fontSize: 44, color: m.scoreA > m.scoreB ? "var(--grass-bright)" : "var(--text)" }}>{m.scoreA}</div></div>
+              <span style={{ color: "var(--faint)", fontWeight: 300, fontSize: 18 }}>x</span>
+              <div style={{ textAlign: "center" }}><span className="bib bib-black" style={{ marginBottom: 6 }}>P</span><div className="num" style={{ fontSize: 44, color: m.scoreB > m.scoreA ? "var(--grass-bright)" : "var(--text)" }}>{m.scoreB}</div></div>
+            </div>
+            {scorers.length > 0 && (
+              <div style={{ padding: "0 12px 12px", display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+                {scorers.map(([pid, v]) => { const nm = firstName(allp.find((p) => p.id === pid)?.name || "?"); return (
+                  <span key={pid} style={{ fontSize: 11, color: "var(--dim)", background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "3px 10px" }}>{nm}{v.g ? <b style={{ color: "var(--grass-bright)" }}> {v.g}G</b> : ""}{v.a ? <b style={{ color: "var(--blue)" }}> {v.a}A</b> : ""}</span>); })}
+              </div>
+            )}
+            <div style={{ background: "rgba(0,0,0,.2)", borderTop: "1px solid var(--line)", padding: 12, minHeight: 52, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {!open ? (mvp ? <div className="ft-pop" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--gold)" }}><Trophy size={15} style={{ fill: "var(--gold)" }} /><span style={{ fontSize: 13, fontWeight: 700 }}>MVP: {firstName(mvp.name)} - {mvp.votes} votos</span></div> : <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Votacao encerrada</span>)
+                : myVote ? <div style={{ textAlign: "center" }}><div style={{ fontSize: 11, color: "var(--grass-bright)", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Check size={11} /> Voto registado</div><div style={{ fontSize: 10, color: "var(--faint)" }}>Resultado em {left}h</div></div>
+                  : voting === m.id ? <div style={{ display: "flex", gap: 8, width: "100%" }}><select value={pick} onChange={(e) => setPick(e.target.value)} className="ft-input" style={{ padding: 8, fontSize: 12 }}><option value="">Quem foi o craque?</option>{allp.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button onClick={() => vote(m)} className="ft-btn" style={{ background: "var(--gold)", color: "#1a1300", padding: "0 16px", fontSize: 12 }}>Votar</button></div>
+                    : <button onClick={() => setVoting(m.id)} className="ft-btn" style={{ background: "none", color: "var(--gold)", fontSize: 12, fontWeight: 700 }}><Star size={13} /> Votar MVP - faltam {left}h</button>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ----------------------------- Carreira ---------------------------------- */
+const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, matches }) => {
+  const s = myProfile?.stats || {};
+  const winRate = s.games ? s.wins / s.games : 0;
+  const scorerMap = useMemo(() => { const map = {}; matches.forEach((m) => Object.entries(m.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; })); return map; }, [matches]);
+  const mine = scorerMap[myProfile?.id] || { g: 0, a: 0 };
+  const top = Object.entries(scorerMap).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name })).filter((x) => x.name).sort((a, b) => b.g - a.g || b.a - a.a).slice(0, 5);
+  const ach = [
+    { ok: s.games >= 50, Icon: Trophy, c: "var(--gold)", t: "Lenda do clube", d: "+50 jogos realizados" },
+    { ok: s.games >= 10, Icon: Medal, c: "var(--blue)", t: "Veterano", d: "+10 jogos realizados" },
+    { ok: winRate > 0.6 && s.games >= 5, Icon: Flame, c: "#ff8a4c", t: "Imparavel", d: "+60% vitorias (min. 5 jogos)" },
+    { ok: mine.g >= 10, Icon: SoccerBall, c: "var(--grass-bright)", t: "Goleador", d: "+10 golos marcados" },
+    { ok: fixedIds.includes(myProfile?.id), Icon: ShieldCheck, c: "var(--grass-bright)", t: "Membro fixo", d: "Inscrito na epoca/mes atual" },
+  ];
+  const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 12, padding: 10, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 22, color: color || "var(--text)" }}>{value}</div></div>);
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="ft-card" style={{ padding: 22, position: "relative", overflow: "hidden" }}>
+        <Trophy size={120} style={{ position: "absolute", top: -10, right: -10, color: "var(--gold)", opacity: .06 }} />
+        <div style={{ position: "relative", textAlign: "center" }}>
+          <div style={{ margin: "0 auto 10px", width: 84, height: 84 }}><Avatar name={myProfile?.name || "Eu"} size={84} /></div>
+          <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: 0 }}>{(myProfile?.name || "EU").toUpperCase()}</h2>
+          <p className="eyebrow" style={{ marginTop: 4, marginBottom: 18 }}>Estatisticas de carreira</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
+            <Stat label="Jogos" value={s.games || 0} /><Stat label="Vitorias" value={s.wins || 0} color="var(--grass-bright)" /><Stat label="Win %" value={`${Math.round(winRate * 100)}%`} color="var(--blue)" />
+            <Stat label="Golos" value={mine.g} color="var(--grass-bright)" /><Stat label="Assist." value={mine.a} color="var(--blue)" /><Stat label="MVPs" value={mvpCount(myProfile?.id)} color="var(--gold)" />
+          </div>
+          {amIAdmin && <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(106,169,224,.1)", border: "1px solid rgba(106,169,224,.3)", borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: "var(--blue)" }}><Star size={12} style={{ fill: "var(--blue)" }} /> Rating medio: {avg(myProfile)}</div>}
+        </div>
+      </div>
+
+      <div className="ft-card" style={{ padding: 18 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 14px" }}><SoccerBall size={16} color="var(--grass-bright)" /> Melhores marcadores</h3>
+        {top.length === 0 ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", margin: 0 }}>Ainda sem golos registados.</p> : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {top.map((p, i) => (
+              <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span className="num" style={{ width: 22, textAlign: "center", fontSize: 16, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
+                <Avatar name={p.name} size={30} /><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{firstName(p.name)}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--grass-bright)" }}>{p.g}G</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--blue)" }}>{p.a}A</span>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div className="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe z-30">
-        <div className="flex justify-around items-center p-2 max-w-md mx-auto">
-          <NavButton active={view==='groups'} onClick={()=>setView('groups')} icon={LayoutGrid} label="Grupos" />
-          <NavButton active={view==='profile'} onClick={()=>setView('profile')} icon={User} label="Perfil" />
+
+      <div className="ft-card" style={{ padding: 18 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Award size={16} style={{ color: "var(--gold)" }} /> Conquistas</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {ach.map((a, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 14, border: "1px solid", borderColor: a.ok ? "rgba(245,197,66,.25)" : "var(--line)", background: a.ok ? "linear-gradient(90deg,rgba(245,197,66,.08),transparent)" : "rgba(0,0,0,.15)", opacity: a.ok ? 1 : .45, filter: a.ok ? "none" : "grayscale(1)" }}>
+              <div style={{ padding: 9, borderRadius: "50%", background: "#0a120f", border: "1px solid var(--line)" }}><a.Icon size={17} color={a.c} style={{ color: a.c }} /></div>
+              <div style={{ textAlign: "left" }}><div style={{ fontSize: 13, fontWeight: 700 }}>{a.t}</div><div style={{ fontSize: 10, color: "var(--dim)" }}>{a.d}</div></div>
+              {a.ok && <CheckCircle size={16} style={{ marginLeft: "auto", color: "var(--grass-bright)" }} />}
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 };
 
-// --- APP PRINCIPAL ---
-const MainApp = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-     const unsubscribe = onAuthStateChanged(auth, u => { 
-         setUser(u); 
-         setLoading(false); 
-     });
-     return () => unsubscribe();
-  }, []);
-
-  if(loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-emerald-500"><Loader2 className="animate-spin" size={40}/></div>;
-  if(!user) return <AuthScreen />;
-  return <GroupSelector user={user} onLogout={() => signOut(auth)} />;
+/* --------------------------- Inscricoes ---------------------------------- */
+const MembersTab = ({ fixedIds, setFixedIds, players, myProfile, showToast, paymentModel }) => {
+  const season = paymentModel === "season";
+  const inscrito = fixedIds.includes(myProfile?.id);
+  return (
+    <div className="ft-in ft-card" style={{ padding: 22 }}>
+      <h3 style={{ textAlign: "center", fontSize: 14, fontWeight: 800, display: "flex", justifyContent: "center", gap: 8, margin: "0 0 4px" }}><ClipboardList size={18} style={{ color: "var(--grass-bright)" }} /> {season ? "Inscricoes da epoca" : "Inscricoes mensais"}</h3>
+      <p style={{ textAlign: "center", fontSize: 12, color: "var(--dim)", margin: "0 0 18px" }}>{season ? "Inscreve-te como fixo desta epoca." : "Inscreve-te como fixo deste mes."}</p>
+      {inscrito
+        ? <button onClick={() => { setFixedIds((f) => f.filter((i) => i !== myProfile.id)); showToast("Inscricao cancelada"); }} className="ft-btn ft-danger" style={{ width: "100%", padding: 12, marginBottom: 18 }}>Cancelar inscricao</button>
+        : <button onClick={() => { setFixedIds((f) => [...f, myProfile.id]); showToast("Inscrito como fixo!"); }} className="ft-btn ft-grass" style={{ width: "100%", padding: 12, marginBottom: 18 }}>Inscrever-me</button>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {fixedIds.map((id) => { const p = players.find((pl) => pl.id === id); return p ? (
+          <div key={id} className="ft-raised" style={{ borderRadius: 12, padding: 10, display: "flex", alignItems: "center", gap: 10 }}><Avatar name={p.name} size={32} /><span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>{id === myProfile?.id && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: "var(--grass-bright)", background: "rgba(34,197,94,.12)", border: "1px solid rgba(34,197,94,.3)", padding: "3px 8px", borderRadius: 8 }}>Eu</span>}</div>) : null; })}
+      </div>
+    </div>
+  );
 };
 
-export default function App() {
+/* ----------------------------- Tesouraria -------------------------------- */
+const TreasuryTab = ({ players, matches, setMatches, collectsFixed, fixedIds, payments, setPayments, fixedFee, fee, fixedLabel, totalRevenue, totalDebt, showToast }) => {
+  const debtsOf = (pid) => {
+    const arr = [];
+    if (collectsFixed && fixedIds.includes(pid) && !payments[pid]) arr.push({ id: "fixed", desc: fixedLabel, amount: fixedFee, pay: () => { setPayments((p) => ({ ...p, [pid]: true })); showToast(`${fixedLabel} paga!`); } });
+    matches.forEach((m) => { if (m.payments?.[pid] === false) arr.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString("pt-PT", { day: "numeric", month: "numeric" })}`, amount: fee, pay: () => { setMatches((ms) => ms.map((x) => x.id === m.id ? { ...x, payments: { ...x.payments, [pid]: true } } : x)); showToast("Jogo pago!"); } }); });
+    return arr;
+  };
+  const withDebt = players.map((p) => ({ ...p, debts: debtsOf(p.id) })).filter((p) => p.debts.length).sort((a, b) => b.debts.reduce((s, d) => s + d.amount, 0) - a.debts.reduce((s, d) => s + d.amount, 0));
   return (
-    <ErrorBoundary>
-        <MainApp />
-    </ErrorBoundary>
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, display: "flex", gap: 8, margin: 0, alignItems: "center" }}><Wallet size={18} style={{ color: "var(--grass-bright)" }} /> Tesouraria</h2>
+        <input type="month" defaultValue={new Date().toISOString().slice(0, 7)} className="ft-input" style={{ width: "auto", padding: "6px 10px", fontSize: 12 }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="ft-card" style={{ padding: 16, background: "linear-gradient(135deg,rgba(34,197,94,.12),var(--card))", borderColor: "rgba(34,197,94,.25)" }}><div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Recebido</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{totalRevenue.toFixed(2)}EUR</div></div>
+        <div className="ft-card" style={{ padding: 16, background: "linear-gradient(135deg,rgba(240,86,58,.12),var(--card))", borderColor: "rgba(240,86,58,.25)" }}><div className="eyebrow" style={{ color: "#ff9684" }}>Divida total</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{totalDebt.toFixed(2)}EUR</div></div>
+      </div>
+      <div className="ft-card" style={{ padding: 16 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 14px", alignItems: "center" }}><AlertCircle size={17} style={{ color: "#ff9684" }} /> Dividas pendentes</h3>
+        {withDebt.length === 0 ? <div style={{ textAlign: "center", color: "var(--faint)", padding: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}><CheckCircle size={30} /><span>Tudo regularizado!</span></div>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {withDebt.map((p) => (
+              <div key={p.id} className="ft-raised" style={{ borderRadius: 14, overflow: "hidden", borderColor: "rgba(240,86,58,.2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, background: "rgba(0,0,0,.2)", borderBottom: "1px solid var(--line)" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={p.name} size={32} /><div><div style={{ fontSize: 13, fontWeight: 700 }}>{p.name}</div>{p.type === "guest" && <div style={{ fontSize: 9, color: "var(--faint)" }}>Convidado</div>}</div></div><div className="num" style={{ fontSize: 18, color: "#ff9684" }}>{p.debts.reduce((s, d) => s + d.amount, 0).toFixed(2)}EUR</div></div>
+                <div style={{ padding: 6 }}>{p.debts.map((d) => (<div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px" }}><span style={{ fontSize: 12, color: "var(--dim)" }}>{d.desc}</span><div style={{ display: "flex", alignItems: "center", gap: 12 }}><span style={{ fontSize: 12, color: "var(--dim)" }}>{d.amount.toFixed(2)}EUR</span><button onClick={d.pay} className="ft-btn" style={{ background: "rgba(34,197,94,.15)", color: "var(--grass-bright)", padding: 7, borderRadius: 9 }}><CheckCircle size={15} /></button></div></div>))}</div>
+              </div>
+            ))}
+          </div>}
+      </div>
+    </div>
+  );
+};
+
+/* ----------------------------- Definicoes -------------------------------- */
+const SettingsTab = ({ settings, setSettings, next, setNext, isOwner, amIAdmin, showToast, onBack }) => {
+  const set = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
+  const Label = ({ children }) => <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>{children}</label>;
+  const MODELS = [["pergame", "Jogo-a-jogo"], ["monthly", "Mensal"], ["season", "Epoca"]];
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {amIAdmin && (
+        <div className="ft-card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Wallet size={17} style={{ color: "var(--blue)" }} /> Modelo de pagamento</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)", marginBottom: 14 }}>
+            {MODELS.map(([v, l]) => <button key={v} onClick={() => set("paymentModel", v)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 12, background: settings.paymentModel === v ? "var(--grass)" : "none", color: settings.paymentModel === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
+          </div>
+          <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>
+            {settings.paymentModel === "pergame" && "Todos pagam um valor por cada jogo."}
+            {settings.paymentModel === "monthly" && "Os fixos pagam uma mensalidade; convidados pagam por jogo."}
+            {settings.paymentModel === "season" && "Os fixos pagam uma vez por toda a epoca; convidados pagam por jogo."}
+          </p>
+          {settings.paymentModel === "monthly" && <div style={{ marginBottom: 14 }}><Label>Valor da mensalidade (EUR)</Label><input type="number" step="0.50" className="ft-input" value={settings.monthlyFee} onChange={(e) => set("monthlyFee", e.target.value)} /></div>}
+          {settings.paymentModel === "season" && <div style={{ marginBottom: 14 }}><Label>Valor da epoca (EUR)</Label><input type="number" step="1" className="ft-input" value={settings.seasonFee} onChange={(e) => set("seasonFee", e.target.value)} /></div>}
+          <Label>Preco por jogo ({settings.paymentModel === "pergame" ? "todos" : "convidados"}) (EUR)</Label>
+          <input type="number" step="0.10" className="ft-input" value={settings.guestFee} onChange={(e) => set("guestFee", e.target.value)} />
+        </div>
+      )}
+      {amIAdmin && (
+        <div className="ft-card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Clock size={17} style={{ color: "var(--blue)" }} /> Proximo jogo</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div><Label>Data</Label><input type="date" className="ft-input" defaultValue={new Date(next.date).toISOString().slice(0, 10)} /></div>
+            <div><Label>Hora</Label><input type="time" className="ft-input" defaultValue={new Date(next.date).toTimeString().slice(0, 5)} /></div>
+          </div>
+          <Label>Periodicidade</Label>
+          <select className="ft-input" value={next.frequency} onChange={(e) => setNext((n) => ({ ...n, frequency: e.target.value }))}><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select>
+        </div>
+      )}
+      {amIAdmin && (
+        <div className="ft-card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 12px", alignItems: "center" }}><MapIcon size={17} style={{ color: "var(--grass-bright)" }} /> Localizacao do campo</h3>
+          <input className="ft-input" placeholder="Cola aqui o link do Google Maps..." />
+          <p style={{ fontSize: 10, color: "var(--faint)", marginTop: 8 }}>A meteorologia e atualizada com base neste link.</p>
+        </div>
+      )}
+      {amIAdmin && <button onClick={() => showToast("Definicoes guardadas!")} className="ft-btn" style={{ width: "100%", background: "var(--blue)", color: "#04101c", padding: 13 }}><Save size={18} /> Guardar definicoes</button>}
+      <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 20, marginTop: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#ff9684", fontWeight: 800, marginBottom: 10 }}><ShieldAlert size={18} /> Zona de perigo</div>
+        <p style={{ fontSize: 13, color: "#ffb3a5", margin: "0 0 14px" }}>{isOwner ? "Como dono, podes apagar este grupo permanentemente. Esta acao e irreversivel." : "Se saires do grupo, deixas de receber convocatorias. O historico e mantido."}</p>
+        <button onClick={onBack} className="ft-btn ft-danger" style={{ width: "100%", padding: 13 }}>{isOwner ? <><Trash2 size={17} /> Apagar grupo</> : <><LogOut size={17} /> Sair do grupo</>}</button>
+      </div>
+    </div>
+  );
+};
+
+/* ============================== ROOT ===================================== */
+export default function App() {
+  const [screen, setScreen] = useState("auth");
+  const [group, setGroup] = useState(null);
+  return (
+    <div className="ft" style={{ minHeight: "100vh" }}>
+      <style>{STYLES}</style>
+      {screen === "auth" && <AuthScreen onEnter={() => setScreen("groups")} />}
+      {screen === "groups" && <GroupSelector onOpen={(g) => { setGroup(g); setScreen("group"); }} onProfile={() => setScreen("profile")} />}
+      {screen === "profile" && <ProfileScreen onBack={() => setScreen("groups")} />}
+      {screen === "group" && <GroupDashboard group={group} onBack={() => setScreen("groups")} />}
+    </div>
   );
 }
