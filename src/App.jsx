@@ -567,20 +567,52 @@ const ChatTab = ({ messages, setMessages, me }) => {
 };
 
 /* ------------------------------ Tatica ----------------------------------- */
-const FORMATIONS = {
-  "2-2": [[50, 91], [30, 70], [70, 70], [32, 50], [68, 50]],
-  "Losango": [[50, 91], [50, 72], [27, 55], [73, 55], [50, 40]],
-  "1-2-1": [[50, 91], [50, 74], [28, 58], [72, 58], [50, 42]],
-  "3-1": [[50, 91], [27, 72], [50, 72], [73, 72], [50, 52]],
+const TACTIC_SYSTEMS = {
+  "5x5": {
+    defaultFormation: "2-2",
+    formations: {
+      "2-2": [[50, 91], [30, 70], [70, 70], [32, 50], [68, 50]],
+      "Losango": [[50, 91], [50, 72], [27, 55], [73, 55], [50, 40]],
+      "1-2-1": [[50, 91], [50, 74], [28, 58], [72, 58], [50, 42]],
+      "3-1": [[50, 91], [27, 72], [50, 72], [73, 72], [50, 52]],
+    },
+  },
+  "7x7": {
+    defaultFormation: "2-3-1",
+    formations: {
+      "2-3-1": [[50,91],[30,75],[70,75],[20,58],[50,58],[80,58],[50,38]],
+      "3-2-1": [[50,91],[22,76],[50,76],[78,76],[35,58],[65,58],[50,38]],
+      "2-1-2-1": [[50,91],[30,76],[70,76],[50,64],[28,50],[72,50],[50,34]],
+    },
+  },
+  "11x11": {
+    defaultFormation: "4-3-3",
+    formations: {
+      "4-3-3": [[50,92],[18,78],[38,80],[62,80],[82,78],[28,62],[50,58],[72,62],[20,36],[50,28],[80,36]],
+      "4-4-2": [[50,92],[18,78],[38,80],[62,80],[82,78],[18,56],[40,60],[60,60],[82,56],[38,34],[62,34]],
+      "3-5-2": [[50,92],[24,78],[50,80],[76,78],[18,60],[36,56],[50,52],[64,56],[82,60],[40,32],[60,32]],
+    },
+  },
 };
-const makeTeam = (form, team) => FORMATIONS[form].map((pos, i) => ({
-  id: `${team}${i}`, team, label: i === 0 ? "GR" : String(i),
-  x: team === "black" ? pos[0] : pos[0], y: team === "black" ? 100 - pos[1] : pos[1],
-}));
+const buildTokens = (mode, formation, team, roster = []) => {
+  const pts = TACTIC_SYSTEMS[mode].formations[formation] || [];
+  return pts.map((pos, i) => ({
+    id: `${team}-${i}`,
+    team,
+    slot: i,
+    playerId: roster[i]?.id || null,
+    label: i === 0 ? "GR" : String(i),
+    x: pos[0],
+    y: team === "black" ? 100 - pos[1] : pos[1],
+  }));
+};
 
 const TacticsTab = ({ members, showToast }) => {
-  const [form, setForm] = useState("2-2");
-  const [tokens, setTokens] = useState(() => makeTeam("2-2", "white"));
+  const [mode, setMode] = useState("5x5");
+  const [form, setForm] = useState(TACTIC_SYSTEMS["5x5"].defaultFormation);
+  const [whiteRoster, setWhiteRoster] = useState([]);
+  const [bench, setBench] = useState(members);
+  const [tokens, setTokens] = useState(() => buildTokens("5x5", TACTIC_SYSTEMS["5x5"].defaultFormation, "white", []));
   const [hasOpp, setHasOpp] = useState(false);
   const [hasBall, setHasBall] = useState(true);
   const [ball, setBall] = useState({ x: 50, y: 50 });
@@ -590,14 +622,57 @@ const TacticsTab = ({ members, showToast }) => {
   const dragRef = useRef(null);
   const drawingRef = useRef(false);
 
+  useEffect(() => {
+    setBench((prev) => {
+      const used = new Set(whiteRoster.map((p) => p.id));
+      const fresh = members.filter((m) => !used.has(m.id));
+      return fresh;
+    });
+  }, [members]);
+
   const pct = (e) => { const r = boardRef.current.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }; };
+  const syncWhiteTokens = (roster, nextMode = mode, nextForm = form) => {
+    const white = buildTokens(nextMode, nextForm, "white", roster);
+    const black = hasOpp ? buildTokens(nextMode, nextForm, "black", []) : [];
+    setTokens([...white, ...black]);
+  };
 
-  const applyForm = (f) => { setForm(f); setTokens((prev) => { const w = makeTeam(f, "white"); const b = prev.filter((t) => t.team === "black"); return hasOpp ? [...w, ...makeTeam(f, "black")] : w; }); };
-  const toggleOpp = () => { setHasOpp((o) => { const n = !o; setTokens((prev) => { const w = prev.filter((t) => t.team === "white"); return n ? [...w, ...makeTeam(form, "black")] : w; }); return n; }); };
-  const loadRoster = () => { setTokens((prev) => prev.map((t) => t.team === "white" && t.label !== "GR" ? { ...t, label: initials(members[+t.label]?.name || t.label).slice(0, 3) } : t)); showToast("Nomes do plantel aplicados"); };
-  const reset = () => { setTokens(makeTeam(form, "white")); setHasOpp(false); setStrokes([]); setBall({ x: 50, y: 50 }); showToast("Quadro reposto"); };
+  const switchMode = (m) => {
+    const df = TACTIC_SYSTEMS[m].defaultFormation;
+    const starters = whiteRoster.slice(0, TACTIC_SYSTEMS[m].formations[df].length);
+    const overflow = whiteRoster.slice(TACTIC_SYSTEMS[m].formations[df].length);
+    setBench((b) => [...overflow, ...b.filter((x) => !overflow.find((o) => o.id === x.id))]);
+    setWhiteRoster(starters);
+    setMode(m); setForm(df); syncWhiteTokens(starters, m, df);
+  };
+  const applyForm = (f) => { setForm(f); syncWhiteTokens(whiteRoster, mode, f); };
+  const toggleOpp = () => { const n = !hasOpp; setHasOpp(n); setTokens((prev) => [...prev.filter(t=>t.team==="white"), ...(n ? buildTokens(mode, form, "black", []) : [])]); };
+  const loadRoster = () => {
+    const limit = TACTIC_SYSTEMS[mode].formations[form].length;
+    const starters = members.slice(0, limit);
+    const subs = members.slice(limit);
+    setWhiteRoster(starters); setBench(subs); syncWhiteTokens(starters); showToast("Plantel aplicado à tática");
+  };
+  const reset = () => { setWhiteRoster([]); setBench(members); setTokens(buildTokens(mode, form, "white", [])); setHasOpp(false); setStrokes([]); setBall({ x: 50, y: 50 }); showToast("Quadro reposto"); };
 
-  /* drag de pecas */
+  const swapBenchIn = (player, slot) => {
+    const next = [...whiteRoster];
+    const replaced = next[slot] || null;
+    next[slot] = player;
+    setWhiteRoster(next);
+    setBench((b) => [...b.filter((x) => x.id !== player.id), ...(replaced ? [replaced] : [])]);
+    syncWhiteTokens(next);
+  };
+  const removeFromField = (slot) => {
+    const next = [...whiteRoster];
+    const removed = next[slot];
+    if (!removed) return;
+    next[slot] = null;
+    setWhiteRoster(next);
+    setBench((b) => [...b, removed]);
+    syncWhiteTokens(next);
+  };
+
   const onTokenDown = (e, id) => { if (drawMode) return; e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = id; };
   const onTokenMove = (e, id) => {
     if (dragRef.current !== id) return;
@@ -606,81 +681,88 @@ const TacticsTab = ({ members, showToast }) => {
   };
   const onTokenUp = (e) => { dragRef.current = null; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { } };
 
-  /* desenho */
   const onBoardDown = (e) => { if (!drawMode) return; e.currentTarget.setPointerCapture(e.pointerId); drawingRef.current = true; const p = pct(e); setStrokes((s) => [...s, [p]]); };
   const onBoardMove = (e) => { if (!drawMode || !drawingRef.current) return; const p = pct(e); setStrokes((s) => { const c = s.slice(); c[c.length - 1] = [...c[c.length - 1], p]; return c; }); };
   const onBoardUp = () => { drawingRef.current = false; };
 
-  const Token = (t) => (
-    <div key={t.id} onPointerDown={(e) => onTokenDown(e, t.id)} onPointerMove={(e) => onTokenMove(e, t.id)} onPointerUp={onTokenUp}
-      style={{ position: "absolute", left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%,-50%)", touchAction: "none",
-        width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 11, fontWeight: 800, cursor: drawMode ? "crosshair" : "grab", userSelect: "none", zIndex: 5,
-        background: t.team === "white" ? "var(--chalk)" : "#0c0f0e", color: t.team === "white" ? "#0b0b0b" : "#cfe8da",
-        border: t.team === "white" ? "2px solid #0b0b0b" : "2px solid #3a4a43", boxShadow: "0 3px 8px rgba(0,0,0,.4)" }}>{t.label}</div>
-  );
-
-  return (
-    <div className="ft-in" style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><TacticIcon size={18} /> Quadro tatico</h2>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }} title="Desenhar"><Pencil size={16} /></button>
-          <button onClick={reset} className="ft-btn ft-ghost" style={{ padding: 9, borderRadius: 10 }} title="Repor"><RotateCcw size={16} /></button>
-        </div>
+  const Token = (t) => {
+    const p = t.team === "white" ? whiteRoster[t.slot] : null;
+    return (
+      <div key={t.id} onPointerDown={(e) => onTokenDown(e, t.id)} onPointerMove={(e) => onTokenMove(e, t.id)} onPointerUp={onTokenUp}
+        style={{ position: "absolute", left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%,-50%)", touchAction: "none",
+          width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 10, fontWeight: 800, cursor: drawMode ? "crosshair" : "grab", userSelect: "none", zIndex: 5,
+          background: t.team === "white" ? "var(--chalk)" : "#0c0f0e", color: t.team === "white" ? "#0b0b0b" : "#cfe8da",
+          border: t.team === "white" ? "2px solid #0b0b0b" : "2px solid #3a4a43", boxShadow: "0 3px 8px rgba(0,0,0,.4)" }}>
+        {p ? initials(p.name) : t.label}
       </div>
+    );
+  };
 
-      {/* campo */}
-      <div ref={boardRef} onPointerDown={onBoardDown} onPointerMove={onBoardMove} onPointerUp={onBoardUp}
-        style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: 18, overflow: "hidden", touchAction: "none",
-          border: "1px solid var(--line)", background: "linear-gradient(180deg,#13301f,#0c2016)" }}>
-        <svg viewBox="0 0 100 150" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <defs><pattern id="grass" width="100" height="12.5" patternUnits="userSpaceOnUse"><rect width="100" height="12.5" fill="rgba(255,255,255,0)" /><rect width="100" height="6.25" fill="rgba(255,255,255,.015)" /></pattern></defs>
-          <rect width="100" height="150" fill="url(#grass)" />
-          <g fill="none" stroke="rgba(245,248,246,.45)" strokeWidth="0.5">
-            <rect x="3" y="3" width="94" height="144" />
-            <line x1="3" y1="75" x2="97" y2="75" />
-            <circle cx="50" cy="75" r="11" /><circle cx="50" cy="75" r="0.9" fill="rgba(245,248,246,.7)" stroke="none" />
-            <rect x="30" y="3" width="40" height="16" /><rect x="40" y="3" width="20" height="7" />
-            <rect x="30" y="131" width="40" height="16" /><rect x="40" y="140" width="20" height="7" />
-            <rect x="42" y="0.5" width="16" height="2.5" stroke="rgba(245,248,246,.7)" />
-            <rect x="42" y="147" width="16" height="2.5" stroke="rgba(245,248,246,.7)" />
-          </g>
-        </svg>
-        {/* desenhos */}
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 3 }}>
-          {strokes.map((s, i) => <polyline key={i} points={s.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="var(--lime)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}
-        </svg>
-        {/* pecas */}
-        {tokens.map(Token)}
-        {hasBall && (
-          <div onPointerDown={(e) => onTokenDown(e, "ball")} onPointerMove={(e) => onTokenMove(e, "ball")} onPointerUp={onTokenUp}
-            style={{ position: "absolute", left: `${ball.x}%`, top: `${ball.y}%`, transform: "translate(-50%,-50%)", touchAction: "none", cursor: drawMode ? "crosshair" : "grab", zIndex: 6 }}>
-            <div style={{ background: "#fff", borderRadius: "50%", padding: 2, boxShadow: "0 2px 6px rgba(0,0,0,.5)" }}><SoccerBall size={18} color="#111" /></div>
-          </div>
-        )}
-        {drawMode && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(198,242,74,.9)", color: "#1a2200", fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 8, zIndex: 7 }}>MODO DESENHO</div>}
-      </div>
-
-      {/* controlos */}
-      <div className="ft-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>Formacao (equipa branca)</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-            {Object.keys(FORMATIONS).map((f) => <button key={f} onClick={() => applyForm(f)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 12, background: form === f ? "var(--grass)" : "var(--raised)", color: form === f ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>{f}</button>)}
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <button onClick={toggleOpp} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasOpp ? "Tirar adversario" : "Adversario (preto)"}</button>
-          <button onClick={() => setHasBall((b) => !b)} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasBall ? "Tirar bola" : "Por bola"}</button>
-          <button onClick={loadRoster} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>Nomes do plantel</button>
-          <button onClick={() => setStrokes([])} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>Limpar desenho</button>
-        </div>
-        <p style={{ fontSize: 11, color: "var(--faint)", margin: 0 }}>Arrasta as pecas e a bola. Ativa o lapis para desenhar movimentos.</p>
+  const slots = TACTIC_SYSTEMS[mode].formations[form].length;
+  return <div className="ft-in" style={{ padding: "16px 16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><TacticIcon size={18} /> Quadro tático</h2>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }}><Pencil size={16} /></button>
+        <button onClick={reset} className="ft-btn ft-ghost" style={{ padding: 9, borderRadius: 10 }}><RotateCcw size={16} /></button>
       </div>
     </div>
-  );
+
+    <div className="ft-card" style={{ padding: 12, display:"grid", gap:10 }}>
+      <div>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Formato do jogo</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+          {Object.keys(TACTIC_SYSTEMS).map((m)=><button key={m} onClick={()=>switchMode(m)} className="ft-btn" style={{padding:"10px 6px", background:mode===m?"var(--grass)":"var(--raised)", color:mode===m?"#04130a":"var(--dim)", border:"1px solid var(--line)"}}>{m}</button>)}
+        </div>
+      </div>
+      <div>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Formação</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+          {Object.keys(TACTIC_SYSTEMS[mode].formations).map((f)=><button key={f} onClick={()=>applyForm(f)} className="ft-btn" style={{padding:"9px 4px", fontSize:12, background:form===f?"var(--grass)":"var(--raised)", color:form===f?"#04130a":"var(--dim)", border:"1px solid var(--line)"}}>{f}</button>)}
+        </div>
+      </div>
+    </div>
+
+    <div ref={boardRef} onPointerDown={onBoardDown} onPointerMove={onBoardMove} onPointerUp={onBoardUp}
+      style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: 18, overflow: "hidden", touchAction: "none",
+        border: "1px solid var(--line)", background: "linear-gradient(180deg,#13301f,#0c2016)" }}>
+      <svg viewBox="0 0 100 150" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}><rect x="3" y="3" width="94" height="144" fill="none" stroke="rgba(245,248,246,.45)" strokeWidth="0.5" /><line x1="3" y1="75" x2="97" y2="75" stroke="rgba(245,248,246,.45)" strokeWidth="0.5" /><circle cx="50" cy="75" r="11" fill="none" stroke="rgba(245,248,246,.45)" strokeWidth="0.5" /></svg>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 3 }}>
+        {strokes.map((s, i) => <polyline key={i} points={s.map((p) => f"{p['x']},{p['y']}").join(" ")} fill="none" stroke="var(--lime)" strokeWidth="2" />)}
+      </svg>
+      {tokens.map(Token)}
+    </div>
+
+    <div className="ft-card" style={{ padding: 14 }}>
+      <div className="eyebrow" style={{ marginBottom: 10 }}>Campo ({whiteRoster.filter(Boolean).length}/{slots})</div>
+      <div style={{ display:"grid", gap:8 }}>
+        {Array.from({length: slots}).map((_,i)=>{
+          const p = whiteRoster[i];
+          return <div key={i} className="ft-raised" style={{borderRadius:12,padding:"10px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}><span className="bib bib-white">{i===0?"GR":i}</span><span style={{fontSize:13,fontWeight:700}}>{p ? p.name : "Lugar vazio"}</span></div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {bench.slice(0,4).map(b=><button key={b.id+"-"+i} onClick={()=>swapBenchIn(b,i)} className="ft-btn ft-ghost" style={{padding:"6px 8px",fontSize:11}}>+ {firstName(b.name)}</button>)}
+              {p && <button onClick={()=>removeFromField(i)} className="ft-btn ft-danger" style={{padding:"6px 8px",fontSize:11}}>Remover</button>}
+            </div>
+          </div>
+        })}
+      </div>
+    </div>
+
+    <div className="ft-card" style={{ padding: 14 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+        <div className="eyebrow">Banco de suplentes - {bench.length}</div>
+        <button onClick={loadRoster} className="ft-btn ft-ghost" style={{padding:"8px 10px", fontSize:12}}>Carregar plantel</button>
+      </div>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+        {bench.map((p)=><div key={p.id} className="ft-raised" style={{borderRadius:999,padding:"6px 10px",display:"flex",alignItems:"center",gap:8}}><Avatar name={p.name} size={24} /><span style={{fontSize:12,fontWeight:700}}>{firstName(p.name)}</span></div>)}
+        {bench.length===0 && <span style={{fontSize:12,color:"var(--faint)"}}>Sem suplentes disponíveis.</span>}
+      </div>
+    </div>
+  </div>;
 };
+
 
 /* ----------------------------- Plantel ----------------------------------- */
 const PlayersTab = ({ members, guests, players, setPlayers, me, amIAdmin, isOwner, avg, showToast }) => {
