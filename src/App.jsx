@@ -266,15 +266,23 @@ const Toast = ({ toast }) => !toast.show ? null : (
     color: toast.type === "error" ? "#fff" : "#04130a",
   }}>{toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}{toast.msg}</div>
 );
-const NavButton = ({ active, onClick, icon: Icon, label }) => (
-  <button onClick={onClick} data-active={active} className="navbtn ft-btn" style={{ background: "none", flexDirection: "column", minWidth: 58, padding: "6px 4px", borderRadius: 14, color: active ? "var(--grass-bright)" : "var(--faint)" }}>
-    <Icon size={22} className="tab-ico" strokeWidth={active ? 2.5 : 2} /><span style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>{label}</span>
+const NavButton = ({ active, onClick, icon: Icon, label, badge }) => (
+  <button onClick={onClick} data-active={active} className="navbtn ft-btn" style={{ background: "none", flexDirection: "column", minWidth: 58, padding: "6px 4px", borderRadius: 14, color: active ? "var(--grass-bright)" : "var(--faint)", position: "relative" }}>
+    <div style={{ position: "relative" }}>
+      <Icon size={22} className="tab-ico" strokeWidth={active ? 2.5 : 2} />
+      {badge > 0 && (
+        <div style={{ position: "absolute", top: -5, right: -7, minWidth: 16, height: 16, borderRadius: 999, background: "var(--danger)", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", border: "1.5px solid var(--bg)", lineHeight: 1 }}>
+          {badge > 99 ? "99+" : badge}
+        </div>
+      )}
+    </div>
+    <span style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>{label}</span>
   </button>
 );
 const BottomNav = ({ items }) => (
   <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, background: "rgba(10,15,14,.92)", backdropFilter: "blur(12px)", borderTop: "1px solid var(--line)", paddingBottom: "env(safe-area-inset-bottom)" }}>
     <div style={{ display: "flex", overflowX: "auto", justifyContent: "flex-start", gap: 2, padding: "8px 10px", maxWidth: 760, margin: "0 auto" }}>
-      {items.map((it) => <NavButton key={it.id} active={it.active} onClick={it.onClick} icon={it.icon} label={it.label} />)}
+      {items.map((it) => <NavButton key={it.id} active={it.active} onClick={it.onClick} icon={it.icon} label={it.label} badge={it.badge} />)}
     </div>
   </div>
 );
@@ -443,10 +451,11 @@ const UserProfile = ({ user, onLogout }) => {
 };
 
 /* ------------------------------- Chat ------------------------------------ */
-const ChatTab = ({ messages, me, onSend }) => {
+const ChatTab = ({ messages, me, onSend, onMarkRead }) => {
   const [text, setText] = useState("");
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { onMarkRead?.(); }, []);
   const send = () => { if (!text.trim()) return; onSend(text.trim()); setText(""); };
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 158px)" }}>
@@ -1034,6 +1043,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [payments, setPayments] = useState({});
   const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
   const [copied, setCopied] = useState(false);
+  const [lastReadTs, setLastReadTs] = useState(() => {
+    try { return parseInt(localStorage.getItem(`lastRead_${group.id}`) || "0"); } catch { return 0; }
+  });
 
   const me = currentUser;
   const groupRef = (col) => collection(db, "artifacts", APP_ID, "groups", group.id, col);
@@ -1100,6 +1112,16 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const members = players.filter((p) => p.type !== "guest");
   const guests = players.filter((p) => p.type === "guest");
 
+  // badges de notificacao in-app
+  const unreadChat = messages.filter((m) => m.uid !== me.uid && (m.ts || 0) > lastReadTs).length;
+  const pendingRsvp = nextGame?.date && !nextGame?.responses?.[me.uid] ? 1 : 0;
+  const myDebt = playerDebt(myProfile?.id || "") > 0 ? 1 : 0;
+  const markChatRead = () => {
+    const now = Date.now();
+    setLastReadTs(now);
+    try { localStorage.setItem(`lastRead_${group.id}`, String(now)); } catch { /* noop */ }
+  };
+
   const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { date: nextGame?.date || new Date().toISOString(), responses: { ...(nextGame?.responses || {}), [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora" : "Removido da convocatoria"); };
   const sendMessage = async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); };
   const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
@@ -1139,15 +1161,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const copyInvite = () => { navigator.clipboard?.writeText(group.id).then(() => { setCopied(true); showToast("Codigo copiado!"); setTimeout(() => setCopied(false), 1800); }).catch(() => showToast("Erro", "error")); };
 
   const TABS = [
-    { id: "schedule", icon: CalendarCheck, label: "Agenda" },
-    { id: "chat", icon: MessageSquare, label: "Chat" },
+    { id: "schedule", icon: CalendarCheck, label: "Agenda", badge: pendingRsvp },
+    { id: "chat", icon: MessageSquare, label: "Chat", badge: tab === "chat" ? 0 : unreadChat },
     { id: "team", icon: Shield, label: "Equipa" },
     { id: "tactics", icon: TacticIcon, label: "Tatica" },
     { id: "players", icon: Users, label: "Plantel" },
     { id: "history", icon: HistoryIcon, label: "Jogos" },
     { id: "trophies", icon: Trophy, label: "Carreira" },
     ...(collectsFixed ? [{ id: "members", icon: ClipboardList, label: "Inscricoes" }] : []),
-    ...(amIAdmin ? [{ id: "treasury", icon: Wallet, label: "Tesouraria" }] : []),
+    ...(amIAdmin ? [{ id: "treasury", icon: Wallet, label: "Tesouraria", badge: myDebt }] : []),
     { id: "settings", icon: Settings, label: "Definicoes" },
   ];
   useEffect(() => { if (!TABS.find((t) => t.id === tab)) setTab("schedule"); }, [collectsFixed, amIAdmin]); // eslint-disable-line
@@ -1168,7 +1190,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
       <div style={{ padding: tab === "chat" || tab === "tactics" ? 0 : 16, maxWidth: tab === "chat" ? 620 : 480, margin: "0 auto" }}>
         {tab === "schedule" && <ScheduleTab next={nextGame} players={players} me={me} locationUrl={settings.locationUrl} onToggle={toggleSchedule} />}
-        {tab === "chat" && <ChatTab messages={messages} me={me} onSend={sendMessage} />}
+        {tab === "chat" && <ChatTab messages={messages} me={me} onSend={sendMessage} onMarkRead={markChatRead} />}
         {tab === "team" && <TeamTab players={players} next={nextGame} avg={avg} onSaveMatch={saveMatch} showToast={showToast} />}
         {tab === "tactics" && <TacticsTab members={members} showToast={showToast} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
