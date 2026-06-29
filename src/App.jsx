@@ -1189,6 +1189,7 @@ const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDel
   const [freq, setFreq] = useState(next?.frequency || "weekly");
   const [locationUrl, setLocationUrl] = useState(settings.locationUrl || "");
   const [leagueModeLocal, setLeagueModeLocal] = useState(settings.leagueMode === true);
+  useEffect(() => { setLeagueModeLocal(settings.leagueMode === true); }, [settings.leagueMode]);
   const Label = ({ children }) => <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>{children}</label>;
   const MODELS = [["pergame", "Jogo-a-jogo"], ["monthly", "Mensal"], ["season", "Epoca"]];
   const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, leagueMode: leagueModeLocal });
@@ -1287,7 +1288,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     const unsubMsg = onSnapshot(query(groupRef("messages"), orderBy("createdAt", "asc")), (s) => setMessages(s.docs.map((d) => { const x = d.data(); return { id: d.id, ...x, ts: x.createdAt?.seconds ? x.createdAt.seconds * 1000 : Date.now() }; })));
     const unsubG = onSnapshot(groupDoc("schedule", "next"), (s) => { if (s.exists()) setNextGame(s.data()); else setNextGame({ date: new Date().toISOString(), responses: {} }); });
     const unsubGroup = onSnapshot(doc(db, "artifacts", APP_ID, "groups", group.id), (s) => {
-      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "" }); }
+      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true }); }
     });
     const unsubLG = onSnapshot(query(groupRef("leagueGames"), orderBy("date", "asc")), (s) => setLeagueGames(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); unsubLG(); };
