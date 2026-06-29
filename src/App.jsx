@@ -7,7 +7,7 @@ import {
   CheckCircle, Award, Flame, Medal, Share2, ShieldCheck, Wind, Droplets,
   CloudSun, Sun, CloudRain, Cloud, CloudFog, CloudLightning, Snowflake,
   MessageSquare, Send, Minus, RotateCcw, Pencil, X, Activity, PlusCircle,
-  ListOrdered, Swords, ChevronDown, ChevronUp,
+  ListOrdered, Swords, ChevronDown, ChevronUp, Dumbbell, Zap,
 } from "lucide-react";
 
 import { initializeApp } from "firebase/app";
@@ -485,6 +485,116 @@ const ChatTab = ({ messages, me, onSend, onMarkRead }) => {
   );
 };
 
+/* ========================= TREINOS ======================================= */
+const TrainingTab = ({ trainings, me, amIAdmin, onAdd, onDelete, onToggle }) => {
+  const [open, setOpen] = useState(false);
+  const [tdate, setTdate] = useState(""); const [ttime, setTtime] = useState("19:00"); const [local, setLocal] = useState("");
+  const submit = () => { if (!tdate || !local.trim()) return; onAdd({ date: `${tdate}T${ttime}:00`, local: local.trim() }); setTdate(""); setLocal(""); setOpen(false); };
+  const now = new Date();
+  const upcoming = [...trainings].filter((t) => new Date(t.date) > now).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const past = [...trainings].filter((t) => new Date(t.date) <= now).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+  const Card = (t) => {
+    const d = new Date(t.date); const myResp = t.responses?.[me.uid];
+    const going = Object.values(t.responses || {}).filter((v) => v === "going").length;
+    const isFuture = d > now;
+    return (
+      <div key={t.id} className="ft-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ background: "rgba(0,0,0,.25)", padding: "6px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span className="eyebrow">{d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })} · {d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
+          {amIAdmin && <button onClick={() => onDelete(t.id)} className="ft-btn" style={{ background: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={12} /></button>}
+        </div>
+        <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ padding: 10, borderRadius: 12, background: "rgba(106,169,224,.12)", color: "var(--blue)" }}><Dumbbell size={18} /></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{t.local}</div>
+            <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Users size={11} /> {going} confirmados</div>
+          </div>
+          {isFuture && (
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => onToggle(t.id, "going")} className="ft-btn" style={{ fontSize: 11, padding: "6px 10px", background: myResp === "going" ? "var(--grass)" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>Vou</button>
+              <button onClick={() => onToggle(t.id, "not_going")} className="ft-btn" style={{ fontSize: 11, padding: "6px 10px", background: myResp === "not_going" ? "var(--danger)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--dim)", border: "1px solid var(--line)" }}>Nao vou</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {amIAdmin && (
+        <button onClick={() => setOpen((o) => !o)} className="ft-btn ft-grass" style={{ padding: 13, justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Plus size={16} /> Marcar treino</span>
+          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+      )}
+      {open && (
+        <div className="ft-card ft-in" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Local</label><input className="ft-input" value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Ex: Campo Municipal de Odivelas" /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Data</label><input type="date" className="ft-input" value={tdate} onChange={(e) => setTdate(e.target.value)} /></div>
+            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Hora</label><input type="time" className="ft-input" value={ttime} onChange={(e) => setTtime(e.target.value)} /></div>
+          </div>
+          <button onClick={submit} disabled={!tdate || !local.trim()} className="ft-btn ft-grass" style={{ padding: 12 }}>Adicionar treino</button>
+        </div>
+      )}
+      {upcoming.length === 0 && past.length === 0 && <div style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--faint)", fontSize: 13 }}>Ainda sem treinos marcados.</div>}
+      {upcoming.length > 0 && <div><div className="eyebrow" style={{ marginBottom: 10 }}>Proximos treinos</div><div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{upcoming.map(Card)}</div></div>}
+      {past.length > 0 && <div style={{ opacity: 0.6 }}><div className="eyebrow" style={{ marginBottom: 10 }}>Ultimos treinos</div><div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{past.map(Card)}</div></div>}
+    </div>
+  );
+};
+
+/* ========================= AGENDA MODO LIGA ============================== */
+const LeagueScheduleTab = ({ leagueGames, me, players }) => {
+  const now = new Date();
+  const next = [...leagueGames].filter((g) => g.scoreA == null).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+  const last = [...leagueGames].filter((g) => g.scoreA != null).sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  const played = leagueGames.filter((g) => g.scoreA != null);
+  const wins = played.filter((g) => g.scoreA > g.scoreB).length;
+  const draws = played.filter((g) => g.scoreA === g.scoreB).length;
+  const losses = played.filter((g) => g.scoreA < g.scoreB).length;
+  const pts = wins * 3 + draws;
+  if (!next && !last) return (
+    <div className="ft-in" style={{ textAlign: "center", padding: "60px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--faint)", fontSize: 13 }}>
+      <ListOrdered size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
+      <p>Ainda sem jogos no calendario.<br />Adiciona jogos no separador Liga.</p>
+    </div>
+  );
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {next && (
+        <div className="pitch" style={{ padding: 22 }}>
+          <PitchLines /><div className="stripe" />
+          <div style={{ position: "relative" }}>
+            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Proximo jogo oficial</span>
+            <div className="num" style={{ fontSize: 36, lineHeight: .95, color: "var(--chalk)", marginTop: 8 }}>vs {next.opponent}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {new Date(next.date).toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: next.home ? "var(--grass-bright)" : "var(--blue)", background: next.home ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", padding: "3px 10px", borderRadius: 8 }}>{next.home ? "Casa" : "Fora"}</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {played.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+          {[["Pts", pts, "var(--gold)"], ["V", wins, "var(--grass-bright)"], ["E", draws, "var(--blue)"], ["D", losses, "var(--danger)"]].map(([l, v, c]) => (
+            <div key={l} className="ft-raised" style={{ borderRadius: 14, padding: "10px 8px", textAlign: "center" }}><div className="eyebrow" style={{ color: c }}>{l}</div><div className="num" style={{ fontSize: 26, color: c }}>{v}</div></div>
+          ))}
+        </div>
+      )}
+      {last && (
+        <div className="ft-card" style={{ padding: 16 }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Ultimo resultado</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="num" style={{ fontSize: 22, color: last.scoreA > last.scoreB ? "var(--grass-bright)" : last.scoreA === last.scoreB ? "var(--gold)" : "var(--danger)", minWidth: 28 }}>{last.scoreA > last.scoreB ? "V" : last.scoreA === last.scoreB ? "E" : "D"}</div>
+            <div><div style={{ fontSize: 14, fontWeight: 700 }}>vs {last.opponent}</div><div className="num" style={{ fontSize: 20, color: "var(--chalk)" }}>{last.scoreA} - {last.scoreB}</div></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ========================= LIGA: CALENDARIO ============================== */
 const POSITIONS_5 = ["GR","DEF","DEF","MEI","AV"];
 const POSITIONS_7 = ["GR","DEF","DEF","DEF","MEI","MEI","AV"];
@@ -701,6 +811,114 @@ const FORMATIONS = {
 const fLabel = (i) => (i === 0 ? "GR" : String(i));
 const makeField = (n) => FORMATIONS[n].map((p, i) => ({ id: "f" + i + rnd(), label: fLabel(i), x: p[0], y: p[1] }));
 const makeOpp = (n) => FORMATIONS[n].map((p, i) => ({ id: "o" + i + rnd(), label: fLabel(i), x: p[0], y: 100 - p[1] }));
+
+/* ========================= TATICA MODO LIGA ============================== */
+const TacticsLeagueTab = ({ members, leagueGames, showToast }) => {
+  const upcoming = leagueGames.filter((g) => g.scoreA == null).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [size, setSize] = useState(5);
+  const [field, setField] = useState(() => makeField(5));
+  const [bench, setBench] = useState([]);
+  const [showOpp, setShowOpp] = useState(false);
+  const [opp, setOpp] = useState([]);
+  const [hasBall, setHasBall] = useState(true);
+  const [ball, setBall] = useState({ x: 50, y: 50 });
+  const [drawMode, setDrawMode] = useState(false);
+  const [strokes, setStrokes] = useState([]);
+  const boardRef = useRef(null); const dragRef = useRef(null); const drawingRef = useRef(false);
+
+  useEffect(() => {
+    if (!selectedGame?.lineup) return;
+    const { size: s, lineup: l } = selectedGame.lineup;
+    if (s) setSize(s);
+    if (l) {
+      const titIds = Object.entries(l).filter(([, v]) => v.role === "titular").map(([id]) => id);
+      const titPlayers = members.filter((m) => titIds.includes(m.id));
+      const positions = FORMATIONS[s || 5] || FORMATIONS[5];
+      setField(titPlayers.map((m, i) => { const pos = positions[i] || [50, 50]; return { id: "f" + rnd(), label: initials(m.name), name: m.name, x: pos[0], y: pos[1] }; }));
+      const benchIds = Object.entries(l).filter(([, v]) => v.role === "suplente").map(([id]) => id);
+      setBench(members.filter((m) => benchIds.includes(m.id)).map((m) => ({ id: "b" + rnd(), label: initials(m.name), name: m.name })));
+    }
+  }, [selectedGame?.id]);
+
+  const pct = (e) => { const r = boardRef.current.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }; };
+  const applySize = (n) => { setSize(n); setField(makeField(n)); setBench([]); if (showOpp) setOpp(makeOpp(n)); };
+  const toggleOpp = () => { setShowOpp((v) => { const n = !v; setOpp(n ? makeOpp(size) : []); return n; }); };
+  const addFromBench = (item) => { setBench((b) => b.filter((x) => x.id !== item.id)); setField((f) => [...f, { id: "f" + rnd(), label: item.label, name: item.name, x: 50, y: 50 }]); };
+  const addBlank = () => setField((f) => [...f, { id: "f" + rnd(), label: String(f.length), x: 50, y: 50 }]);
+  const removeToBench = (t) => { setField((f) => f.filter((x) => x.id !== t.id)); setBench((b) => [...b, { id: "b" + rnd(), label: t.label, name: t.name || t.label }]); };
+  const reset = () => { setField(makeField(size)); setOpp(showOpp ? makeOpp(size) : []); setBench([]); setStrokes([]); setBall({ x: 50, y: 50 }); showToast("Quadro reposto"); };
+  const onTokenDown = (e, id) => { if (drawMode) return; e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = id; };
+  const onTokenMove = (e, id) => { if (dragRef.current !== id) return; const p = pct(e); const x = Math.max(4, Math.min(96, p.x)), y = Math.max(3, Math.min(97, p.y)); if (id === "ball") setBall({ x, y }); else if (id[0] === "o") setOpp((ts) => ts.map((t) => (t.id === id ? { ...t, x, y } : t))); else setField((ts) => ts.map((t) => (t.id === id ? { ...t, x, y } : t))); };
+  const onTokenUp = (e) => { dragRef.current = null; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { } };
+  const onBoardDown = (e) => { if (!drawMode) return; e.currentTarget.setPointerCapture(e.pointerId); drawingRef.current = true; setStrokes((s) => [...s, [pct(e)]]); };
+  const onBoardMove = (e) => { if (!drawMode || !drawingRef.current) return; const p = pct(e); setStrokes((s) => { const c = s.slice(); c[c.length - 1] = [...c[c.length - 1], p]; return c; }); };
+  const onBoardUp = () => { drawingRef.current = false; };
+  const Token = (t, black) => (
+    <div key={t.id} onPointerDown={(e) => onTokenDown(e, t.id)} onPointerMove={(e) => onTokenMove(e, t.id)} onPointerUp={onTokenUp}
+      style={{ position: "absolute", left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%,-50%)", touchAction: "none", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, cursor: drawMode ? "crosshair" : "grab", userSelect: "none", zIndex: 5, background: black ? "#0c0f0e" : "var(--chalk)", color: black ? "#cfe8da" : "#0b0b0b", border: black ? "2px solid #3a4a43" : "2px solid #0b0b0b", boxShadow: "0 3px 8px rgba(0,0,0,.4)" }}>
+      {t.label}
+      {!black && !drawMode && (<span onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); removeToBench(t); }} style={{ position: "absolute", top: -7, right: -7, width: 16, height: 16, borderRadius: "50%", background: "var(--danger)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,.4)" }}><X size={10} /></span>)}
+    </div>
+  );
+  return (
+    <div className="ft-in" style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><TacticIcon size={18} /> Quadro tatico</h2>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }}><Pencil size={16} /></button>
+          <button onClick={reset} className="ft-btn ft-ghost" style={{ padding: 9, borderRadius: 10 }}><RotateCcw size={16} /></button>
+        </div>
+      </div>
+      {upcoming.length > 0 && (
+        <div className="ft-card" style={{ padding: 12 }}>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Jogo oficial (carrega convocatoria)</div>
+          <select className="ft-input" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)} style={{ padding: "8px 10px", fontSize: 12 }}>
+            <option value="">Selecionar jogo...</option>
+            {upcoming.map((g) => <option key={g.id} value={g.id}>{new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} · vs {g.opponent}</option>)}
+          </select>
+          {selectedGame?.lineup && <p style={{ fontSize: 10, color: "var(--grass-bright)", margin: "6px 0 0", display: "flex", alignItems: "center", gap: 4 }}><Check size={10} /> Convocatoria carregada automaticamente</p>}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
+        {[5, 7, 11].map((n) => <button key={n} onClick={() => applySize(n)} className="ft-btn" style={{ padding: "8px 4px", fontSize: 12, background: size === n ? "var(--grass)" : "none", color: size === n ? "#04130a" : "var(--faint)" }}>{n}x{n}</button>)}
+      </div>
+      <div ref={boardRef} onPointerDown={onBoardDown} onPointerMove={onBoardMove} onPointerUp={onBoardUp}
+        style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: 18, overflow: "hidden", touchAction: "none", border: "1px solid var(--line)", background: "linear-gradient(180deg,#13301f,#0c2016)" }}>
+        <svg viewBox="0 0 100 150" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          <g fill="none" stroke="rgba(245,248,246,.45)" strokeWidth="0.5">
+            <rect x="3" y="3" width="94" height="144" /><line x1="3" y1="75" x2="97" y2="75" />
+            <circle cx="50" cy="75" r="11" /><circle cx="50" cy="75" r="0.9" fill="rgba(245,248,246,.7)" stroke="none" />
+            <rect x="30" y="3" width="40" height="16" /><rect x="40" y="3" width="20" height="7" />
+            <rect x="30" y="131" width="40" height="16" /><rect x="40" y="140" width="20" height="7" />
+            <rect x="42" y="0.5" width="16" height="2.5" stroke="rgba(245,248,246,.7)" /><rect x="42" y="147" width="16" height="2.5" stroke="rgba(245,248,246,.7)" />
+          </g>
+        </svg>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 3 }}>
+          {strokes.map((s, i) => <polyline key={i} points={s.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="var(--lime)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}
+        </svg>
+        {opp.map((t) => Token(t, true))}{field.map((t) => Token(t, false))}
+        {hasBall && (<div onPointerDown={(e) => onTokenDown(e, "ball")} onPointerMove={(e) => onTokenMove(e, "ball")} onPointerUp={onTokenUp} style={{ position: "absolute", left: `${ball.x}%`, top: `${ball.y}%`, transform: "translate(-50%,-50%)", touchAction: "none", cursor: drawMode ? "crosshair" : "grab", zIndex: 6 }}><div style={{ background: "#fff", borderRadius: "50%", padding: 2, boxShadow: "0 2px 6px rgba(0,0,0,.5)" }}><SoccerBall size={18} color="#111" /></div></div>)}
+        {drawMode && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(198,242,74,.9)", color: "#1a2200", fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 8, zIndex: 7 }}>MODO DESENHO</div>}
+      </div>
+      <div className="ft-card" style={{ padding: 14 }}>
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Banco - {bench.length}</div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, minHeight: 40 }}>
+          {bench.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Sem suplentes na convocatoria.</span>}
+          {bench.map((b) => (<button key={b.id} onClick={() => addFromBench(b)} className="ft-btn" style={{ flexDirection: "column", gap: 4, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 12, padding: "8px 6px", minWidth: 56 }}><Avatar name={b.name || b.label} size={28} /><span style={{ fontSize: 10, fontWeight: 700 }}>{firstName(b.name || b.label)}</span></button>))}
+        </div>
+      </div>
+      <div className="ft-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <button onClick={addBlank} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Plus size={14} /> Adicionar peca</button>
+          <button onClick={toggleOpp} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{showOpp ? "Tirar adversario" : "Adversario"}</button>
+          <button onClick={() => setHasBall((b) => !b)} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasBall ? "Tirar bola" : "Por bola"}</button>
+          <button onClick={() => setStrokes([])} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Pencil size={14} /> Limpar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const TacticsTab = ({ members, showToast }) => {
   const [size, setSize] = useState(5);
@@ -1267,6 +1485,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     try { return parseInt(localStorage.getItem(`lastRead_${group.id}`) || "0"); } catch { return 0; }
   });
   const [leagueGames, setLeagueGames] = useState([]);
+  const [trainings, setTrainings] = useState([]);
 
   const me = currentUser;
   const groupRef = (col) => collection(db, "artifacts", APP_ID, "groups", group.id, col);
@@ -1288,10 +1507,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     const unsubMsg = onSnapshot(query(groupRef("messages"), orderBy("createdAt", "asc")), (s) => setMessages(s.docs.map((d) => { const x = d.data(); return { id: d.id, ...x, ts: x.createdAt?.seconds ? x.createdAt.seconds * 1000 : Date.now() }; })));
     const unsubG = onSnapshot(groupDoc("schedule", "next"), (s) => { if (s.exists()) setNextGame(s.data()); else setNextGame({ date: new Date().toISOString(), responses: {} }); });
     const unsubGroup = onSnapshot(doc(db, "artifacts", APP_ID, "groups", group.id), (s) => {
-      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true }); }
+      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true, groupMode: st.groupMode || "casual" }); }
     });
     const unsubLG = onSnapshot(query(groupRef("leagueGames"), orderBy("date", "asc")), (s) => setLeagueGames(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); unsubLG(); };
+    const unsubTr = onSnapshot(query(groupRef("trainings"), orderBy("date", "asc")), (s) => setTrainings(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); unsubLG(); unsubTr(); };
   }, [group.id]);
 
   useEffect(() => {
@@ -1346,6 +1566,12 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { date: nextGame?.date || new Date().toISOString(), responses: { ...(nextGame?.responses || {}), [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora" : "Removido da convocatoria"); };
   const sendMessage = async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); };
+  const groupMode = settings.groupMode || "casual";
+  const isLeague = groupMode === "league";
+  const isWeekly = groupMode === "weekly";
+  const addTraining = async ({ date, local }) => { await addDoc(groupRef("trainings"), { date, local, responses: {}, createdAt: serverTimestamp() }); showToast("Treino marcado!"); };
+  const deleteTraining = async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); };
+  const toggleTraining = async (id, status) => { const t = trainings.find((x) => x.id === id); await updateDoc(groupDoc("trainings", id), { responses: { ...(t?.responses || {}), [me.uid]: status } }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
   const isLeagueMode = settings.leagueMode === true;
   const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendario!"); };
   const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
@@ -1391,14 +1617,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const TABS = [
     { id: "schedule", icon: CalendarCheck, label: "Agenda", badge: pendingRsvp },
     { id: "chat", icon: MessageSquare, label: "Chat", badge: tab === "chat" ? 0 : unreadChat },
-    { id: "team", icon: Shield, label: "Equipa" },
+    ...(!isLeague ? [{ id: "team", icon: Shield, label: "Equipa" }] : []),
     { id: "tactics", icon: TacticIcon, label: "Tatica" },
     { id: "players", icon: Users, label: "Plantel" },
     { id: "history", icon: HistoryIcon, label: "Jogos" },
     { id: "trophies", icon: Trophy, label: "Carreira" },
-    ...(isLeagueMode ? [{ id: "leaguecal", icon: ListOrdered, label: "Liga" }] : []),
-    ...(isLeagueMode ? [{ id: "lineup", icon: Swords, label: "Convoc." }] : []),
-    ...(collectsFixed ? [{ id: "members", icon: ClipboardList, label: "Inscricoes" }] : []),
+    ...(isLeague ? [{ id: "leaguecal", icon: ListOrdered, label: "Liga" }] : []),
+    ...(isLeague ? [{ id: "lineup", icon: Swords, label: "Convoc." }] : []),
+    ...(isLeague ? [{ id: "training", icon: Dumbbell, label: "Treinos" }] : []),
+    ...(collectsFixed && !isLeague ? [{ id: "members", icon: ClipboardList, label: "Inscricoes" }] : []),
     ...(amIAdmin ? [{ id: "treasury", icon: Wallet, label: "Tesouraria", badge: myDebt }] : []),
     { id: "settings", icon: Settings, label: "Definicoes" },
   ];
@@ -1419,12 +1646,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       </div>
 
       <div style={{ padding: tab === "chat" || tab === "tactics" ? 0 : 16, maxWidth: tab === "chat" ? 620 : 480, margin: "0 auto" }}>
-        {tab === "schedule" && <ScheduleTab next={nextGame} players={players} me={me} locationUrl={settings.locationUrl} onToggle={toggleSchedule} />}
+        {tab === "schedule" && !isLeague && <ScheduleTab next={nextGame} players={players} me={me} locationUrl={settings.locationUrl} onToggle={toggleSchedule} />}
+        {tab === "schedule" && isLeague && <LeagueScheduleTab leagueGames={leagueGames} me={me} players={players} />}
         {tab === "chat" && <ChatTab messages={messages} me={me} onSend={sendMessage} onMarkRead={markChatRead} />}
-        {tab === "leaguecal" && isLeagueMode && <LeagueCalendarTab leagueGames={leagueGames} members={members} amIAdmin={amIAdmin} onAdd={addLeagueGame} onDelete={deleteLeagueGame} onResult={saveLeagueResult} />}
-        {tab === "lineup" && isLeagueMode && <LineupTab members={members} amIAdmin={amIAdmin} leagueGames={leagueGames} onSaveLineup={saveLineup} />}
-        {tab === "team" && <TeamTab players={players} next={nextGame} avg={avg} onSaveMatch={saveMatch} showToast={showToast} />}
-        {tab === "tactics" && <TacticsTab members={members} showToast={showToast} />}
+        {tab === "leaguecal" && isLeague && <LeagueCalendarTab leagueGames={leagueGames} members={members} amIAdmin={amIAdmin} onAdd={addLeagueGame} onDelete={deleteLeagueGame} onResult={saveLeagueResult} />}
+        {tab === "lineup" && isLeague && <LineupTab members={members} amIAdmin={amIAdmin} leagueGames={leagueGames} onSaveLineup={saveLineup} />}
+        {tab === "training" && <TrainingTab trainings={trainings} me={me} amIAdmin={amIAdmin} onAdd={addTraining} onDelete={deleteTraining} onToggle={toggleTraining} />}
+        {tab === "team" && !isLeague && <TeamTab players={players} next={nextGame} avg={avg} onSaveMatch={saveMatch} showToast={showToast} />}
+        {tab === "tactics" && !isLeague && <TacticsTab members={members} showToast={showToast} />}
+        {tab === "tactics" && isLeague && <TacticsLeagueTab members={members} leagueGames={leagueGames} showToast={showToast} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
         {tab === "history" && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onDelete={deleteMatch} />}
         {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} mvpCount={mvpCount} fixedIds={fixedIds} players={players} matches={matches} />}
@@ -1443,6 +1673,7 @@ const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState("groups");
   const [groups, setGroups] = useState([]);
   const [newGroup, setNewGroup] = useState("");
+  const [groupMode, setGroupMode] = useState(null);
   const [joinCode, setJoinCode] = useState("");
   const [selected, setSelected] = useState(null);
   const [msg, setMsg] = useState("");
@@ -1461,7 +1692,7 @@ const GroupSelector = ({ user, onLogout }) => {
       const groupRef = doc(db, "artifacts", APP_ID, "groups", customId);
       if ((await getDoc(groupRef)).exists()) return setCreateError("Ja existe um grupo com esse nome. Tenta outro.");
       const batch = writeBatch(db);
-      batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: "monthly", monthlyFee: 0, seasonFee: 0, guestFee: 4.5 }, createdAt: serverTimestamp() });
+      batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: groupMode === "weekly" ? "monthly" : "pergame", monthlyFee: 0, seasonFee: 0, guestFee: 4.5, groupMode: groupMode || "casual", leagueMode: groupMode === "league" }, createdAt: serverTimestamp() });
       const playerRef = doc(collection(db, "artifacts", APP_ID, "groups", customId, "players"));
       batch.set(playerRef, { name: user.displayName || "Eu", uid: user.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: true, photoUrl: user.photoURL || null, votes: {}, createdAt: serverTimestamp() });
       await batch.commit();
@@ -1508,9 +1739,32 @@ const GroupSelector = ({ user, onLogout }) => {
       </header>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 14, marginBottom: 26 }}>
         <div className="ft-card" style={{ padding: 18 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}><PlusCircle size={16} style={{ color: "var(--grass-bright)" }} /> Criar grupo</h2>
-          <form onSubmit={createGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="Nome do grupo..." /><button type="submit" disabled={!newGroup.trim()} className="ft-btn ft-grass" style={{ padding: "0 18px" }}>Criar</button></form>
-          {createError && <div style={{ marginTop: 10, fontSize: 12, background: "rgba(240,86,58,.12)", color: "#ff9684", border: "1px solid rgba(240,86,58,.3)", borderRadius: 10, padding: 8, display: "flex", gap: 6, alignItems: "center" }}><AlertCircle size={12} /> {createError}</div>}
+          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 14px" }}><PlusCircle size={16} style={{ color: "var(--grass-bright)" }} /> Criar grupo</h2>
+          {!groupMode ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 6px" }}>Qual e o tipo de grupo?</p>
+              {[
+                { id: "casual", Icon: Zap, color: "var(--blue)", bg: "rgba(106,169,224,.15)", label: "Casual", sub: "Jogamos de vez em quando, sem calendario fixo" },
+                { id: "weekly", Icon: CalendarCheck, color: "var(--grass-bright)", bg: "rgba(34,197,94,.15)", label: "Semanal", sub: "Peladas regulares com mensalidade e inscricoes" },
+                { id: "league", Icon: Trophy, color: "var(--gold)", bg: "rgba(245,197,66,.15)", label: "Liga", sub: "Equipa numa competicao oficial com convocatorias" },
+              ].map(({ id, Icon, color, bg, label, sub }) => (
+                <button key={id} onClick={() => setGroupMode(id)} className="ft-btn ft-ghost" style={{ padding: "12px 14px", justifyContent: "flex-start", gap: 12 }}>
+                  <div style={{ padding: 8, borderRadius: 10, background: bg, color, flexShrink: 0 }}><Icon size={18} /></div>
+                  <div style={{ textAlign: "left" }}><div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div><div style={{ fontSize: 11, color: "var(--dim)" }}>{sub}</div></div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--raised)", borderRadius: 10 }}>
+                <span style={{ fontSize: 11, color: "var(--dim)" }}>Modo:</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: groupMode === "league" ? "var(--gold)" : groupMode === "weekly" ? "var(--grass-bright)" : "var(--blue)" }}>{groupMode === "league" ? "Liga" : groupMode === "weekly" ? "Semanal" : "Casual"}</span>
+                <button onClick={() => { setGroupMode(null); setNewGroup(""); setCreateError(""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--faint)", cursor: "pointer", fontSize: 11 }}>Mudar</button>
+              </div>
+              <form onSubmit={createGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="Nome do grupo..." autoFocus /><button type="submit" disabled={!newGroup.trim()} className="ft-btn ft-grass" style={{ padding: "0 18px" }}>Criar</button></form>
+              {createError && <div style={{ fontSize: 12, background: "rgba(240,86,58,.12)", color: "#ff9684", border: "1px solid rgba(240,86,58,.3)", borderRadius: 10, padding: 8, display: "flex", gap: 6, alignItems: "center" }}><AlertCircle size={12} /> {createError}</div>}
+            </div>
+          )}
         </div>
         <div className="ft-card" style={{ padding: 18 }}>
           <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}><UserPlus size={16} style={{ color: "var(--blue)" }} /> Entrar com codigo</h2>
@@ -1525,11 +1779,12 @@ const GroupSelector = ({ user, onLogout }) => {
           {groups.map((g) => (
             <button key={g.id} onClick={() => setSelected(g)} className="ft-card ft-btn" style={{ padding: 20, textAlign: "left", alignItems: "stretch", flexDirection: "column", borderRadius: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 16 }}>
-                <div style={{ padding: 12, borderRadius: 14, background: "var(--raised)", color: "var(--grass-bright)" }}><Users size={24} /></div>
+                <div style={{ padding: 12, borderRadius: 14, background: g.settings?.groupMode === "league" ? "rgba(245,197,66,.15)" : g.settings?.groupMode === "weekly" ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", color: g.settings?.groupMode === "league" ? "var(--gold)" : g.settings?.groupMode === "weekly" ? "var(--grass-bright)" : "var(--blue)" }}>{g.settings?.groupMode === "league" ? <Trophy size={24} /> : g.settings?.groupMode === "weekly" ? <CalendarCheck size={24} /> : <Zap size={24} />}</div>
                 {g.ownerId === user.uid && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "3px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
               </div>
               <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{g.name}</h3>
-              <p style={{ fontSize: 12, color: "var(--dim)", margin: "6px 0 0", display: "flex", alignItems: "center", gap: 4 }}>Entrar no grupo <ArrowRight size={12} /></p>
+              <p style={{ fontSize: 12, color: "var(--dim)", margin: "4px 0 0" }}>{g.settings?.groupMode === "league" ? "Liga" : g.settings?.groupMode === "weekly" ? "Semanal" : "Casual"}</p>
+              <p style={{ fontSize: 12, color: "var(--faint)", margin: "4px 0 0", display: "flex", alignItems: "center", gap: 4 }}>Entrar no grupo <ArrowRight size={12} /></p>
             </button>
           ))}
         </div>
