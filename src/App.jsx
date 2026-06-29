@@ -16,7 +16,7 @@ import {
 } from "firebase/auth";
 import {
   getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc,
-  serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove,
+  serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove, writeBatch,
 } from "firebase/firestore";
 
 /* =========================================================================
@@ -1204,12 +1204,15 @@ const GroupSelector = ({ user, onLogout }) => {
     const customId = newGroup.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     if (!customId) return setCreateError("Nome invalido para criar ID.");
     try {
-      const ref = doc(db, "artifacts", APP_ID, "groups", customId);
-      if ((await getDoc(ref)).exists()) return setCreateError("Ja existe um grupo com esse nome. Tenta outro.");
-      await setDoc(ref, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: "monthly", monthlyFee: 0, seasonFee: 0, guestFee: 4.5 }, createdAt: serverTimestamp() });
-      await addDoc(collection(db, "artifacts", APP_ID, "groups", customId, "players"), { name: user.displayName || "Eu", uid: user.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: true, photoUrl: user.photoURL, votes: {}, createdAt: serverTimestamp() });
+      const groupRef = doc(db, "artifacts", APP_ID, "groups", customId);
+      if ((await getDoc(groupRef)).exists()) return setCreateError("Ja existe um grupo com esse nome. Tenta outro.");
+      const batch = writeBatch(db);
+      batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: "monthly", monthlyFee: 0, seasonFee: 0, guestFee: 4.5 }, createdAt: serverTimestamp() });
+      const playerRef = doc(collection(db, "artifacts", APP_ID, "groups", customId, "players"));
+      batch.set(playerRef, { name: user.displayName || "Eu", uid: user.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: true, photoUrl: user.photoURL || null, votes: {}, createdAt: serverTimestamp() });
+      await batch.commit();
       setNewGroup("");
-    } catch (err) { console.error(err); setCreateError("Erro ao criar grupo."); }
+    } catch (err) { console.error(err); setCreateError("Erro ao criar grupo: " + err.message); }
   };
 
   const joinGroup = async (e) => {
