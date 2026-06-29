@@ -23,7 +23,7 @@ import {
 /* =========================================================================
    FUTEBOLADAS V3 - app completa (Firebase) com revamp visual + novas funcoes:
    chat de grupo, quadro tatico (5/7/11 + banco de suplentes + add/remove),
-   modelos de pagamento (jogo-a-jogo / mensal / epoca) e golos & assistencias.
+   modelos de pagamento (jogo-a-jogo / mensal / época) e golos & assistencias.
    RESET DA BASE DE DADOS: APP_ID mudou para "futeboladas-v3", por isso a app
    arranca com um espaco de dados novo e limpo (os dados antigos em
    "futeboladas-v2" deixam de ser referenciados).
@@ -199,7 +199,7 @@ const WeatherWidget = ({ date, locationUrl }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const info = (code) => {
-    if (code === 0) return { Icon: Sun, label: "Ceu limpo", color: "var(--gold)" };
+    if (code === 0) return { Icon: Sun, label: "Céu limpo", color: "var(--gold)" };
     if ([1, 2, 3].includes(code)) return { Icon: CloudSun, label: "Pouco nublado", color: "var(--blue)" };
     if ([45, 48].includes(code)) return { Icon: CloudFog, label: "Nevoeiro", color: "var(--dim)" };
     if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { Icon: CloudRain, label: "Chuva", color: "var(--blue)" };
@@ -210,13 +210,13 @@ const WeatherWidget = ({ date, locationUrl }) => {
   useEffect(() => {
     if (!date || !locationUrl) return;
     const coords = getCoordsFromUrl(locationUrl);
-    if (!coords) { setError("Localizacao invalida no mapa"); return; }
+    if (!coords) { setError("Localização inválida no mapa"); return; }
     const run = async () => {
       setLoading(true); setError("");
       try {
         const game = new Date(date); const diff = Math.ceil((game - new Date()) / 864e5);
-        if (diff > 14) { setError("Previsao disponivel 14 dias antes"); setLoading(false); return; }
-        if (diff < 0) { setError("Dados historicos nao disponiveis"); setLoading(false); return; }
+        if (diff > 14) { setError("Previsão disponível 14 dias antes"); setLoading(false); return; }
+        if (diff < 0) { setError("Dados históricos não disponíveis"); setLoading(false); return; }
         const dateStr = new Date(date).toISOString().split("T")[0];
         const hour = new Date(date).getHours();
         // FIX: timezone=auto alinha a hora local com o indice horario do array
@@ -302,7 +302,7 @@ class ErrorBoundary extends React.Component {
           <div className="ft-card" style={{ padding: 28, maxWidth: 360, textAlign: "center" }}>
             <div style={{ width: 60, height: 60, margin: "0 auto 14px", borderRadius: "50%", background: "rgba(240,86,58,.12)", border: "1px solid rgba(240,86,58,.3)", display: "flex", alignItems: "center", justifyContent: "center" }}><Activity size={28} style={{ color: "#ff9684" }} /></div>
             <h1 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 6px" }}>Jogo interrompido</h1>
-            <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 18px" }}>Atualizacao detetada ou erro de rede.</p>
+            <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 18px" }}>Atualização detetada ou erro de rede.</p>
             <button onClick={this.handleReset} className="ft-btn ft-grass" style={{ width: "100%", padding: 13 }}><RotateCcw size={18} /> Recarregar app</button>
           </div>
         </div>
@@ -332,7 +332,7 @@ const AuthScreen = () => {
             <div style={{ width: 76, height: 76, margin: "0 auto 16px", borderRadius: 22, transform: "rotate(-6deg)", background: "linear-gradient(135deg,var(--grass-2),#0c7a3a)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 16px 40px -12px rgba(34,197,94,.7)", border: "2px solid rgba(255,255,255,.15)" }}><SoccerBall size={42} color="#fff" /></div>
             <h1 className="num" style={{ fontSize: 46, lineHeight: .9, margin: 0, color: "var(--chalk)" }}>FUTEBOLADAS</h1>
             <div style={{ height: 3, width: 64, margin: "10px auto 0", background: "var(--lime)", borderRadius: 2 }} />
-            <p className="eyebrow" style={{ marginTop: 12, color: "var(--grass-bright)" }}>Gestor de peladas - V3</p>
+            <p className="eyebrow" style={{ marginTop: 12, color: "var(--grass-bright)" }}>Gestor de peladas · V3</p>
           </div>
         </div>
         <div className="ft-card" style={{ padding: 24 }}>
@@ -345,7 +345,7 @@ const AuthScreen = () => {
             <input className="ft-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Palavra-passe" required />
             <button type="submit" disabled={loading} className="ft-btn ft-grass" style={{ padding: 13, marginTop: 4 }}>{loading ? <Loader2 size={18} style={{ animation: "ftspin 1s linear infinite" }} /> : (isLogin ? "Entrar" : "Registar")}</button>
           </form>
-          <button onClick={() => setIsLogin(!isLogin)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--grass-bright)", fontSize: 13, marginTop: 18, width: "100%" }}>{isLogin ? "Ainda nao tens conta? Cria gratis" : "Ja tens conta? Faz login"}</button>
+          <button onClick={() => setIsLogin(!isLogin)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--grass-bright)", fontSize: 13, marginTop: 18, width: "100%" }}>{isLogin ? "Ainda não tens conta? Cria grátis" : "Já tens conta? Faz login"}</button>
         </div>
       </div>
     </div>
@@ -399,7 +399,7 @@ const UserProfile = ({ user, onLogout }) => {
     reader.onerror = () => { setUploading(false); setMsg("Erro ao ler a imagem."); };
     reader.onload = (ev) => {
       const img = new Image();
-      img.onerror = () => { setUploading(false); setMsg("Imagem invalida."); };
+      img.onerror = () => { setUploading(false); setMsg("Imagem inválida."); };
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const MAX = 512; let w = img.width, h = img.height;
@@ -436,11 +436,11 @@ const UserProfile = ({ user, onLogout }) => {
         </div>
         <div style={{ marginTop: 16 }}><label className="eyebrow">Nome de jogador</label><input className="ft-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="O teu nome..." style={{ marginTop: 6 }} /></div>
         {msg && <div style={{ marginTop: 12, textAlign: "center", fontSize: 13, padding: 8, borderRadius: 10, background: msg.includes("sucesso") ? "rgba(34,197,94,.12)" : "rgba(240,86,58,.12)", color: msg.includes("sucesso") ? "var(--grass-bright)" : "#ff9684" }}>{msg}</div>}
-        <button onClick={save} disabled={uploading} className="ft-btn ft-grass" style={{ width: "100%", padding: 13, marginTop: 16 }}><Save size={18} /> Guardar alteracoes</button>
+        <button onClick={save} disabled={uploading} className="ft-btn ft-grass" style={{ width: "100%", padding: 13, marginTop: 16 }}><Save size={18} /> Guardar alterações</button>
       </div>
       <div className="ft-card" style={{ padding: 22 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}><Trophy size={16} style={{ color: "var(--gold)" }} /> Numeros globais</h3>
-        <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>O somatorio da tua carreira em todos os grupos.</p>
+        <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}><Trophy size={16} style={{ color: "var(--gold)" }} /> Números globais</h3>
+        <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>O somatório da tua carreira em todos os grupos.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
           <Stat label="Jogos" value={stats.games} /><Stat label="Vitorias" value={stats.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${stats.games ? Math.round((stats.wins / stats.games) * 100) : 0}%`} color="var(--blue)" />
           <Stat label="Golos" value={stats.goals} color="var(--grass-bright)" /><Stat label="Assist." value={stats.assists} color="var(--blue)" /><Stat label="MVPs" value={stats.mvps} color="var(--gold)" />
@@ -461,7 +461,7 @@ const ChatTab = ({ messages, me, onSend, onMarkRead }) => {
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 158px)" }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
-        {messages.length === 0 && <p style={{ textAlign: "center", color: "var(--faint)", fontStyle: "italic", fontSize: 13, marginTop: 20 }}>Ainda sem mensagens. Diz ola!</p>}
+        {messages.length === 0 && <p style={{ textAlign: "center", color: "var(--faint)", fontStyle: "italic", fontSize: 13, marginTop: 20 }}>Ainda sem mensagens. Diz olá!</p>}
         {messages.map((m) => {
           const mine = m.uid === me.uid;
           return (
@@ -512,7 +512,7 @@ const TrainingTab = ({ trainings, me, amIAdmin, onAdd, onDelete, onToggle }) => 
           {isFuture && (
             <div style={{ display: "flex", gap: 6 }}>
               <button onClick={() => onToggle(t.id, "going")} className="ft-btn" style={{ fontSize: 11, padding: "6px 10px", background: myResp === "going" ? "var(--grass)" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>Vou</button>
-              <button onClick={() => onToggle(t.id, "not_going")} className="ft-btn" style={{ fontSize: 11, padding: "6px 10px", background: myResp === "not_going" ? "var(--danger)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--dim)", border: "1px solid var(--line)" }}>Nao vou</button>
+              <button onClick={() => onToggle(t.id, "not_going")} className="ft-btn" style={{ fontSize: 11, padding: "6px 10px", background: myResp === "not_going" ? "var(--danger)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--dim)", border: "1px solid var(--line)" }}>Não vou</button>
             </div>
           )}
         </div>
@@ -538,8 +538,8 @@ const TrainingTab = ({ trainings, me, amIAdmin, onAdd, onDelete, onToggle }) => 
         </div>
       )}
       {upcoming.length === 0 && past.length === 0 && <div style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--faint)", fontSize: 13 }}>Ainda sem treinos marcados.</div>}
-      {upcoming.length > 0 && <div><div className="eyebrow" style={{ marginBottom: 10 }}>Proximos treinos</div><div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{upcoming.map(Card)}</div></div>}
-      {past.length > 0 && <div style={{ opacity: 0.6 }}><div className="eyebrow" style={{ marginBottom: 10 }}>Ultimos treinos</div><div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{past.map(Card)}</div></div>}
+      {upcoming.length > 0 && <div><div className="eyebrow" style={{ marginBottom: 10 }}>Próximos treinos</div><div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{upcoming.map(Card)}</div></div>}
+      {past.length > 0 && <div style={{ opacity: 0.6 }}><div className="eyebrow" style={{ marginBottom: 10 }}>Últimos treinos</div><div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{past.map(Card)}</div></div>}
     </div>
   );
 };
@@ -557,7 +557,7 @@ const LeagueScheduleTab = ({ leagueGames, me, players }) => {
   if (!next && !last) return (
     <div className="ft-in" style={{ textAlign: "center", padding: "60px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--faint)", fontSize: 13 }}>
       <ListOrdered size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
-      <p>Ainda sem jogos no calendario.<br />Adiciona jogos no separador Liga.</p>
+      <p>Ainda sem jogos no calendário.<br />Adiciona jogos no separador Liga.</p>
     </div>
   );
   return (
@@ -566,7 +566,7 @@ const LeagueScheduleTab = ({ leagueGames, me, players }) => {
         <div className="pitch" style={{ padding: 22 }}>
           <PitchLines /><div className="stripe" />
           <div style={{ position: "relative" }}>
-            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Proximo jogo oficial</span>
+            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Próximo jogo oficial</span>
             <div className="num" style={{ fontSize: 36, lineHeight: .95, color: "var(--chalk)", marginTop: 8 }}>vs {next.opponent}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {new Date(next.date).toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}</span>
@@ -584,7 +584,7 @@ const LeagueScheduleTab = ({ leagueGames, me, players }) => {
       )}
       {last && (
         <div className="ft-card" style={{ padding: 16 }}>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Ultimo resultado</div>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Último resultado</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div className="num" style={{ fontSize: 22, color: last.scoreA > last.scoreB ? "var(--grass-bright)" : last.scoreA === last.scoreB ? "var(--gold)" : "var(--danger)", minWidth: 28 }}>{last.scoreA > last.scoreB ? "V" : last.scoreA === last.scoreB ? "E" : "D"}</div>
             <div><div style={{ fontSize: 14, fontWeight: 700 }}>vs {last.opponent}</div><div className="num" style={{ fontSize: 20, color: "var(--chalk)" }}>{last.scoreA} - {last.scoreB}</div></div>
@@ -696,12 +696,12 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
             {[[true, "Casa"], [false, "Fora"]].map(([v, l]) => <button key={l} onClick={() => setHome(v)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 13, background: home === v ? "var(--grass)" : "none", color: home === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
           </div>
-          <button onClick={submit} disabled={!opponent.trim() || !date} className="ft-btn ft-grass" style={{ padding: 12 }}>Adicionar ao calendario</button>
+          <button onClick={submit} disabled={!opponent.trim() || !date} className="ft-btn ft-grass" style={{ padding: 12 }}>Adicionar ao calendário</button>
         </div>
       )}
       {upcoming.length > 0 && (
         <div>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>Proximos jogos - {upcoming.length}</div>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Próximos jogos - {upcoming.length}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{upcoming.map(GameCard)}</div>
         </div>
       )}
@@ -765,7 +765,7 @@ const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
       <div className="ft-card" style={{ padding: 16 }}>
         <h3 style={{ fontSize: 13, fontWeight: 800, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}><Swords size={16} style={{ color: "var(--gold)" }} /> Jogo oficial</h3>
         {upcoming.length === 0
-          ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", margin: 0 }}>Adiciona um jogo no Calendario para poder fazer a convocatoria.</p>
+          ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", margin: 0 }}>Adiciona um jogo no Calendário para poder fazer a convocatória.</p>
           : <select className="ft-input" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)}>
               <option value="">Seleciona o jogo...</option>
               {upcoming.map((g) => <option key={g.id} value={g.id}>{new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} · vs {g.opponent} {g.home ? "(Casa)" : "(Fora)"}</option>)}
@@ -779,7 +779,7 @@ const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
           <div className="ft-card" style={{ padding: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span className="eyebrow">Titulares <span style={{ color: titulares.length === size ? "var(--grass-bright)" : "var(--faint)" }}>({titulares.length}/{size})</span></span>
-              <span style={{ fontSize: 10, color: "var(--faint)" }}>Posicao recomendada: {defaultPositions.join("-").replace("GR-", "GR · ")}</span>
+              <span style={{ fontSize: 10, color: "var(--faint)" }}>Posição recomendada: {defaultPositions.join("-").replace("GR-", "GR · ")}</span>
             </div>
             {titulares.length === 0 ? <p style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Nenhum titular selecionado.</p> : titulares.map((p) => <PlayerRow key={p.id} p={p} role="titular" />)}
           </div>
@@ -788,12 +788,12 @@ const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
             {suplentes.length === 0 ? <p style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Nenhum suplente selecionado.</p> : suplentes.map((p) => <PlayerRow key={p.id} p={p} role="suplente" />)}
           </div>
           <div className="ft-card" style={{ padding: 14 }}>
-            <div className="eyebrow" style={{ marginBottom: 10 }}>Nao convocados ({notCalled.length})</div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>Não convocados ({notCalled.length})</div>
             {notCalled.length === 0 ? <p style={{ fontSize: 11, color: "var(--grass-bright)", fontSize: 12 }}>Toda a gente convocada!</p> : notCalled.map((p) => <PlayerRow key={p.id} p={p} role={null} />)}
           </div>
           {amIAdmin && (
             <button onClick={save} className="ft-btn ft-grass" style={{ width: "100%", padding: 14 }}>
-              {saved ? <><Check size={16} /> Guardado!</> : <><Save size={16} /> Guardar convocatoria</>}
+              {saved ? <><Check size={16} /> Guardado!</> : <><Save size={16} /> Guardar convocatória</>}
             </button>
           )}
         </>
@@ -872,7 +872,7 @@ const TacticsLeagueTab = ({ members, leagueGames, showToast }) => {
       </div>
       {upcoming.length > 0 && (
         <div className="ft-card" style={{ padding: 12 }}>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>Jogo oficial (carrega convocatoria)</div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Jogo oficial (carrega convocatória)</div>
           <select className="ft-input" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)} style={{ padding: "8px 10px", fontSize: 12 }}>
             <option value="">Selecionar jogo...</option>
             {upcoming.map((g) => <option key={g.id} value={g.id}>{new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} · vs {g.opponent}</option>)}
@@ -904,13 +904,13 @@ const TacticsLeagueTab = ({ members, leagueGames, showToast }) => {
       <div className="ft-card" style={{ padding: 14 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>Banco - {bench.length}</div>
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, minHeight: 40 }}>
-          {bench.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Sem suplentes na convocatoria.</span>}
+          {bench.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Sem suplentes na convocatória.</span>}
           {bench.map((b) => (<button key={b.id} onClick={() => addFromBench(b)} className="ft-btn" style={{ flexDirection: "column", gap: 4, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 12, padding: "8px 6px", minWidth: 56 }}><Avatar name={b.name || b.label} size={28} /><span style={{ fontSize: 10, fontWeight: 700 }}>{firstName(b.name || b.label)}</span></button>))}
         </div>
       </div>
       <div className="ft-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <button onClick={addBlank} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Plus size={14} /> Adicionar peca</button>
+          <button onClick={addBlank} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Plus size={14} /> Adicionar peça</button>
           <button onClick={toggleOpp} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{showOpp ? "Tirar adversario" : "Adversario"}</button>
           <button onClick={() => setHasBall((b) => !b)} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasBall ? "Tirar bola" : "Por bola"}</button>
           <button onClick={() => setStrokes([])} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Pencil size={14} /> Limpar</button>
@@ -1016,7 +1016,7 @@ const TacticsTab = ({ members, showToast }) => {
       <div className="ft-card" style={{ padding: 14 }}>
         <div className="eyebrow" style={{ marginBottom: 10 }}>Banco de suplentes - {bench.length}</div>
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, minHeight: 40 }}>
-          {bench.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Remove jogadores do campo (x) ou carrega o plantel.</span>}
+          {bench.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Remove jogadores do campo (×) ou carrega o plantel.</span>}
           {bench.map((b) => (
             <button key={b.id} onClick={() => addFromBench(b)} className="ft-btn" style={{ flexDirection: "column", gap: 4, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 12, padding: "8px 6px", minWidth: 56 }}>
               <Avatar name={b.name || b.label} size={28} /><span style={{ fontSize: 10, fontWeight: 700 }}>{firstName(b.name || b.label)}</span>
@@ -1027,7 +1027,7 @@ const TacticsTab = ({ members, showToast }) => {
 
       <div className="ft-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <button onClick={addBlank} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Plus size={14} /> Adicionar peca</button>
+          <button onClick={addBlank} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Plus size={14} /> Adicionar peça</button>
           <button onClick={loadRoster} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>Carregar plantel</button>
           <button onClick={toggleOpp} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{showOpp ? "Tirar adversario" : "Adversario (preto)"}</button>
           <button onClick={() => setHasBall((b) => !b)} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasBall ? "Tirar bola" : "Por bola"}</button>
@@ -1052,8 +1052,8 @@ const ScheduleTab = ({ next, players, me, locationUrl, onToggle }) => {
         <PitchLines /><div className="stripe" />
         <div style={{ position: "relative" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Proxima peladinha</span>
-            {diffMs > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--lime)", border: "1px solid rgba(198,242,74,.3)", background: "rgba(198,242,74,.08)", padding: "4px 10px", borderRadius: 999 }}>{days > 0 ? `faltam ${days}d ${hrs}h` : `hoje - ${Math.max(0, hrs)}h`}</span>}
+            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Próxima peladinha</span>
+            {diffMs > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--lime)", border: "1px solid rgba(198,242,74,.3)", background: "rgba(198,242,74,.08)", padding: "4px 10px", borderRadius: 999 }}>{days > 0 ? `faltam ${days}d ${hrs}h` : `hoje · ${Math.max(0, hrs)}h`}</span>}
           </div>
           <div className="num" style={{ fontSize: 40, lineHeight: .95, color: "var(--chalk)", marginTop: 10, textTransform: "capitalize" }}>{date ? date.toLocaleDateString("pt-PT", { weekday: "long" }) : "A definir"}</div>
           {date && <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}><span className="num" style={{ fontSize: 22, color: "var(--text)" }}>{date.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })}</span><span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 700, color: "var(--grass-bright)" }}><Clock size={14} /> {date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span></div>}
@@ -1063,13 +1063,13 @@ const ScheduleTab = ({ next, players, me, locationUrl, onToggle }) => {
       {locationUrl && <button onClick={() => window.open(locationUrl, "_blank")} className="ft-card ft-btn" style={{ padding: 14, justifyContent: "center", gap: 8, color: "var(--grass-bright)", fontWeight: 700 }}><MapPin size={16} style={{ color: "var(--danger)" }} /> Ver campo no mapa</button>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <button onClick={() => onToggle("going")} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "going" ? "var(--grass-bright)" : "var(--line)", background: myResp === "going" ? "linear-gradient(135deg,var(--grass-2),var(--grass))" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--text)" }}><span style={{ fontSize: 22 }}>{"\u{1F44D}"}</span><span style={{ fontWeight: 800 }}>Vou jogar</span></button>
-        <button onClick={() => onToggle("not_going")} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "not_going" ? "var(--danger)" : "var(--line)", background: myResp === "not_going" ? "rgba(240,86,58,.85)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--text)" }}><span style={{ fontSize: 22 }}>{"\u{1F6AB}"}</span><span style={{ fontWeight: 800 }}>Nao vou</span></button>
+        <button onClick={() => onToggle("not_going")} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "not_going" ? "var(--danger)" : "var(--line)", background: myResp === "not_going" ? "rgba(240,86,58,.85)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--text)" }}><span style={{ fontSize: 22 }}>{"\u{1F6AB}"}</span><span style={{ fontWeight: 800 }}>Não vou</span></button>
       </div>
       <div className="ft-card" style={{ padding: 16 }}>
         <div className="eyebrow" style={{ marginBottom: 12 }}>Convocados - {going.length}</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {going.map(([uid]) => { const p = players.find((pl) => pl.uid === uid); return p ? (<div key={uid} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "5px 12px 5px 5px" }}><Avatar name={p.name} photo={p.photoUrl} size={24} /><span style={{ fontSize: 12, fontWeight: 600 }}>{firstName(p.name)}</span></div>) : null; })}
-          {going.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Ainda ninguem confirmou.</span>}
+          {going.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Ainda ninguém confirmou.</span>}
         </div>
       </div>
     </div>
@@ -1153,7 +1153,7 @@ const TeamTab = ({ players, next, avg, onSaveMatch, showToast }) => {
   const members = players.filter((p) => p.type !== "guest");
   const guests = players.filter((p) => p.type === "guest");
   const generate = () => {
-    if (selected.length < 2) return showToast("Minimo 2 jogadores", "error");
+    if (selected.length < 2) return showToast("Mínimo 2 jogadores", "error");
     const chosen = players.filter((p) => selected.includes(p.id));
     const blocks = {};
     chosen.forEach((p) => { let b = p.id; if (p.type === "guest" && p.hostId && selected.includes(p.hostId)) b = p.hostId; (blocks[b] ||= []).push(p); });
@@ -1207,7 +1207,7 @@ const TeamTab = ({ players, next, avg, onSaveMatch, showToast }) => {
           </div>
         </div>
         <button onClick={() => setShowStats((s) => !s)} className="ft-btn ft-ghost" style={{ padding: 12, justifyContent: "space-between" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><SoccerBall size={15} color="var(--grass-bright)" /> Golos & assistencias (opcional)</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><SoccerBall size={15} color="var(--grass-bright)" /> Golos & assistências (opcional)</span>
           <span style={{ transform: showStats ? "rotate(90deg)" : "none", transition: "transform .2s" }}><ArrowRight size={16} /></span>
         </button>
         {showStats && (
@@ -1270,10 +1270,10 @@ const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onDelete }) => {
               </div>
             )}
             <div style={{ background: "rgba(0,0,0,.2)", borderTop: "1px solid var(--line)", padding: 12, minHeight: 52, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {!open ? (mvp ? <div className="ft-pop" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--gold)" }}><Trophy size={15} style={{ fill: "var(--gold)" }} /><span style={{ fontSize: 13, fontWeight: 700 }}>MVP: {firstName(mvp.name)} - {mvp.votes} votos</span></div> : <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Votacao encerrada</span>)
+              {!open ? (mvp ? <div className="ft-pop" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--gold)" }}><Trophy size={15} style={{ fill: "var(--gold)" }} /><span style={{ fontSize: 13, fontWeight: 700 }}>MVP: {firstName(mvp.name)} - {mvp.votes} votos</span></div> : <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Votação encerrada</span>)
                 : myVote ? <div style={{ textAlign: "center" }}><div style={{ fontSize: 11, color: "var(--grass-bright)", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Check size={11} /> Voto registado</div><div style={{ fontSize: 10, color: "var(--faint)" }}>Resultado em {left}h</div></div>
                   : voting === m.id ? <div style={{ display: "flex", gap: 8, width: "100%" }}><select value={pick} onChange={(e) => setPick(e.target.value)} className="ft-input" style={{ padding: 8, fontSize: 12 }}><option value="">Quem foi o craque?</option>{allp.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button onClick={() => { if (pick) { onVote(m.id, pick); setVoting(null); setPick(""); } }} className="ft-btn" style={{ background: "var(--gold)", color: "#1a1300", padding: "0 16px", fontSize: 12 }}>Votar</button></div>
-                    : <button onClick={() => setVoting(m.id)} className="ft-btn" style={{ background: "none", color: "var(--gold)", fontSize: 12, fontWeight: 700 }}><Star size={13} /> Votar MVP - faltam {left}h</button>}
+                    : <button onClick={() => setVoting(m.id)} className="ft-btn" style={{ background: "none", color: "var(--gold)", fontSize: 12, fontWeight: 700 }}><Star size={13} /> Votar MVP · faltam {left}h</button>}
             </div>
           </div>
         );
@@ -1294,7 +1294,7 @@ const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, ma
     { ok: s.games >= 10, Icon: Medal, c: "var(--blue)", t: "Veterano", d: "+10 jogos realizados" },
     { ok: winRate > 0.6 && s.games >= 5, Icon: Flame, c: "#ff8a4c", t: "Imparavel", d: "+60% vitorias (min. 5 jogos)" },
     { ok: mine.g >= 10, Icon: SoccerBall, c: "var(--grass-bright)", t: "Goleador", d: "+10 golos marcados" },
-    { ok: fixedIds.includes(myProfile?.id), Icon: ShieldCheck, c: "var(--grass-bright)", t: "Membro fixo", d: "Inscrito na epoca/mes atual" },
+    { ok: fixedIds.includes(myProfile?.id), Icon: ShieldCheck, c: "var(--grass-bright)", t: "Membro fixo", d: "Inscrito na época/mês atual" },
   ];
   const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 12, padding: 10, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 22, color: color || "var(--text)" }}>{value}</div></div>);
   return (
@@ -1304,12 +1304,12 @@ const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, ma
         <div style={{ position: "relative", textAlign: "center" }}>
           <div style={{ margin: "0 auto 10px", width: 84, height: 84 }}><Avatar name={myProfile?.name || "Eu"} photo={myProfile?.photoUrl} size={84} /></div>
           <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: 0 }}>{(myProfile?.name || "EU").toUpperCase()}</h2>
-          <p className="eyebrow" style={{ marginTop: 4, marginBottom: 18 }}>Estatisticas de carreira</p>
+          <p className="eyebrow" style={{ marginTop: 4, marginBottom: 18 }}>Estatísticas de carreira</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
             <Stat label="Jogos" value={s.games || 0} /><Stat label="Vitorias" value={s.wins || 0} color="var(--grass-bright)" /><Stat label="Win %" value={`${Math.round(winRate * 100)}%`} color="var(--blue)" />
             <Stat label="Golos" value={mine.g} color="var(--grass-bright)" /><Stat label="Assist." value={mine.a} color="var(--blue)" /><Stat label="MVPs" value={mvpCount(myProfile?.id)} color="var(--gold)" />
           </div>
-          {amIAdmin && <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(106,169,224,.1)", border: "1px solid rgba(106,169,224,.3)", borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: "var(--blue)" }}><Star size={12} style={{ fill: "var(--blue)" }} /> Rating medio: {avg(myProfile || { votes: {} })}</div>}
+          {amIAdmin && <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(106,169,224,.1)", border: "1px solid rgba(106,169,224,.3)", borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: "var(--blue)" }}><Star size={12} style={{ fill: "var(--blue)" }} /> Rating médio: {avg(myProfile || { votes: {} })}</div>}
         </div>
       </div>
       <div className="ft-card" style={{ padding: 18 }}>
@@ -1348,10 +1348,10 @@ const MembersTab = ({ fixedIds, players, myProfile, paymentModel, onSignUp, onSi
   const inscrito = fixedIds.includes(myProfile?.id);
   return (
     <div className="ft-in ft-card" style={{ padding: 22, maxWidth: 480, margin: "0 auto" }}>
-      <h3 style={{ textAlign: "center", fontSize: 14, fontWeight: 800, display: "flex", justifyContent: "center", gap: 8, margin: "0 0 4px" }}><ClipboardList size={18} style={{ color: "var(--grass-bright)" }} /> {season ? "Inscricoes da epoca" : "Inscricoes mensais"}</h3>
-      <p style={{ textAlign: "center", fontSize: 12, color: "var(--dim)", margin: "0 0 18px" }}>{season ? "Inscreve-te como fixo desta epoca." : "Inscreve-te como fixo deste mes."}</p>
+      <h3 style={{ textAlign: "center", fontSize: 14, fontWeight: 800, display: "flex", justifyContent: "center", gap: 8, margin: "0 0 4px" }}><ClipboardList size={18} style={{ color: "var(--grass-bright)" }} /> {season ? "Inscrições da época" : "Inscrições mensais"}</h3>
+      <p style={{ textAlign: "center", fontSize: 12, color: "var(--dim)", margin: "0 0 18px" }}>{season ? "Inscreve-te como fixo desta época." : "Inscreve-te como fixo deste mês."}</p>
       {!myProfile ? <p style={{ textAlign: "center", fontSize: 12, color: "var(--faint)" }}>Entra primeiro no plantel.</p> : inscrito
-        ? <button onClick={onSignOut} className="ft-btn ft-danger" style={{ width: "100%", padding: 12, marginBottom: 18 }}>Cancelar inscricao</button>
+        ? <button onClick={onSignOut} className="ft-btn ft-danger" style={{ width: "100%", padding: 12, marginBottom: 18 }}>Cancelar inscrição</button>
         : <button onClick={onSignUp} className="ft-btn ft-grass" style={{ width: "100%", padding: 12, marginBottom: 18 }}>Inscrever-me</button>}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {fixedIds.map((id) => { const p = players.find((pl) => pl.id === id); return p ? (<div key={id} className="ft-raised" style={{ borderRadius: 12, padding: 10, display: "flex", alignItems: "center", gap: 10 }}><Avatar name={p.name} photo={p.photoUrl} size={32} /><span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>{id === myProfile?.id && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: "var(--grass-bright)", background: "rgba(34,197,94,.12)", border: "1px solid rgba(34,197,94,.3)", padding: "3px 8px", borderRadius: 8 }}>Eu</span>}</div>) : null; })}
@@ -1374,14 +1374,14 @@ const TreasuryTab = ({ players, matches, collectsFixed, fixedIds, payments, fixe
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontSize: 18, fontWeight: 800, display: "flex", gap: 8, margin: 0, alignItems: "center" }}><Wallet size={18} style={{ color: "var(--grass-bright)" }} /> Tesouraria</h2>
         {paymentModel === "monthly" && <input type="month" value={currentMonth} onChange={(e) => setCurrentMonth(e.target.value)} className="ft-input" style={{ width: "auto", padding: "6px 10px", fontSize: 12 }} />}
-        {paymentModel === "season" && <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Epoca atual</span>}
+        {paymentModel === "season" && <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Época atual</span>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div className="ft-card" style={{ padding: 16, background: "linear-gradient(135deg,rgba(34,197,94,.12),var(--card))", borderColor: "rgba(34,197,94,.25)" }}><div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Recebido</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{totalRevenue.toFixed(2)}EUR</div></div>
-        <div className="ft-card" style={{ padding: 16, background: "linear-gradient(135deg,rgba(240,86,58,.12),var(--card))", borderColor: "rgba(240,86,58,.25)" }}><div className="eyebrow" style={{ color: "#ff9684" }}>Divida total</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{totalDebt.toFixed(2)}EUR</div></div>
+        <div className="ft-card" style={{ padding: 16, background: "linear-gradient(135deg,rgba(240,86,58,.12),var(--card))", borderColor: "rgba(240,86,58,.25)" }}><div className="eyebrow" style={{ color: "#ff9684" }}>Dívida total</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{totalDebt.toFixed(2)}EUR</div></div>
       </div>
       <div className="ft-card" style={{ padding: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 14px", alignItems: "center" }}><AlertCircle size={17} style={{ color: "#ff9684" }} /> Dividas pendentes</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 14px", alignItems: "center" }}><AlertCircle size={17} style={{ color: "#ff9684" }} /> Dívidas pendentes</h3>
         {withDebt.length === 0 ? <div style={{ textAlign: "center", color: "var(--faint)", padding: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}><CheckCircle size={30} /><span>Tudo regularizado!</span></div>
           : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {withDebt.map((p) => (
@@ -1422,17 +1422,17 @@ const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDel
           <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>
             {model === "pergame" && "Todos pagam um valor por cada jogo."}
             {model === "monthly" && "Os fixos pagam uma mensalidade; convidados pagam por jogo."}
-            {model === "season" && "Os fixos pagam uma vez por toda a epoca; convidados pagam por jogo."}
+            {model === "season" && "Os fixos pagam uma vez por toda a época; convidados pagam por jogo."}
           </p>
           {model === "monthly" && <div style={{ marginBottom: 14 }}><Label>Valor da mensalidade (EUR)</Label><input type="number" step="0.50" className="ft-input" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} /></div>}
-          {model === "season" && <div style={{ marginBottom: 14 }}><Label>Valor da epoca (EUR)</Label><input type="number" step="1" className="ft-input" value={seasonFee} onChange={(e) => setSeasonFee(e.target.value)} /></div>}
-          <Label>Preco por jogo ({model === "pergame" ? "todos" : "convidados"}) (EUR)</Label>
+          {model === "season" && <div style={{ marginBottom: 14 }}><Label>Valor da época (EUR)</Label><input type="number" step="1" className="ft-input" value={seasonFee} onChange={(e) => setSeasonFee(e.target.value)} /></div>}
+          <Label>Preço por jogo ({model === "pergame" ? "todos" : "convidados"}) (EUR)</Label>
           <input type="number" step="0.10" className="ft-input" value={guestFee} onChange={(e) => setGuestFee(e.target.value)} />
         </div>
       )}
       {amIAdmin && (
         <div className="ft-card" style={{ padding: 20 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Clock size={17} style={{ color: "var(--blue)" }} /> Proximo jogo</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Clock size={17} style={{ color: "var(--blue)" }} /> Próximo jogo</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
             <div><Label>Data</Label><input type="date" className="ft-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div><Label>Hora</Label><input type="time" className="ft-input" value={time} onChange={(e) => setTime(e.target.value)} /></div>
@@ -1443,22 +1443,22 @@ const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDel
       )}
       {amIAdmin && (
         <div className="ft-card" style={{ padding: 20 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 12px", alignItems: "center" }}><MapIcon size={17} style={{ color: "var(--grass-bright)" }} /> Localizacao do campo</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 12px", alignItems: "center" }}><MapIcon size={17} style={{ color: "var(--grass-bright)" }} /> Localização do campo</h3>
           <input className="ft-input" value={locationUrl} onChange={(e) => setLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." />
-          <p style={{ fontSize: 10, color: "var(--faint)", marginTop: 8 }}>A meteorologia e atualizada com base neste link.</p>
+          <p style={{ fontSize: 10, color: "var(--faint)", marginTop: 8 }}>A meteorologia é atualizada com base neste link.</p>
         </div>
       )}
       {amIAdmin && (
         <div className="ft-card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 10px", alignItems: "center" }}><Swords size={17} style={{ color: "var(--gold)" }} /> Modo liga</h3>
-          <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>Ativa separadores exclusivos para gerir jogos oficiais, calendario da liga e convocatorias.</p>
+          <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>Ativa separadores exclusivos para gerir jogos oficiais, calendário da liga e convocatórias.</p>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a120f", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
-            <div><div style={{ fontSize: 13, fontWeight: 700 }}>Modo liga</div><div style={{ fontSize: 10, color: leagueModeLocal ? "var(--grass-bright)" : "var(--faint)" }}>{leagueModeLocal ? "Ativo" : "Inativo"}</div></div>
-            <button onClick={() => setLeagueModeLocal((v) => !v)} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: leagueModeLocal ? "var(--grass)" : "var(--raised)", color: leagueModeLocal ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>{leagueModeLocal ? "Ligado" : "Desligado"}</button>
+            <div><div style={{ fontSize: 13, fontWeight: 700 }}>Modo Liga</div><div style={{ fontSize: 10, color: leagueModeLocal ? "var(--grass-bright)" : "var(--faint)" }}>{leagueModeLocal ? "Ativo" : "Inativo"}</div></div>
+            <button onClick={() => setLeagueModeLocal((v) => !v)} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: leagueModeLocal ? "var(--grass)" : "var(--raised)", color: leagueModeLocal ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>{leagueModeLocal ? "Ativo" : "Inativo"}</button>
           </div>
         </div>
       )}
-      {amIAdmin && <button onClick={save} className="ft-btn" style={{ width: "100%", background: "var(--blue)", color: "#04101c", padding: 13 }}><Save size={18} /> Guardar definicoes</button>}
+      {amIAdmin && <button onClick={save} className="ft-btn" style={{ width: "100%", background: "var(--blue)", color: "#04101c", padding: 13 }}><Save size={18} /> Guardar definições</button>}
       <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 20, marginTop: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#ff9684", fontWeight: 800, marginBottom: 10 }}><ShieldAlert size={18} /> Zona de perigo</div>
         <p style={{ fontSize: 13, color: "#ffb3a5", margin: "0 0 14px" }}>{isOwner ? "Como dono, podes apagar este grupo permanentemente. Esta acao e irreversivel." : "Se saires do grupo, deixas de receber convocatorias. O historico e mantido."}</p>
@@ -1497,7 +1497,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const collectsFixed = settings.paymentModel !== "pergame";
   const fixedFee = settings.paymentModel === "season" ? Number(settings.seasonFee) || 0 : Number(settings.monthlyFee) || 0;
-  const fixedLabel = settings.paymentModel === "season" ? "Inscricao da epoca" : "Mensalidade";
+  const fixedLabel = settings.paymentModel === "season" ? "Inscrição da época" : "Mensalidade";
   const fee = Number(settings.guestFee) || 0;
   const periodKey = settings.paymentModel === "season" ? "season" : `month_${currentMonth}`;
 
@@ -1564,7 +1564,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     try { localStorage.setItem(`lastRead_${group.id}`, String(now)); } catch { /* noop */ }
   };
 
-  const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { date: nextGame?.date || new Date().toISOString(), responses: { ...(nextGame?.responses || {}), [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora" : "Removido da convocatoria"); };
+  const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { date: nextGame?.date || new Date().toISOString(), responses: { ...(nextGame?.responses || {}), [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); };
   const sendMessage = async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); };
   const groupMode = settings.groupMode || "casual";
   const isLeague = groupMode === "league";
@@ -1573,20 +1573,20 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const deleteTraining = async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); };
   const toggleTraining = async (id, status) => { const t = trainings.find((x) => x.id === id); await updateDoc(groupDoc("trainings", id), { responses: { ...(t?.responses || {}), [me.uid]: status } }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
   const isLeagueMode = settings.leagueMode === true;
-  const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendario!"); };
+  const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); };
   const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
   const saveLeagueResult = async (id, scoreA, scoreB) => { await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB }); showToast("Resultado guardado!"); };
   const saveLineup = async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); };
 
   const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
-  const joinAsPlayer = async () => { if (players.find((p) => p.uid === me.uid)) return showToast("Ja estas no plantel!", "error"); let photo = me.photoURL; try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", me.uid)); if (ud.exists()) photo = ud.data().photoUrl || photo; } catch (e) { /* noop */ } await addDoc(groupRef("players"), { name: me.displayName || "Eu", uid: me.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste no plantel!"); };
-  const ratePlayer = async (p, r) => { await updateDoc(groupDoc("players", p.id), { votes: { ...(p.votes || {}), [me.uid]: r } }); showToast("Avaliacao registada!"); };
+  const joinAsPlayer = async () => { if (players.find((p) => p.uid === me.uid)) return showToast("Já estás no plantel!", "error"); let photo = me.photoURL; try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", me.uid)); if (ud.exists()) photo = ud.data().photoUrl || photo; } catch (e) { /* noop */ } await addDoc(groupRef("players"), { name: me.displayName || "Eu", uid: me.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste no plantel!"); };
+  const ratePlayer = async (p, r) => { await updateDoc(groupDoc("players", p.id), { votes: { ...(p.votes || {}), [me.uid]: r } }); showToast("Avaliação registada!"); };
   const removePlayer = async (p) => { if (!amIAdmin) return; if (window.confirm(`Eliminar ${p.name}?`)) await deleteDoc(groupDoc("players", p.id)); };
   const toggleAdmin = async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc("players", p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); };
   const deleteMatch = async (id) => { if (!amIAdmin) return; if (window.confirm("Apagar jogo?")) await deleteDoc(groupDoc("matches", id)); };
   const submitMvp = async (mid, pid) => { const m = matches.find((x) => x.id === mid); await updateDoc(groupDoc("matches", mid), { mvpVotes: { ...(m.mvpVotes || {}), [me.uid]: pid } }); showToast("Voto registado!"); };
   const signUp = async () => { if (!myProfile || fixedIds.includes(myProfile.id)) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: [...fixedIds, myProfile.id], payments }, { merge: true }); showToast("Inscrito como fixo!"); };
-  const signOutFixed = async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: fixedIds.filter((id) => id !== myProfile.id), payments }, { merge: true }); showToast("Inscricao cancelada"); };
+  const signOutFixed = async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: fixedIds.filter((id) => id !== myProfile.id), payments }, { merge: true }); showToast("Inscrição cancelada"); };
   const payFixed = async (pid) => { await setDoc(groupDoc("treasury", periodKey), { payments: { ...payments, [pid]: true } }, { merge: true }); showToast(`${fixedLabel} paga!`); };
   const payMatch = async (mid, pid) => { const m = matches.find((x) => x.id === mid); await updateDoc(groupDoc("matches", mid), { payments: { ...(m.payments || {}), [pid]: true } }); showToast("Jogo pago!"); };
 
@@ -1600,7 +1600,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     const w = scoreA > scoreB ? "A" : scoreB > scoreA ? "B" : "draw";
     const upd = (p, res) => { const s = { games: 0, wins: 0, draws: 0, losses: 0, ...(p.stats || {}) }; s.games++; if (res === "win") s.wins++; else if (res === "draw") s.draws++; else s.losses++; return updateDoc(groupDoc("players", p.id), { stats: s }); };
     await Promise.all([...teamA.map((p) => upd(p, w === "A" ? "win" : w === "draw" ? "draw" : "loss")), ...teamB.map((p) => upd(p, w === "B" ? "win" : w === "draw" ? "draw" : "loss"))]);
-    showToast("Jogo guardado! Proxima data atualizada."); setTab("history");
+    showToast("Jogo guardado! Próxima data atualizada."); setTab("history");
   };
 
   const saveSettings = async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, leagueMode }) => {
@@ -1608,11 +1608,11 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     if (Object.keys(sched).length) await setDoc(groupDoc("schedule", "next"), sched, { merge: true });
     const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0, leagueMode: !!leagueMode } };
     if (locationUrl) { gUpdate.locationUrl = locationUrl; const c = getCoordsFromUrl(locationUrl); if (c) gUpdate.location = c; }
-    await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), gUpdate); showToast("Definicoes guardadas!");
+    await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), gUpdate); showToast("Definições guardadas!");
   };
   const leaveGroup = async () => { if (isOwner) return; if (window.confirm("Sair do grupo?")) { await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { members: arrayRemove(me.uid) }); onBack(); } };
   const deleteGroup = async () => { if (window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, "artifacts", APP_ID, "groups", group.id)); onBack(); } };
-  const copyInvite = () => { navigator.clipboard?.writeText(group.id).then(() => { setCopied(true); showToast("Codigo copiado!"); setTimeout(() => setCopied(false), 1800); }).catch(() => showToast("Erro", "error")); };
+  const copyInvite = () => { navigator.clipboard?.writeText(group.id).then(() => { setCopied(true); showToast("Código copiado!"); setTimeout(() => setCopied(false), 1800); }).catch(() => showToast("Erro", "error")); };
 
   const TABS = [
     { id: "schedule", icon: CalendarCheck, label: "Agenda", badge: pendingRsvp },
@@ -1687,10 +1687,10 @@ const GroupSelector = ({ user, onLogout }) => {
   const createGroup = async (e) => {
     e.preventDefault(); if (!newGroup.trim()) return; setCreateError("");
     const customId = newGroup.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    if (!customId) return setCreateError("Nome invalido para criar ID.");
+    if (!customId) return setCreateError("Nome inválido para criar ID.");
     try {
       const groupRef = doc(db, "artifacts", APP_ID, "groups", customId);
-      if ((await getDoc(groupRef)).exists()) return setCreateError("Ja existe um grupo com esse nome. Tenta outro.");
+      if ((await getDoc(groupRef)).exists()) return setCreateError("Já existe um grupo com esse nome. Tenta outro.");
       const batch = writeBatch(db);
       batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: groupMode === "weekly" ? "monthly" : "pergame", monthlyFee: 0, seasonFee: 0, guestFee: 4.5, groupMode: groupMode || "casual", leagueMode: groupMode === "league" }, createdAt: serverTimestamp() });
       const playerRef = doc(collection(db, "artifacts", APP_ID, "groups", customId, "players"));
@@ -1704,9 +1704,9 @@ const GroupSelector = ({ user, onLogout }) => {
     e.preventDefault(); if (!joinCode.trim()) return; setMsg("");
     try {
       const id = joinCode.trim(); const ref = doc(db, "artifacts", APP_ID, "groups", id); const snap = await getDoc(ref);
-      if (!snap.exists()) return setMsg("Grupo nao encontrado. Verifica o codigo.");
+      if (!snap.exists()) return setMsg("Grupo não encontrado. Verifica o código.");
       const data = snap.data();
-      if (data.members?.includes(user.uid)) return setMsg("Ja pertences a este grupo!");
+      if (data.members?.includes(user.uid)) return setMsg("Já pertences a este grupo!");
       await updateDoc(ref, { members: arrayUnion(user.uid) });
       const pq = query(collection(db, "artifacts", APP_ID, "groups", id, "players"), where("uid", "==", user.uid));
       if ((await getDocs(pq)).empty) {
@@ -1733,7 +1733,7 @@ const GroupSelector = ({ user, onLogout }) => {
         <div>
           <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneario</div>
           <h1 className="num" style={{ fontSize: 30, margin: "2px 0 0", color: "var(--chalk)" }}>OS TEUS GRUPOS</h1>
-          <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Ola, <b style={{ color: "var(--text)" }}>{user.displayName || "Jogador"}</b></p>
+          <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Olá, <b style={{ color: "var(--text)" }}>{user.displayName || "Jogador"}</b></p>
         </div>
         <button onClick={() => setView("profile")} className="ft-btn" style={{ background: "none", padding: 0 }}><Avatar name={user.displayName || "Eu"} photo={user.photoURL} size={44} /></button>
       </header>
@@ -1742,11 +1742,11 @@ const GroupSelector = ({ user, onLogout }) => {
           <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 14px" }}><PlusCircle size={16} style={{ color: "var(--grass-bright)" }} /> Criar grupo</h2>
           {!groupMode ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 6px" }}>Qual e o tipo de grupo?</p>
+              <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 6px" }}>Qual é o tipo de grupo?</p>
               {[
-                { id: "casual", Icon: Zap, color: "var(--blue)", bg: "rgba(106,169,224,.15)", label: "Casual", sub: "Jogamos de vez em quando, sem calendario fixo" },
-                { id: "weekly", Icon: CalendarCheck, color: "var(--grass-bright)", bg: "rgba(34,197,94,.15)", label: "Semanal", sub: "Peladas regulares com mensalidade e inscricoes" },
-                { id: "league", Icon: Trophy, color: "var(--gold)", bg: "rgba(245,197,66,.15)", label: "Liga", sub: "Equipa numa competicao oficial com convocatorias" },
+                { id: "casual", Icon: Zap, color: "var(--blue)", bg: "rgba(106,169,224,.15)", label: "Casual", sub: "Jogamos de vez em quando, sem calendário fixo" },
+                { id: "weekly", Icon: CalendarCheck, color: "var(--grass-bright)", bg: "rgba(34,197,94,.15)", label: "Semanal", sub: "Peladas regulares com mensalidade e inscrições" },
+                { id: "league", Icon: Trophy, color: "var(--gold)", bg: "rgba(245,197,66,.15)", label: "Liga", sub: "Equipa numa competição oficial com convocatórias" },
               ].map(({ id, Icon, color, bg, label, sub }) => (
                 <button key={id} onClick={() => setGroupMode(id)} className="ft-btn ft-ghost" style={{ padding: "12px 14px", justifyContent: "flex-start", gap: 12 }}>
                   <div style={{ padding: 8, borderRadius: 10, background: bg, color, flexShrink: 0 }}><Icon size={18} /></div>
@@ -1767,13 +1767,13 @@ const GroupSelector = ({ user, onLogout }) => {
           )}
         </div>
         <div className="ft-card" style={{ padding: 18 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}><UserPlus size={16} style={{ color: "var(--blue)" }} /> Entrar com codigo</h2>
-          <form onSubmit={joinGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Codigo do convite..." /><button type="submit" disabled={!joinCode.trim()} className="ft-btn ft-ghost" style={{ padding: "0 18px", color: "var(--blue)" }}>Entrar</button></form>
+          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}><UserPlus size={16} style={{ color: "var(--blue)" }} /> Entrar com código</h2>
+          <form onSubmit={joinGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Código do convite..." /><button type="submit" disabled={!joinCode.trim()} className="ft-btn ft-ghost" style={{ padding: "0 18px", color: "var(--blue)" }}>Entrar</button></form>
           {msg && <p style={{ fontSize: 12, color: "var(--grass-bright)", marginTop: 8 }}>{msg}</p>}
         </div>
       </div>
       {groups.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", border: "2px dashed var(--line)", borderRadius: 18 }}><Users size={44} style={{ color: "var(--faint)", marginBottom: 12 }} /><p style={{ color: "var(--dim)", fontSize: 14 }}>Cria um grupo ou pede um codigo a um amigo!</p></div>
+        <div style={{ textAlign: "center", padding: "60px 20px", border: "2px dashed var(--line)", borderRadius: 18 }}><Users size={44} style={{ color: "var(--faint)", marginBottom: 12 }} /><p style={{ color: "var(--dim)", fontSize: 14 }}>Cria um grupo ou pede um código a um amigo!</p></div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 14 }}>
           {groups.map((g) => (
