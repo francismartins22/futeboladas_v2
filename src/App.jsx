@@ -7,6 +7,7 @@ import {
   CheckCircle, Award, Flame, Medal, Share2, ShieldCheck, Wind, Droplets,
   CloudSun, Sun, CloudRain, Cloud, CloudFog, CloudLightning, Snowflake,
   MessageSquare, Send, Minus, RotateCcw, Pencil, X, Activity, PlusCircle,
+  ListOrdered, Swords, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 import { initializeApp } from "firebase/app";
@@ -480,6 +481,213 @@ const ChatTab = ({ messages, me, onSend, onMarkRead }) => {
         <input className="ft-input" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Escreve uma mensagem..." />
         <button onClick={send} disabled={!text.trim()} className="ft-btn ft-grass" style={{ width: 46, padding: 0, borderRadius: 12 }}><Send size={18} /></button>
       </div>
+    </div>
+  );
+};
+
+/* ========================= LIGA: CALENDARIO ============================== */
+const POSITIONS_5 = ["GR","DEF","DEF","MEI","AV"];
+const POSITIONS_7 = ["GR","DEF","DEF","DEF","MEI","MEI","AV"];
+const POSITIONS_11 = ["GR","DEF","DEF","DEF","DEF","MEI","MEI","MEI","AV","AV","AV"];
+const POSITION_OPTS = ["GR","DEF","MEI","AV","SUP"];
+
+const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, onResult }) => {
+  const [open, setOpen] = useState(false);
+  const [opponent, setOpponent] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("21:00");
+  const [home, setHome] = useState(true);
+  const [editResult, setEditResult] = useState(null);
+  const [sa, setSa] = useState(""); const [sb, setSb] = useState("");
+
+  const sorted = [...leagueGames].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const played = sorted.filter((g) => g.scoreA != null);
+  const upcoming = sorted.filter((g) => g.scoreA == null);
+
+  const pts = (g) => { if (g.scoreA == null) return null; const w = home ? g.scoreA > g.scoreB : g.scoreB > g.scoreA; const d = g.scoreA === g.scoreB; return w ? 3 : d ? 1 : 0; };
+  const totalPts = played.reduce((s, g) => s + (pts(g) || 0), 0);
+  const wins = played.filter((g) => pts(g) === 3).length;
+  const draws = played.filter((g) => pts(g) === 1).length;
+  const losses = played.filter((g) => pts(g) === 0).length;
+
+  const submit = () => {
+    if (!opponent.trim() || !date) return;
+    onAdd({ opponent: opponent.trim(), date: `${date}T${time}:00`, home });
+    setOpponent(""); setDate(""); setOpen(false);
+  };
+  const saveResult = (g) => {
+    if (sa === "" || sb === "") return;
+    onResult(g.id, parseInt(sa, 10), parseInt(sb, 10));
+    setEditResult(null); setSa(""); setSb("");
+  };
+
+  const GameCard = (g) => {
+    const d = new Date(g.date); const past = g.scoreA != null;
+    const myScore = g.home ? g.scoreA : g.scoreB; const oppScore = g.home ? g.scoreB : g.scoreA;
+    const result = past ? (myScore > oppScore ? "V" : myScore === oppScore ? "E" : "D") : null;
+    const resultColor = { V: "var(--grass-bright)", E: "var(--gold)", D: "var(--danger)" }[result];
+    return (
+      <div key={g.id} className="ft-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ background: "rgba(0,0,0,.25)", padding: "6px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span className="eyebrow">{d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })} · {d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: g.home ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", color: g.home ? "var(--grass-bright)" : "var(--blue)" }}>{g.home ? "Casa" : "Fora"}</span>
+            {amIAdmin && <button onClick={() => onDelete(g.id)} className="ft-btn" style={{ background: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={12} /></button>}
+          </div>
+        </div>
+        <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+          {result && <div className="num" style={{ fontSize: 22, color: resultColor, minWidth: 28 }}>{result}</div>}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 800 }}>vs {g.opponent}</div>
+            {past && <div className="num" style={{ fontSize: 26, color: "var(--chalk)", marginTop: 2 }}>{g.scoreA} <span style={{ color: "var(--faint)", fontWeight: 300 }}>-</span> {g.scoreB}</div>}
+          </div>
+          {!past && amIAdmin && editResult?.id !== g.id && (
+            <button onClick={() => { setEditResult(g); setSa(""); setSb(""); }} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "8px 12px" }}>Resultado</button>
+          )}
+        </div>
+        {editResult?.id === g.id && (
+          <div className="ft-in" style={{ padding: "0 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+            <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nos" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+            <span style={{ color: "var(--faint)" }}>-</span>
+            <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+            <button onClick={() => saveResult(g)} className="ft-btn ft-grass" style={{ flex: 1, padding: 10, fontSize: 13 }}>Guardar</button>
+            <button onClick={() => setEditResult(null)} className="ft-btn ft-ghost" style={{ padding: 10 }}><X size={14} /></button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {played.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+          {[["Pontos", totalPts, "var(--gold)"], ["Vitorias", wins, "var(--grass-bright)"], ["Empates", draws, "var(--blue)"], ["Derrotas", losses, "var(--danger)"]].map(([l, v, c]) => (
+            <div key={l} className="ft-raised" style={{ borderRadius: 14, padding: "10px 8px", textAlign: "center" }}>
+              <div className="eyebrow" style={{ color: c }}>{l}</div>
+              <div className="num" style={{ fontSize: 26, color: c }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {amIAdmin && (
+        <button onClick={() => setOpen((o) => !o)} className="ft-btn ft-grass" style={{ padding: 13, justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Plus size={16} /> Adicionar jogo oficial</span>
+          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+      )}
+      {open && (
+        <div className="ft-card ft-in" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Adversario</label><input className="ft-input" value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Nome da equipa adversaria..." /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Data</label><input type="date" className="ft-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Hora</label><input type="time" className="ft-input" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
+            {[[true, "Casa"], [false, "Fora"]].map(([v, l]) => <button key={l} onClick={() => setHome(v)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 13, background: home === v ? "var(--grass)" : "none", color: home === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
+          </div>
+          <button onClick={submit} disabled={!opponent.trim() || !date} className="ft-btn ft-grass" style={{ padding: 12 }}>Adicionar ao calendario</button>
+        </div>
+      )}
+      {upcoming.length > 0 && (
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Proximos jogos - {upcoming.length}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{upcoming.map(GameCard)}</div>
+        </div>
+      )}
+      {played.length > 0 && (
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>Jogados - {played.length}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{played.map(GameCard)}</div>
+        </div>
+      )}
+      {leagueGames.length === 0 && <div style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--faint)", fontSize: 13 }}>Ainda sem jogos na liga.<br />Adiciona o primeiro jogo oficial acima.</div>}
+    </div>
+  );
+};
+
+/* ========================= LIGA: CONVOCATORIA ============================ */
+const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [size, setSize] = useState(5);
+  const [lineup, setLineup] = useState({}); // { playerId: { pos, role: "titular"|"suplente" } }
+  const [saved, setSaved] = useState(false);
+
+  const upcoming = leagueGames.filter((g) => g.scoreA == null).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const defaultPositions = size === 5 ? POSITIONS_5 : size === 7 ? POSITIONS_7 : POSITIONS_11;
+  const titulares = members.filter((p) => lineup[p.id]?.role === "titular");
+  const suplentes = members.filter((p) => lineup[p.id]?.role === "suplente");
+  const notCalled = members.filter((p) => !lineup[p.id]?.role);
+
+  const setRole = (pid, role) => setLineup((l) => ({ ...l, [pid]: { ...l[pid], role } }));
+  const setPos = (pid, pos) => setLineup((l) => ({ ...l, [pid]: { ...l[pid], pos } }));
+  const clearPlayer = (pid) => setLineup((l) => { const n = { ...l }; delete n[pid]; return n; });
+
+  const save = async () => {
+    if (!selectedGame) return;
+    await onSaveLineup(selectedGame.id, { size, lineup });
+    setSaved(true); setTimeout(() => setSaved(false), 2000);
+  };
+
+  const PlayerRow = ({ p, role }) => (
+    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderTop: "1px solid var(--line-soft)" }}>
+      <Avatar name={p.name} photo={p.photoUrl} size={30} />
+      <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+      {role === "titular" && (
+        <select value={lineup[p.id]?.pos || ""} onChange={(e) => setPos(p.id, e.target.value)}
+          className="ft-input" style={{ width: 72, padding: "4px 6px", fontSize: 11 }}>
+          <option value="">Pos.</option>
+          {POSITION_OPTS.map((po) => <option key={po} value={po}>{po}</option>)}
+        </select>
+      )}
+      {amIAdmin && (
+        <div style={{ display: "flex", gap: 4 }}>
+          {role !== "titular" && <button onClick={() => setRole(p.id, "titular")} className="ft-btn" style={{ fontSize: 10, padding: "4px 8px", background: "rgba(34,197,94,.15)", color: "var(--grass-bright)", border: "1px solid rgba(34,197,94,.3)" }}>Titular</button>}
+          {role !== "suplente" && <button onClick={() => setRole(p.id, "suplente")} className="ft-btn" style={{ fontSize: 10, padding: "4px 8px", background: "rgba(106,169,224,.15)", color: "var(--blue)", border: "1px solid rgba(106,169,224,.3)" }}>SUP</button>}
+          {role && <button onClick={() => clearPlayer(p.id)} className="ft-btn" style={{ padding: "4px 6px", background: "none", color: "var(--faint)" }}><X size={12} /></button>}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="ft-card" style={{ padding: 16 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 800, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}><Swords size={16} style={{ color: "var(--gold)" }} /> Jogo oficial</h3>
+        {upcoming.length === 0
+          ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", margin: 0 }}>Adiciona um jogo no Calendario para poder fazer a convocatoria.</p>
+          : <select className="ft-input" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)}>
+              <option value="">Seleciona o jogo...</option>
+              {upcoming.map((g) => <option key={g.id} value={g.id}>{new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} · vs {g.opponent} {g.home ? "(Casa)" : "(Fora)"}</option>)}
+            </select>}
+      </div>
+      {selectedGame && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
+            {[5, 7, 11].map((n) => <button key={n} onClick={() => setSize(n)} className="ft-btn" style={{ padding: "8px 4px", fontSize: 12, background: size === n ? "var(--grass)" : "none", color: size === n ? "#04130a" : "var(--faint)" }}>{n}x{n}</button>)}
+          </div>
+          <div className="ft-card" style={{ padding: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <span className="eyebrow">Titulares <span style={{ color: titulares.length === size ? "var(--grass-bright)" : "var(--faint)" }}>({titulares.length}/{size})</span></span>
+              <span style={{ fontSize: 10, color: "var(--faint)" }}>Posicao recomendada: {defaultPositions.join("-").replace("GR-", "GR · ")}</span>
+            </div>
+            {titulares.length === 0 ? <p style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Nenhum titular selecionado.</p> : titulares.map((p) => <PlayerRow key={p.id} p={p} role="titular" />)}
+          </div>
+          <div className="ft-card" style={{ padding: 14 }}>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>Suplentes ({suplentes.length})</div>
+            {suplentes.length === 0 ? <p style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Nenhum suplente selecionado.</p> : suplentes.map((p) => <PlayerRow key={p.id} p={p} role="suplente" />)}
+          </div>
+          <div className="ft-card" style={{ padding: 14 }}>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>Nao convocados ({notCalled.length})</div>
+            {notCalled.length === 0 ? <p style={{ fontSize: 11, color: "var(--grass-bright)", fontSize: 12 }}>Toda a gente convocada!</p> : notCalled.map((p) => <PlayerRow key={p.id} p={p} role={null} />)}
+          </div>
+          {amIAdmin && (
+            <button onClick={save} className="ft-btn ft-grass" style={{ width: "100%", padding: 14 }}>
+              {saved ? <><Check size={16} /> Guardado!</> : <><Save size={16} /> Guardar convocatoria</>}
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 };
@@ -980,9 +1188,10 @@ const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDel
   const [time, setTime] = useState(next?.date ? new Date(next.date).toTimeString().slice(0, 5) : "21:00");
   const [freq, setFreq] = useState(next?.frequency || "weekly");
   const [locationUrl, setLocationUrl] = useState(settings.locationUrl || "");
+  const [leagueModeLocal, setLeagueModeLocal] = useState(settings.leagueMode === true);
   const Label = ({ children }) => <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>{children}</label>;
   const MODELS = [["pergame", "Jogo-a-jogo"], ["monthly", "Mensal"], ["season", "Epoca"]];
-  const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl });
+  const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, leagueMode: leagueModeLocal });
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {amIAdmin && (
@@ -1020,6 +1229,16 @@ const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDel
           <p style={{ fontSize: 10, color: "var(--faint)", marginTop: 8 }}>A meteorologia e atualizada com base neste link.</p>
         </div>
       )}
+      {amIAdmin && (
+        <div className="ft-card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 10px", alignItems: "center" }}><Swords size={17} style={{ color: "var(--gold)" }} /> Modo liga</h3>
+          <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>Ativa separadores exclusivos para gerir jogos oficiais, calendario da liga e convocatorias.</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a120f", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
+            <div><div style={{ fontSize: 13, fontWeight: 700 }}>Modo liga</div><div style={{ fontSize: 10, color: leagueModeLocal ? "var(--grass-bright)" : "var(--faint)" }}>{leagueModeLocal ? "Ativo" : "Inativo"}</div></div>
+            <button onClick={() => setLeagueModeLocal((v) => !v)} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: leagueModeLocal ? "var(--grass)" : "var(--raised)", color: leagueModeLocal ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>{leagueModeLocal ? "Ligado" : "Desligado"}</button>
+          </div>
+        </div>
+      )}
       {amIAdmin && <button onClick={save} className="ft-btn" style={{ width: "100%", background: "var(--blue)", color: "#04101c", padding: 13 }}><Save size={18} /> Guardar definicoes</button>}
       <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 20, marginTop: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#ff9684", fontWeight: 800, marginBottom: 10 }}><ShieldAlert size={18} /> Zona de perigo</div>
@@ -1046,6 +1265,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [lastReadTs, setLastReadTs] = useState(() => {
     try { return parseInt(localStorage.getItem(`lastRead_${group.id}`) || "0"); } catch { return 0; }
   });
+  const [leagueGames, setLeagueGames] = useState([]);
 
   const me = currentUser;
   const groupRef = (col) => collection(db, "artifacts", APP_ID, "groups", group.id, col);
@@ -1069,7 +1289,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     const unsubGroup = onSnapshot(doc(db, "artifacts", APP_ID, "groups", group.id), (s) => {
       if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "" }); }
     });
-    return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); };
+    const unsubLG = onSnapshot(query(groupRef("leagueGames"), orderBy("date", "asc")), (s) => setLeagueGames(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); unsubLG(); };
   }, [group.id]);
 
   useEffect(() => {
@@ -1124,6 +1345,12 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { date: nextGame?.date || new Date().toISOString(), responses: { ...(nextGame?.responses || {}), [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora" : "Removido da convocatoria"); };
   const sendMessage = async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); };
+  const isLeagueMode = settings.leagueMode === true;
+  const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendario!"); };
+  const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
+  const saveLeagueResult = async (id, scoreA, scoreB) => { await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB }); showToast("Resultado guardado!"); };
+  const saveLineup = async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); };
+
   const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
   const joinAsPlayer = async () => { if (players.find((p) => p.uid === me.uid)) return showToast("Ja estas no plantel!", "error"); let photo = me.photoURL; try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", me.uid)); if (ud.exists()) photo = ud.data().photoUrl || photo; } catch (e) { /* noop */ } await addDoc(groupRef("players"), { name: me.displayName || "Eu", uid: me.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste no plantel!"); };
   const ratePlayer = async (p, r) => { await updateDoc(groupDoc("players", p.id), { votes: { ...(p.votes || {}), [me.uid]: r } }); showToast("Avaliacao registada!"); };
@@ -1149,10 +1376,10 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     showToast("Jogo guardado! Proxima data atualizada."); setTab("history");
   };
 
-  const saveSettings = async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl }) => {
+  const saveSettings = async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, leagueMode }) => {
     const sched = {}; if (date && time) sched.date = `${date}T${time}:00`; if (freq) sched.frequency = freq;
     if (Object.keys(sched).length) await setDoc(groupDoc("schedule", "next"), sched, { merge: true });
-    const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0 } };
+    const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0, leagueMode: !!leagueMode } };
     if (locationUrl) { gUpdate.locationUrl = locationUrl; const c = getCoordsFromUrl(locationUrl); if (c) gUpdate.location = c; }
     await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), gUpdate); showToast("Definicoes guardadas!");
   };
@@ -1168,6 +1395,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     { id: "players", icon: Users, label: "Plantel" },
     { id: "history", icon: HistoryIcon, label: "Jogos" },
     { id: "trophies", icon: Trophy, label: "Carreira" },
+    ...(isLeagueMode ? [{ id: "leaguecal", icon: ListOrdered, label: "Liga" }] : []),
+    ...(isLeagueMode ? [{ id: "lineup", icon: Swords, label: "Convoc." }] : []),
     ...(collectsFixed ? [{ id: "members", icon: ClipboardList, label: "Inscricoes" }] : []),
     ...(amIAdmin ? [{ id: "treasury", icon: Wallet, label: "Tesouraria", badge: myDebt }] : []),
     { id: "settings", icon: Settings, label: "Definicoes" },
@@ -1191,6 +1420,8 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
       <div style={{ padding: tab === "chat" || tab === "tactics" ? 0 : 16, maxWidth: tab === "chat" ? 620 : 480, margin: "0 auto" }}>
         {tab === "schedule" && <ScheduleTab next={nextGame} players={players} me={me} locationUrl={settings.locationUrl} onToggle={toggleSchedule} />}
         {tab === "chat" && <ChatTab messages={messages} me={me} onSend={sendMessage} onMarkRead={markChatRead} />}
+        {tab === "leaguecal" && isLeagueMode && <LeagueCalendarTab leagueGames={leagueGames} members={members} amIAdmin={amIAdmin} onAdd={addLeagueGame} onDelete={deleteLeagueGame} onResult={saveLeagueResult} />}
+        {tab === "lineup" && isLeagueMode && <LineupTab members={members} amIAdmin={amIAdmin} leagueGames={leagueGames} onSaveLineup={saveLineup} />}
         {tab === "team" && <TeamTab players={players} next={nextGame} avg={avg} onSaveMatch={saveMatch} showToast={showToast} />}
         {tab === "tactics" && <TacticsTab members={members} showToast={showToast} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
