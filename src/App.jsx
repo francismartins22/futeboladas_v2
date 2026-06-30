@@ -554,6 +554,20 @@ const LeagueScheduleTab = ({ leagueGames, me, players }) => {
   const draws = played.filter((g) => g.scoreA === g.scoreB).length;
   const losses = played.filter((g) => g.scoreA < g.scoreB).length;
   const pts = wins * 3 + draws;
+
+  const stats = useMemo(() => {
+    const map = {};
+    played.forEach((g) => {
+      Object.entries(g.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0, mvp: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; });
+      if (g.mvp) { if (!map[g.mvp]) map[g.mvp] = { g: 0, a: 0, mvp: 0 }; map[g.mvp].mvp += 1; }
+    });
+    return Object.entries(map).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name })).filter((x) => x.name);
+  }, [played, players]);
+  const topGoals = [...stats].sort((a, b) => b.g - a.g).filter((p) => p.g > 0).slice(0, 3);
+  const topAssists = [...stats].sort((a, b) => b.a - a.a).filter((p) => p.a > 0).slice(0, 3);
+  const topMvp = [...stats].sort((a, b) => b.mvp - a.mvp).filter((p) => p.mvp > 0).slice(0, 3);
+  const hasRanking = topGoals.length > 0 || topAssists.length > 0 || topMvp.length > 0;
+
   if (!next && !last) return (
     <div className="ft-in" style={{ textAlign: "center", padding: "60px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--faint)", fontSize: 13 }}>
       <ListOrdered size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
@@ -588,6 +602,55 @@ const LeagueScheduleTab = ({ leagueGames, me, players }) => {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div className="num" style={{ fontSize: 22, color: last.scoreA > last.scoreB ? "var(--grass-bright)" : last.scoreA === last.scoreB ? "var(--gold)" : "var(--danger)", minWidth: 28 }}>{last.scoreA > last.scoreB ? "V" : last.scoreA === last.scoreB ? "E" : "D"}</div>
             <div><div style={{ fontSize: 14, fontWeight: 700 }}>vs {last.opponent}</div><div className="num" style={{ fontSize: 20, color: "var(--chalk)" }}>{last.scoreA} - {last.scoreB}</div></div>
+          </div>
+        </div>
+      )}
+      {hasRanking && (
+        <div className="ft-card" style={{ padding: 18 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 14px" }}><Trophy size={16} style={{ color: "var(--gold)" }} /> Top da equipa</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {topGoals.length > 0 && (
+              <div>
+                <div className="eyebrow" style={{ color: "var(--grass-bright)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><SoccerBall size={11} /> Melhores marcadores</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {topGoals.map((p, i) => (
+                    <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span className="num" style={{ width: 18, textAlign: "center", fontSize: 14, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
+                      <Avatar name={p.name} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--grass-bright)" }}>{p.g}G</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {topAssists.length > 0 && (
+              <div>
+                <div className="eyebrow" style={{ color: "var(--blue)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Share2 size={11} /> Melhores assistentes</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {topAssists.map((p, i) => (
+                    <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span className="num" style={{ width: 18, textAlign: "center", fontSize: 14, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
+                      <Avatar name={p.name} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--blue)" }}>{p.a}A</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {topMvp.length > 0 && (
+              <div>
+                <div className="eyebrow" style={{ color: "var(--gold)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Trophy size={11} style={{ fill: "var(--gold)" }} /> Mais MVPs</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {topMvp.map((p, i) => (
+                    <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span className="num" style={{ width: 18, textAlign: "center", fontSize: 14, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
+                      <Avatar name={p.name} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)" }}>{p.mvp}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1624,7 +1687,19 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const toggleTraining = async (id, status) => { const t = trainings.find((x) => x.id === id); await updateDoc(groupDoc("trainings", id), { responses: { ...(t?.responses || {}), [me.uid]: status } }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
   const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); };
   const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
-  const saveLeagueResult = async (id, scoreA, scoreB, goals, mvp) => { await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null }); showToast("Resultado guardado!"); };
+  const saveLeagueResult = async (id, scoreA, scoreB, goals, mvp) => {
+    await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null });
+    const game = leagueGames.find((g) => g.id === id);
+    const calledIds = game?.lineup?.lineup ? Object.keys(game.lineup.lineup) : members.map((m) => m.id);
+    const result = scoreA > scoreB ? "win" : scoreA < scoreB ? "loss" : "draw";
+    await Promise.all(calledIds.map((pid) => {
+      const p = players.find((pl) => pl.id === pid); if (!p) return Promise.resolve();
+      const s = { games: 0, wins: 0, draws: 0, losses: 0, ...(p.stats || {}) };
+      s.games++; if (result === "win") s.wins++; else if (result === "draw") s.draws++; else s.losses++;
+      return updateDoc(groupDoc("players", pid), { stats: s });
+    }));
+    showToast("Resultado guardado!");
+  };
   const saveLineup = async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); };
 
   const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
