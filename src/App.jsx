@@ -609,9 +609,6 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
   const [home, setHome] = useState(true);
   const [editResult, setEditResult] = useState(null);
   const [sa, setSa] = useState(""); const [sb, setSb] = useState("");
-  const [gstats, setGstats] = useState({});
-  const [mvp, setMvp] = useState("");
-  const [showStats, setShowStats] = useState(false);
 
   const sorted = [...leagueGames].sort((a, b) => new Date(a.date) - new Date(b.date));
   const played = sorted.filter((g) => g.scoreA != null);
@@ -628,22 +625,10 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
     onAdd({ opponent: opponent.trim(), date: `${date}T${time}:00`, home });
     setOpponent(""); setDate(""); setOpen(false);
   };
-  const startResult = (g) => {
-    setEditResult(g); setSa(""); setSb(""); setMvp(""); setShowStats(false);
-    const lineupIds = g.lineup?.lineup ? Object.entries(g.lineup.lineup).filter(([, v]) => v.role === "titular" || v.role === "suplente").map(([id]) => id) : members.map((m) => m.id);
-    const gs = {}; lineupIds.forEach((id) => (gs[id] = { g: 0, a: 0 })); setGstats(gs);
-  };
-  const bump = (pid, key, d) => setGstats((g) => ({ ...g, [pid]: { ...g[pid], [key]: Math.max(0, (g[pid]?.[key] || 0) + d) } }));
   const saveResult = (g) => {
     if (sa === "" || sb === "") return;
-    onResult(g.id, parseInt(sa, 10), parseInt(sb, 10), gstats, mvp || null);
-    setEditResult(null); setSa(""); setSb(""); setGstats({}); setMvp("");
-  };
-
-  const calledPlayers = (g) => {
-    if (!g.lineup?.lineup) return members;
-    const ids = Object.keys(g.lineup.lineup);
-    return members.filter((m) => ids.includes(m.id));
+    onResult(g.id, parseInt(sa, 10), parseInt(sb, 10));
+    setEditResult(null); setSa(""); setSb("");
   };
 
   const GameCard = (g) => {
@@ -651,7 +636,6 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
     const myScore = g.home ? g.scoreA : g.scoreB; const oppScore = g.home ? g.scoreB : g.scoreA;
     const result = past ? (myScore > oppScore ? "V" : myScore === oppScore ? "E" : "D") : null;
     const resultColor = { V: "var(--grass-bright)", E: "var(--gold)", D: "var(--danger)" }[result];
-    const scorers = g.goals ? Object.entries(g.goals).filter(([, v]) => v.g || v.a) : [];
     return (
       <div key={g.id} className="ft-card" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ background: "rgba(0,0,0,.25)", padding: "6px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -668,46 +652,16 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
             {past && <div className="num" style={{ fontSize: 26, color: "var(--chalk)", marginTop: 2 }}>{g.scoreA} <span style={{ color: "var(--faint)", fontWeight: 300 }}>-</span> {g.scoreB}</div>}
           </div>
           {!past && amIAdmin && editResult?.id !== g.id && (
-            <button onClick={() => startResult(g)} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "8px 12px" }}>Resultado</button>
+            <button onClick={() => { setEditResult(g); setSa(""); setSb(""); }} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "8px 12px" }}>Resultado</button>
           )}
         </div>
-        {past && (scorers.length > 0 || g.mvp) && (
-          <div style={{ padding: "0 16px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {g.mvp && <span style={{ fontSize: 11, color: "var(--gold)", background: "rgba(245,197,66,.12)", border: "1px solid rgba(245,197,66,.3)", borderRadius: 999, padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}><Trophy size={11} style={{ fill: "var(--gold)" }} /> MVP: {firstName(members.find((m) => m.id === g.mvp)?.name || "?")}</span>}
-            {scorers.map(([pid, v]) => { const nm = firstName(members.find((m) => m.id === pid)?.name || "?"); return (<span key={pid} style={{ fontSize: 11, color: "var(--dim)", background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "3px 10px" }}>{nm}{v.g ? <b style={{ color: "var(--grass-bright)" }}> {v.g}G</b> : ""}{v.a ? <b style={{ color: "var(--blue)" }}> {v.a}A</b> : ""}</span>); })}
-          </div>
-        )}
         {editResult?.id === g.id && (
-          <div className="ft-in" style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nos" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
-              <span style={{ color: "var(--faint)" }}>-</span>
-              <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
-            </div>
-            <select className="ft-input" value={mvp} onChange={(e) => setMvp(e.target.value)} style={{ fontSize: 13 }}>
-              <option value="">MVP do jogo (opcional)</option>
-              {calledPlayers(g).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <button onClick={() => setShowStats((s) => !s)} className="ft-btn ft-ghost" style={{ padding: 10, justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}><SoccerBall size={14} color="var(--grass-bright)" /> Golos & assistências (opcional)</span>
-              <span style={{ transform: showStats ? "rotate(90deg)" : "none", transition: "transform .2s" }}><ArrowRight size={14} /></span>
-            </button>
-            {showStats && (
-              <div className="ft-raised ft-in" style={{ borderRadius: 12, padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 28, paddingRight: 4, marginBottom: 4 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
-                {calledPlayers(g).map((p) => (
-                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderTop: "1px solid var(--line-soft)" }}>
-                    <Avatar name={p.name} photo={p.photoUrl} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
-                    <Stepper val={gstats[p.id]?.g || 0} onDec={() => bump(p.id, "g", -1)} onInc={() => bump(p.id, "g", 1)} color="var(--grass-bright)" />
-                    <Stepper val={gstats[p.id]?.a || 0} onDec={() => bump(p.id, "a", -1)} onInc={() => bump(p.id, "a", 1)} color="var(--blue)" />
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => saveResult(g)} className="ft-btn ft-grass" style={{ flex: 1, padding: 11, fontSize: 13 }}>Guardar resultado</button>
-              <button onClick={() => setEditResult(null)} className="ft-btn ft-ghost" style={{ padding: 11 }}><X size={14} /></button>
-            </div>
+          <div className="ft-in" style={{ padding: "0 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+            <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nos" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+            <span style={{ color: "var(--faint)" }}>-</span>
+            <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+            <button onClick={() => saveResult(g)} className="ft-btn ft-grass" style={{ flex: 1, padding: 10, fontSize: 13 }}>Guardar</button>
+            <button onClick={() => setEditResult(null)} className="ft-btn ft-ghost" style={{ padding: 10 }}><X size={14} /></button>
           </div>
         )}
       </div>
@@ -1329,15 +1283,10 @@ const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onDelete }) => {
 };
 
 /* ----------------------------- Carreira ---------------------------------- */
-const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, matches, leagueGames }) => {
+const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, matches }) => {
   const s = myProfile?.stats || {};
   const winRate = s.games ? s.wins / s.games : 0;
-  const scorerMap = useMemo(() => {
-    const map = {};
-    matches.forEach((m) => Object.entries(m.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; }));
-    (leagueGames || []).forEach((g) => Object.entries(g.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; }));
-    return map;
-  }, [matches, leagueGames]);
+  const scorerMap = useMemo(() => { const map = {}; matches.forEach((m) => Object.entries(m.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; })); return map; }, [matches]);
   const mine = scorerMap[myProfile?.id] || { g: 0, a: 0 };
   const top = Object.entries(scorerMap).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name })).filter((x) => x.name).sort((a, b) => b.g - a.g || b.a - a.a).slice(0, 5);
   const ach = [
@@ -1449,7 +1398,8 @@ const TreasuryTab = ({ players, matches, collectsFixed, fixedIds, payments, fixe
 
 /* ----------------------------- Definicoes -------------------------------- */
 const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDelete }) => {
-  const [model, setModel] = useState(settings.paymentModel || "monthly");
+  const isLeague = settings.groupMode === "league";
+  const [model, setModel] = useState(isLeague && settings.paymentModel === "pergame" ? "monthly" : (settings.paymentModel || "monthly"));
   const [monthlyFee, setMonthlyFee] = useState(settings.monthlyFee ?? 0);
   const [seasonFee, setSeasonFee] = useState(settings.seasonFee ?? 0);
   const [guestFee, setGuestFee] = useState(settings.guestFee ?? 4.5);
@@ -1457,31 +1407,30 @@ const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDel
   const [time, setTime] = useState(next?.date ? new Date(next.date).toTimeString().slice(0, 5) : "21:00");
   const [freq, setFreq] = useState(next?.frequency || "weekly");
   const [locationUrl, setLocationUrl] = useState(settings.locationUrl || "");
-  const [leagueModeLocal, setLeagueModeLocal] = useState(settings.leagueMode === true);
-  useEffect(() => { setLeagueModeLocal(settings.leagueMode === true); }, [settings.leagueMode]);
   const Label = ({ children }) => <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>{children}</label>;
-  const MODELS = [["pergame", "Jogo-a-jogo"], ["monthly", "Mensal"], ["season", "Epoca"]];
-  const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, leagueMode: leagueModeLocal });
+  const MODELS = isLeague ? [["monthly", "Mensal"], ["season", "Epoca/Anual"]] : [["pergame", "Jogo-a-jogo"], ["monthly", "Mensal"], ["season", "Epoca"]];
+  const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl });
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {amIAdmin && (
         <div className="ft-card" style={{ padding: 20 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Wallet size={17} style={{ color: "var(--blue)" }} /> Modelo de pagamento</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)", marginBottom: 14 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Wallet size={17} style={{ color: "var(--blue)" }} /> {isLeague ? "Quota da equipa" : "Modelo de pagamento"}</h3>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${MODELS.length},1fr)`, gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)", marginBottom: 14 }}>
             {MODELS.map(([v, l]) => <button key={v} onClick={() => setModel(v)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 12, background: model === v ? "var(--grass)" : "none", color: model === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
           </div>
           <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>
-            {model === "pergame" && "Todos pagam um valor por cada jogo."}
-            {model === "monthly" && "Os fixos pagam uma mensalidade; convidados pagam por jogo."}
-            {model === "season" && "Os fixos pagam uma vez por toda a época; convidados pagam por jogo."}
+            {!isLeague && model === "pergame" && "Todos pagam um valor por cada jogo."}
+            {!isLeague && model === "monthly" && "Os fixos pagam uma mensalidade; convidados pagam por jogo."}
+            {!isLeague && model === "season" && "Os fixos pagam uma vez por toda a época; convidados pagam por jogo."}
+            {isLeague && model === "monthly" && "Todos os membros pagam uma quota mensal fixa da equipa."}
+            {isLeague && model === "season" && "Todos os membros pagam uma quota unica para toda a epoca/temporada."}
           </p>
-          {model === "monthly" && <div style={{ marginBottom: 14 }}><Label>Valor da mensalidade (EUR)</Label><input type="number" step="0.50" className="ft-input" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} /></div>}
-          {model === "season" && <div style={{ marginBottom: 14 }}><Label>Valor da época (EUR)</Label><input type="number" step="1" className="ft-input" value={seasonFee} onChange={(e) => setSeasonFee(e.target.value)} /></div>}
-          <Label>Preço por jogo ({model === "pergame" ? "todos" : "convidados"}) (EUR)</Label>
-          <input type="number" step="0.10" className="ft-input" value={guestFee} onChange={(e) => setGuestFee(e.target.value)} />
+          {model === "monthly" && <div style={{ marginBottom: isLeague ? 0 : 14 }}><Label>{isLeague ? "Valor da quota mensal (EUR)" : "Valor da mensalidade (EUR)"}</Label><input type="number" step="0.50" className="ft-input" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} /></div>}
+          {model === "season" && <div style={{ marginBottom: isLeague ? 0 : 14 }}><Label>{isLeague ? "Valor da quota da epoca (EUR)" : "Valor da época (EUR)"}</Label><input type="number" step="1" className="ft-input" value={seasonFee} onChange={(e) => setSeasonFee(e.target.value)} /></div>}
+          {!isLeague && (<><Label>Preço por jogo ({model === "pergame" ? "todos" : "convidados"}) (EUR)</Label><input type="number" step="0.10" className="ft-input" value={guestFee} onChange={(e) => setGuestFee(e.target.value)} /></>)}
         </div>
       )}
-      {amIAdmin && (
+      {amIAdmin && !isLeague && (
         <div className="ft-card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Clock size={17} style={{ color: "var(--blue)" }} /> Próximo jogo</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -1499,16 +1448,12 @@ const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDel
           <p style={{ fontSize: 10, color: "var(--faint)", marginTop: 8 }}>A meteorologia é atualizada com base neste link.</p>
         </div>
       )}
-      {amIAdmin && (
-        <div className="ft-card" style={{ padding: 20 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 10px", alignItems: "center" }}><Swords size={17} style={{ color: "var(--gold)" }} /> Modo liga</h3>
-          <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>Ativa separadores exclusivos para gerir jogos oficiais, calendário da liga e convocatórias.</p>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a120f", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
-            <div><div style={{ fontSize: 13, fontWeight: 700 }}>Modo Liga</div><div style={{ fontSize: 10, color: leagueModeLocal ? "var(--grass-bright)" : "var(--faint)" }}>{leagueModeLocal ? "Ativo" : "Inativo"}</div></div>
-            <button onClick={() => setLeagueModeLocal((v) => !v)} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: leagueModeLocal ? "var(--grass)" : "var(--raised)", color: leagueModeLocal ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>{leagueModeLocal ? "Ativo" : "Inativo"}</button>
-          </div>
+      <div className="ft-card" style={{ padding: 16, background: "rgba(106,169,224,.06)", borderColor: "rgba(106,169,224,.2)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {isLeague ? <Trophy size={16} style={{ color: "var(--gold)" }} /> : settings.groupMode === "weekly" ? <CalendarCheck size={16} style={{ color: "var(--grass-bright)" }} /> : <Zap size={16} style={{ color: "var(--blue)" }} />}
+          <div><div style={{ fontSize: 12, fontWeight: 700 }}>Tipo de grupo: {isLeague ? "Liga" : settings.groupMode === "weekly" ? "Semanal" : "Casual"}</div><div style={{ fontSize: 10, color: "var(--faint)" }}>O tipo de grupo e definido na criacao e nao pode ser alterado.</div></div>
         </div>
-      )}
+      </div>
       {amIAdmin && <button onClick={save} className="ft-btn" style={{ width: "100%", background: "var(--blue)", color: "#04101c", padding: 13 }}><Save size={18} /> Guardar definições</button>}
       <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 20, marginTop: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#ff9684", fontWeight: 800, marginBottom: 10 }}><ShieldAlert size={18} /> Zona de perigo</div>
@@ -1596,14 +1541,18 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const avg = (p) => { const v = Object.values(p.votes || {}); return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : 3; };
   const matchMVP = (m) => { if (!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach((id) => (c[id] = (c[id] || 0) + 1)); let mx = 0, win = null; Object.entries(c).forEach(([id, n]) => { if (n > mx) { mx = n; win = id; } }); const p = players.find((pl) => pl.id === win); return p ? { ...p, votes: mx } : null; };
-  const mvpCount = (pid) => matches.filter((m) => matchMVP(m)?.id === pid).length + leagueGames.filter((g) => g.mvp === pid).length;
-  const playerDebt = (pid) => { let t = 0; if (collectsFixed && fixedIds.includes(pid) && !payments[pid]) t += fixedFee; matches.forEach((m) => { if (m.payments?.[pid] === false) t += fee; }); return t; };
-  const totalDebt = players.reduce((s, p) => s + playerDebt(p.id), 0);
-  const guestRevenue = matches.reduce((s, m) => s + (m.payments ? Object.values(m.payments).filter((v) => v === true).length * fee : 0), 0);
-  const fixedRevenue = collectsFixed ? fixedIds.filter((id) => payments[id]).length * fixedFee : 0;
-  const totalRevenue = guestRevenue + fixedRevenue;
+  const mvpCount = (pid) => matches.filter((m) => matchMVP(m)?.id === pid).length;
   const members = players.filter((p) => p.type !== "guest");
   const guests = players.filter((p) => p.type === "guest");
+  const groupMode = settings.groupMode || "casual";
+  const isLeague = groupMode === "league";
+  const isWeekly = groupMode === "weekly";
+  const effectiveFixedIds = isLeague ? members.map((p) => p.id) : fixedIds;
+  const playerDebt = (pid) => { let t = 0; if (collectsFixed && effectiveFixedIds.includes(pid) && !payments[pid]) t += fixedFee; if (!isLeague) matches.forEach((m) => { if (m.payments?.[pid] === false) t += fee; }); return t; };
+  const totalDebt = players.reduce((s, p) => s + playerDebt(p.id), 0);
+  const guestRevenue = matches.reduce((s, m) => s + (m.payments ? Object.values(m.payments).filter((v) => v === true).length * fee : 0), 0);
+  const fixedRevenue = collectsFixed ? effectiveFixedIds.filter((id) => payments[id]).length * fixedFee : 0;
+  const totalRevenue = guestRevenue + fixedRevenue;
 
   // badges de notificacao in-app
   const unreadChat = messages.filter((m) => m.uid !== me.uid && (m.ts || 0) > lastReadTs).length;
@@ -1617,16 +1566,12 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { date: nextGame?.date || new Date().toISOString(), responses: { ...(nextGame?.responses || {}), [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); };
   const sendMessage = async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); };
-  const groupMode = settings.groupMode || "casual";
-  const isLeague = groupMode === "league";
-  const isWeekly = groupMode === "weekly";
   const addTraining = async ({ date, local }) => { await addDoc(groupRef("trainings"), { date, local, responses: {}, createdAt: serverTimestamp() }); showToast("Treino marcado!"); };
   const deleteTraining = async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); };
   const toggleTraining = async (id, status) => { const t = trainings.find((x) => x.id === id); await updateDoc(groupDoc("trainings", id), { responses: { ...(t?.responses || {}), [me.uid]: status } }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
-  const isLeagueMode = settings.leagueMode === true;
   const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); };
   const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
-  const saveLeagueResult = async (id, scoreA, scoreB, goals, mvp) => { await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null }); showToast("Resultado guardado!"); };
+  const saveLeagueResult = async (id, scoreA, scoreB) => { await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB }); showToast("Resultado guardado!"); };
   const saveLineup = async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); };
 
   const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
@@ -1708,9 +1653,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         {tab === "tactics" && isLeague && <TacticsLeagueTab members={members} leagueGames={leagueGames} showToast={showToast} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
         {tab === "history" && !isLeague && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onDelete={deleteMatch} />}
-        {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} mvpCount={mvpCount} fixedIds={fixedIds} players={players} matches={matches} leagueGames={leagueGames} />}
+        {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} mvpCount={mvpCount} fixedIds={effectiveFixedIds} players={players} matches={matches} />}
         {tab === "members" && collectsFixed && <MembersTab fixedIds={fixedIds} players={players} myProfile={myProfile} paymentModel={settings.paymentModel} onSignUp={signUp} onSignOut={signOutFixed} />}
-        {tab === "treasury" && amIAdmin && <TreasuryTab players={players} matches={matches} collectsFixed={collectsFixed} fixedIds={fixedIds} payments={payments} fixedFee={fixedFee} fee={fee} fixedLabel={fixedLabel} totalRevenue={totalRevenue} totalDebt={totalDebt} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} paymentModel={settings.paymentModel} onPayFixed={payFixed} onPayMatch={payMatch} />}
+        {tab === "treasury" && amIAdmin && <TreasuryTab players={players} matches={isLeague ? [] : matches} collectsFixed={collectsFixed} fixedIds={effectiveFixedIds} payments={payments} fixedFee={fixedFee} fee={fee} fixedLabel={fixedLabel} totalRevenue={totalRevenue} totalDebt={totalDebt} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} paymentModel={settings.paymentModel} onPayFixed={payFixed} onPayMatch={payMatch} />}
         {tab === "settings" && <SettingsTab settings={settings} next={nextGame} isOwner={isOwner} amIAdmin={amIAdmin} onSave={saveSettings} onLeave={leaveGroup} onDelete={deleteGroup} />}
       </div>
 
@@ -1743,7 +1688,7 @@ const GroupSelector = ({ user, onLogout }) => {
       const groupRef = doc(db, "artifacts", APP_ID, "groups", customId);
       if ((await getDoc(groupRef)).exists()) return setCreateError("Já existe um grupo com esse nome. Tenta outro.");
       const batch = writeBatch(db);
-      batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: groupMode === "weekly" ? "monthly" : "pergame", monthlyFee: 0, seasonFee: 0, guestFee: 4.5, groupMode: groupMode || "casual", leagueMode: groupMode === "league" }, createdAt: serverTimestamp() });
+      batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: groupMode === "casual" ? "pergame" : "monthly", monthlyFee: 0, seasonFee: 0, guestFee: 4.5, groupMode: groupMode || "casual", leagueMode: groupMode === "league" }, createdAt: serverTimestamp() });
       const playerRef = doc(collection(db, "artifacts", APP_ID, "groups", customId, "players"));
       batch.set(playerRef, { name: user.displayName || "Eu", uid: user.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: true, photoUrl: user.photoURL || null, votes: {}, createdAt: serverTimestamp() });
       await batch.commit();
