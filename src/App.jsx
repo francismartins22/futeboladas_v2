@@ -415,7 +415,13 @@ const UserProfile = ({ user, onLogout }) => {
 
   const save = async () => {
     setMsg(""); if (!name.trim()) return setMsg("O nome e obrigatorio.");
-    try { setUploading(true); await updateProfile(auth.currentUser, { displayName: name }); await setDoc(doc(db, "artifacts", APP_ID, "users", user.uid), { name, photoUrl, updatedAt: serverTimestamp() }, { merge: true }); setMsg("Perfil atualizado com sucesso!"); }
+    try {
+      setUploading(true);
+      try { await updateProfile(auth.currentUser, { displayName: name, photoURL: photoUrl || null }); }
+      catch { await updateProfile(auth.currentUser, { displayName: name }); } // photoURL pode exceder o limite do Firebase Auth; o Firestore continua a guardar a foto real
+      await setDoc(doc(db, "artifacts", APP_ID, "users", user.uid), { name, photoUrl, updatedAt: serverTimestamp() }, { merge: true });
+      setMsg("Perfil atualizado com sucesso!");
+    }
     catch (e) { console.error(e); setMsg("Erro ao guardar perfil."); } finally { setUploading(false); }
   };
 
@@ -1632,7 +1638,6 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   }, [group.id, periodKey]);
 
   useEffect(() => {
-    if (players.length === 0) return;
     const mine = players.find((p) => p.uid === me.uid); if (!mine) return;
     (async () => {
       try {
@@ -1643,7 +1648,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         if (Object.keys(up).length) await updateDoc(groupDoc("players", mine.id), up);
       } catch (e) { /* noop */ }
     })();
-  }, [players.length, me.uid]);
+  }, [players, me.uid]);
 
   useEffect(() => {
     if (!nextGame?.date || !nextGame.frequency || nextGame.frequency === "once" || !amIAdmin) return;
@@ -1802,6 +1807,15 @@ const GroupSelector = ({ user, onLogout }) => {
   const [selected, setSelected] = useState(null);
   const [msg, setMsg] = useState("");
   const [createError, setCreateError] = useState("");
+  const [profilePhoto, setProfilePhoto] = useState(user.photoURL || "");
+  const [profileName, setProfileName] = useState(user.displayName || "");
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "artifacts", APP_ID, "users", user.uid), (s) => {
+      if (s.exists()) { const d = s.data(); if (d.photoUrl) setProfilePhoto(d.photoUrl); if (d.name) setProfileName(d.name); }
+    });
+    return () => unsub();
+  }, [user.uid]);
 
   useEffect(() => {
     const q = query(collection(db, "artifacts", APP_ID, "groups"), where("members", "array-contains", user.uid));
@@ -1857,9 +1871,9 @@ const GroupSelector = ({ user, onLogout }) => {
         <div>
           <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneario</div>
           <h1 className="num" style={{ fontSize: 30, margin: "2px 0 0", color: "var(--chalk)" }}>OS TEUS GRUPOS</h1>
-          <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Olá, <b style={{ color: "var(--text)" }}>{user.displayName || "Jogador"}</b></p>
+          <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Olá, <b style={{ color: "var(--text)" }}>{profileName || "Jogador"}</b></p>
         </div>
-        <button onClick={() => setView("profile")} className="ft-btn" style={{ background: "none", padding: 0 }}><Avatar name={user.displayName || "Eu"} photo={user.photoURL} size={44} /></button>
+        <button onClick={() => setView("profile")} className="ft-btn" style={{ background: "none", padding: 0 }}><Avatar name={profileName || "Eu"} photo={profilePhoto} size={44} /></button>
       </header>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 14, marginBottom: 26 }}>
         <div className="ft-card" style={{ padding: 18 }}>
