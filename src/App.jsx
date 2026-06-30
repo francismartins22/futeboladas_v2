@@ -1620,7 +1620,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     ...(!isLeague ? [{ id: "team", icon: Shield, label: "Equipa" }] : []),
     { id: "tactics", icon: TacticIcon, label: "Tatica" },
     { id: "players", icon: Users, label: "Plantel" },
-    { id: "history", icon: HistoryIcon, label: "Jogos" },
+    ...(!isLeague ? [{ id: "history", icon: HistoryIcon, label: "Jogos" }] : []),
     { id: "trophies", icon: Trophy, label: "Carreira" },
     ...(isLeague ? [{ id: "leaguecal", icon: ListOrdered, label: "Liga" }] : []),
     ...(isLeague ? [{ id: "lineup", icon: Swords, label: "Convoc." }] : []),
@@ -1656,7 +1656,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         {tab === "tactics" && !isLeague && <TacticsTab members={members} showToast={showToast} />}
         {tab === "tactics" && isLeague && <TacticsLeagueTab members={members} leagueGames={leagueGames} showToast={showToast} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
-        {tab === "history" && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onDelete={deleteMatch} />}
+        {tab === "history" && !isLeague && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onDelete={deleteMatch} />}
         {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} mvpCount={mvpCount} fixedIds={fixedIds} players={players} matches={matches} />}
         {tab === "members" && collectsFixed && <MembersTab fixedIds={fixedIds} players={players} myProfile={myProfile} paymentModel={settings.paymentModel} onSignUp={signUp} onSignOut={signOutFixed} />}
         {tab === "treasury" && amIAdmin && <TreasuryTab players={players} matches={matches} collectsFixed={collectsFixed} fixedIds={fixedIds} payments={payments} fixedFee={fixedFee} fee={fee} fixedLabel={fixedLabel} totalRevenue={totalRevenue} totalDebt={totalDebt} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} paymentModel={settings.paymentModel} onPayFixed={payFixed} onPayMatch={payMatch} />}
