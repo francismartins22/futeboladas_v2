@@ -1599,10 +1599,10 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     showToast("Jogo guardado! Próxima data atualizada."); setTab("history");
   };
 
-  const saveSettings = async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, leagueMode }) => {
+  const saveSettings = async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl }) => {
     const sched = {}; if (date && time) sched.date = `${date}T${time}:00`; if (freq) sched.frequency = freq;
     if (Object.keys(sched).length) await setDoc(groupDoc("schedule", "next"), sched, { merge: true });
-    const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0, leagueMode: !!leagueMode } };
+    const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0, groupMode: settings.groupMode || "casual", leagueMode: settings.groupMode === "league" } };
     if (locationUrl) { gUpdate.locationUrl = locationUrl; const c = getCoordsFromUrl(locationUrl); if (c) gUpdate.location = c; }
     await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), gUpdate); showToast("Definições guardadas!");
   };
