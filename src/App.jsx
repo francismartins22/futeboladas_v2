@@ -294,8 +294,8 @@ const Toast = ({ toast }) => !toast.show ? null : (
     color: toast.type === "error" ? "#fff" : "#04130a",
   }}>{toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}{toast.msg}</div>
 );
-const NavButton = ({ active, onClick, icon: Icon, label, badge }) => (
-  <button onClick={onClick} data-active={active} className="navbtn ft-btn" style={{ background: "none", flexDirection: "column", minWidth: 58, padding: "6px 4px", borderRadius: 14, color: active ? "var(--grass-bright)" : "var(--faint)", position: "relative" }}>
+const NavButton = ({ active, onClick, icon: Icon, label, badge, btnRef }) => (
+  <button ref={btnRef} onClick={onClick} data-active={active} className="navbtn ft-btn" style={{ background: "none", flexDirection: "column", minWidth: 58, padding: "6px 4px", borderRadius: 14, color: active ? "var(--grass-bright)" : "var(--faint)", position: "relative", flexShrink: 0 }}>
     <div style={{ position: "relative" }}>
       <Icon size={22} className="tab-ico" strokeWidth={active ? 2.5 : 2} />
       {badge > 0 && (
@@ -307,13 +307,27 @@ const NavButton = ({ active, onClick, icon: Icon, label, badge }) => (
     <span style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>{label}</span>
   </button>
 );
-const BottomNav = ({ items }) => (
-  <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, background: "rgba(10,15,14,.92)", backdropFilter: "blur(12px)", borderTop: "1px solid var(--line)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-    <div style={{ display: "flex", overflowX: "auto", justifyContent: "flex-start", gap: 2, padding: "8px 10px", maxWidth: 760, margin: "0 auto" }}>
-      {items.map((it) => <NavButton key={it.id} active={it.active} onClick={it.onClick} icon={it.icon} label={it.label} badge={it.badge} />)}
+const BottomNav = ({ items }) => {
+  const scrollerRef = useRef(null);
+  const btnRefs = useRef({});
+  const activeId = items.find((it) => it.active)?.id;
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const btn = btnRefs.current[activeId];
+    if (!scroller || !btn) return;
+    const target = btn.offsetLeft - (scroller.clientWidth - btn.clientWidth) / 2;
+    scroller.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+  }, [activeId]);
+
+  return (
+    <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, background: "rgba(10,15,14,.92)", backdropFilter: "blur(12px)", borderTop: "1px solid var(--line)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div ref={scrollerRef} style={{ display: "flex", overflowX: "auto", justifyContent: "flex-start", gap: 2, padding: "8px 10px", maxWidth: 760, margin: "0 auto" }}>
+        {items.map((it) => <NavButton key={it.id} active={it.active} onClick={it.onClick} icon={it.icon} label={it.label} badge={it.badge} btnRef={(el) => (btnRefs.current[it.id] = el)} />)}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* --------------------------- ErrorBoundary ------------------------------- */
 class ErrorBoundary extends React.Component {
@@ -1814,9 +1828,9 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   useEffect(() => { if (!TABS.find((t) => t.id === tab)) setTab("schedule"); }, [collectsFixed, amIAdmin]); // eslint-disable-line
 
   return (
-    <div className="ft-in" style={{ minHeight: "100vh", paddingBottom: 96 }}>
+    <div style={{ minHeight: "100vh", paddingBottom: 96 }}>
       <Toast toast={toast} />
-      <div style={{ position: "sticky", top: 0, zIndex: 30, background: "rgba(13,20,17,.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="ft-in" style={{ position: "sticky", top: 0, zIndex: 30, background: "rgba(13,20,17,.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={onBack} className="ft-btn ft-ghost" style={{ padding: 9, borderRadius: 12 }}><ArrowLeft size={18} /></button>
           <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 7 }}><Users size={17} style={{ color: "var(--grass-bright)" }} /> {group.name}</h2>
@@ -1919,8 +1933,8 @@ const GroupSelector = ({ user, onLogout }) => {
     );
   }
   return (
-    <div className="ft-in" style={{ minHeight: "100vh", padding: "20px 16px 110px", maxWidth: 880, margin: "0 auto" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)", marginBottom: 24 }}>
+    <div style={{ minHeight: "100vh", padding: "20px 16px 110px", maxWidth: 880, margin: "0 auto" }}>
+      <header className="ft-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)", marginBottom: 24 }}>
         <div>
           <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneario</div>
           <h1 className="num" style={{ fontSize: 30, margin: "2px 0 0", color: "var(--chalk)" }}>OS TEUS GRUPOS</h1>
