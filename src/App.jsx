@@ -609,12 +609,17 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
   const [home, setHome] = useState(true);
   const [editResult, setEditResult] = useState(null);
   const [sa, setSa] = useState(""); const [sb, setSb] = useState("");
+  const [gstats, setGstats] = useState({});
+  const [mvp, setMvp] = useState("");
+  const [showStats, setShowStats] = useState(false);
 
   const sorted = [...leagueGames].sort((a, b) => new Date(a.date) - new Date(b.date));
   const played = sorted.filter((g) => g.scoreA != null);
   const upcoming = sorted.filter((g) => g.scoreA == null);
 
-  const pts = (g) => { if (g.scoreA == null) return null; const w = home ? g.scoreA > g.scoreB : g.scoreB > g.scoreA; const d = g.scoreA === g.scoreB; return w ? 3 : d ? 1 : 0; };
+  // FIX: scoreA e scoreB representam sempre "Nos" e "Adversario" (nao casa/fora).
+  // O calculo de pontos/resultado tem de usar scoreA/scoreB diretamente, sem depender de g.home.
+  const pts = (g) => { if (g.scoreA == null) return null; const w = g.scoreA > g.scoreB; const d = g.scoreA === g.scoreB; return w ? 3 : d ? 1 : 0; };
   const totalPts = played.reduce((s, g) => s + (pts(g) || 0), 0);
   const wins = played.filter((g) => pts(g) === 3).length;
   const draws = played.filter((g) => pts(g) === 1).length;
@@ -625,17 +630,30 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
     onAdd({ opponent: opponent.trim(), date: `${date}T${time}:00`, home });
     setOpponent(""); setDate(""); setOpen(false);
   };
+  const startResult = (g) => {
+    setEditResult(g); setSa(""); setSb(""); setMvp(""); setShowStats(false);
+    const lineupIds = g.lineup?.lineup ? Object.entries(g.lineup.lineup).filter(([, v]) => v.role === "titular" || v.role === "suplente").map(([id]) => id) : members.map((m) => m.id);
+    const gs = {}; lineupIds.forEach((id) => (gs[id] = { g: 0, a: 0 })); setGstats(gs);
+  };
+  const bump = (pid, key, d) => setGstats((g) => ({ ...g, [pid]: { ...g[pid], [key]: Math.max(0, (g[pid]?.[key] || 0) + d) } }));
   const saveResult = (g) => {
     if (sa === "" || sb === "") return;
-    onResult(g.id, parseInt(sa, 10), parseInt(sb, 10));
-    setEditResult(null); setSa(""); setSb("");
+    onResult(g.id, parseInt(sa, 10), parseInt(sb, 10), gstats, mvp || null);
+    setEditResult(null); setSa(""); setSb(""); setGstats({}); setMvp("");
+  };
+
+  const calledPlayers = (g) => {
+    if (!g.lineup?.lineup) return members;
+    const ids = Object.keys(g.lineup.lineup);
+    return members.filter((m) => ids.includes(m.id));
   };
 
   const GameCard = (g) => {
     const d = new Date(g.date); const past = g.scoreA != null;
-    const myScore = g.home ? g.scoreA : g.scoreB; const oppScore = g.home ? g.scoreB : g.scoreA;
-    const result = past ? (myScore > oppScore ? "V" : myScore === oppScore ? "E" : "D") : null;
+    // FIX: "Nos" e "Adversario" sao sempre scoreA/scoreB, independente de casa ou fora
+    const result = past ? (g.scoreA > g.scoreB ? "V" : g.scoreA === g.scoreB ? "E" : "D") : null;
     const resultColor = { V: "var(--grass-bright)", E: "var(--gold)", D: "var(--danger)" }[result];
+    const scorers = g.goals ? Object.entries(g.goals).filter(([, v]) => v.g || v.a) : [];
     return (
       <div key={g.id} className="ft-card" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ background: "rgba(0,0,0,.25)", padding: "6px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -652,16 +670,46 @@ const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDelete, on
             {past && <div className="num" style={{ fontSize: 26, color: "var(--chalk)", marginTop: 2 }}>{g.scoreA} <span style={{ color: "var(--faint)", fontWeight: 300 }}>-</span> {g.scoreB}</div>}
           </div>
           {!past && amIAdmin && editResult?.id !== g.id && (
-            <button onClick={() => { setEditResult(g); setSa(""); setSb(""); }} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "8px 12px" }}>Resultado</button>
+            <button onClick={() => startResult(g)} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "8px 12px" }}>Resultado</button>
           )}
         </div>
+        {past && (scorers.length > 0 || g.mvp) && (
+          <div style={{ padding: "0 16px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {g.mvp && <span style={{ fontSize: 11, color: "var(--gold)", background: "rgba(245,197,66,.12)", border: "1px solid rgba(245,197,66,.3)", borderRadius: 999, padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}><Trophy size={11} style={{ fill: "var(--gold)" }} /> MVP: {firstName(members.find((m) => m.id === g.mvp)?.name || "?")}</span>}
+            {scorers.map(([pid, v]) => { const nm = firstName(members.find((m) => m.id === pid)?.name || "?"); return (<span key={pid} style={{ fontSize: 11, color: "var(--dim)", background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "3px 10px" }}>{nm}{v.g ? <b style={{ color: "var(--grass-bright)" }}> {v.g}G</b> : ""}{v.a ? <b style={{ color: "var(--blue)" }}> {v.a}A</b> : ""}</span>); })}
+          </div>
+        )}
         {editResult?.id === g.id && (
-          <div className="ft-in" style={{ padding: "0 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nos" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
-            <span style={{ color: "var(--faint)" }}>-</span>
-            <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
-            <button onClick={() => saveResult(g)} className="ft-btn ft-grass" style={{ flex: 1, padding: 10, fontSize: 13 }}>Guardar</button>
-            <button onClick={() => setEditResult(null)} className="ft-btn ft-ghost" style={{ padding: 10 }}><X size={14} /></button>
+          <div className="ft-in" style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nos" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+              <span style={{ color: "var(--faint)" }}>-</span>
+              <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+            </div>
+            <select className="ft-input" value={mvp} onChange={(e) => setMvp(e.target.value)} style={{ fontSize: 13 }}>
+              <option value="">MVP do jogo (opcional)</option>
+              {calledPlayers(g).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <button onClick={() => setShowStats((s) => !s)} className="ft-btn ft-ghost" style={{ padding: 10, justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}><SoccerBall size={14} color="var(--grass-bright)" /> Golos & assistências (opcional)</span>
+              <span style={{ transform: showStats ? "rotate(90deg)" : "none", transition: "transform .2s" }}><ArrowRight size={14} /></span>
+            </button>
+            {showStats && (
+              <div className="ft-raised ft-in" style={{ borderRadius: 12, padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 28, paddingRight: 4, marginBottom: 4 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
+                {calledPlayers(g).map((p) => (
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderTop: "1px solid var(--line-soft)" }}>
+                    <Avatar name={p.name} photo={p.photoUrl} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                    <Stepper val={gstats[p.id]?.g || 0} onDec={() => bump(p.id, "g", -1)} onInc={() => bump(p.id, "g", 1)} color="var(--grass-bright)" />
+                    <Stepper val={gstats[p.id]?.a || 0} onDec={() => bump(p.id, "a", -1)} onInc={() => bump(p.id, "a", 1)} color="var(--blue)" />
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => saveResult(g)} className="ft-btn ft-grass" style={{ flex: 1, padding: 11, fontSize: 13 }}>Guardar resultado</button>
+              <button onClick={() => setEditResult(null)} className="ft-btn ft-ghost" style={{ padding: 11 }}><X size={14} /></button>
+            </div>
           </div>
         )}
       </div>
@@ -1283,10 +1331,15 @@ const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onDelete }) => {
 };
 
 /* ----------------------------- Carreira ---------------------------------- */
-const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, matches }) => {
+const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, matches, leagueGames }) => {
   const s = myProfile?.stats || {};
   const winRate = s.games ? s.wins / s.games : 0;
-  const scorerMap = useMemo(() => { const map = {}; matches.forEach((m) => Object.entries(m.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; })); return map; }, [matches]);
+  const scorerMap = useMemo(() => {
+    const map = {};
+    matches.forEach((m) => Object.entries(m.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; }));
+    (leagueGames || []).forEach((g) => Object.entries(g.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; }));
+    return map;
+  }, [matches, leagueGames]);
   const mine = scorerMap[myProfile?.id] || { g: 0, a: 0 };
   const top = Object.entries(scorerMap).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name })).filter((x) => x.name).sort((a, b) => b.g - a.g || b.a - a.a).slice(0, 5);
   const ach = [
@@ -1541,7 +1594,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const avg = (p) => { const v = Object.values(p.votes || {}); return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : 3; };
   const matchMVP = (m) => { if (!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach((id) => (c[id] = (c[id] || 0) + 1)); let mx = 0, win = null; Object.entries(c).forEach(([id, n]) => { if (n > mx) { mx = n; win = id; } }); const p = players.find((pl) => pl.id === win); return p ? { ...p, votes: mx } : null; };
-  const mvpCount = (pid) => matches.filter((m) => matchMVP(m)?.id === pid).length;
+  const mvpCount = (pid) => matches.filter((m) => matchMVP(m)?.id === pid).length + leagueGames.filter((g) => g.mvp === pid).length;
   const members = players.filter((p) => p.type !== "guest");
   const guests = players.filter((p) => p.type === "guest");
   const groupMode = settings.groupMode || "casual";
@@ -1571,7 +1624,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   const toggleTraining = async (id, status) => { const t = trainings.find((x) => x.id === id); await updateDoc(groupDoc("trainings", id), { responses: { ...(t?.responses || {}), [me.uid]: status } }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
   const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); };
   const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
-  const saveLeagueResult = async (id, scoreA, scoreB) => { await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB }); showToast("Resultado guardado!"); };
+  const saveLeagueResult = async (id, scoreA, scoreB, goals, mvp) => { await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null }); showToast("Resultado guardado!"); };
   const saveLineup = async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); };
 
   const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
@@ -1653,7 +1706,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
         {tab === "tactics" && isLeague && <TacticsLeagueTab members={members} leagueGames={leagueGames} showToast={showToast} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
         {tab === "history" && !isLeague && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onDelete={deleteMatch} />}
-        {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} mvpCount={mvpCount} fixedIds={effectiveFixedIds} players={players} matches={matches} />}
+        {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} mvpCount={mvpCount} fixedIds={effectiveFixedIds} players={players} matches={matches} leagueGames={leagueGames} />}
         {tab === "members" && collectsFixed && <MembersTab fixedIds={fixedIds} players={players} myProfile={myProfile} paymentModel={settings.paymentModel} onSignUp={signUp} onSignOut={signOutFixed} />}
         {tab === "treasury" && amIAdmin && <TreasuryTab players={players} matches={isLeague ? [] : matches} collectsFixed={collectsFixed} fixedIds={effectiveFixedIds} payments={payments} fixedFee={fixedFee} fee={fee} fixedLabel={fixedLabel} totalRevenue={totalRevenue} totalDebt={totalDebt} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} paymentModel={settings.paymentModel} onPayFixed={payFixed} onPayMatch={payMatch} />}
         {tab === "settings" && <SettingsTab settings={settings} next={nextGame} isOwner={isOwner} amIAdmin={amIAdmin} onSave={saveSettings} onLeave={leaveGroup} onDelete={deleteGroup} />}
