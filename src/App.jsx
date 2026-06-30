@@ -7,7 +7,7 @@ import {
   CheckCircle, Award, Flame, Medal, Share2, ShieldCheck, Wind, Droplets,
   CloudSun, Sun, CloudRain, Cloud, CloudFog, CloudLightning, Snowflake,
   MessageSquare, Send, Minus, RotateCcw, Pencil, X, Activity, PlusCircle,
-  ListOrdered, Swords, ChevronDown, ChevronUp, Dumbbell, Zap,
+  ListOrdered, Swords, ChevronDown, ChevronUp, Dumbbell, Zap, Bell, BellOff,
 } from "lucide-react";
 
 import { initializeApp } from "firebase/app";
@@ -19,6 +19,7 @@ import {
   getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc,
   serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove, writeBatch,
 } from "firebase/firestore";
+import { getMessaging, getToken, isSupported as isMessagingSupported } from "firebase/messaging";
 
 /* =========================================================================
    FUTEBOLADAS V3 - app completa (Firebase) com revamp visual + novas funcoes:
@@ -66,6 +67,32 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const APP_ID = "futeboladas-v3"; // <-- reset: novo namespace de dados (clean)
+const VAPID_KEY = "BOp0T6S2cuvzGGJ4bcjDKl_bncxCmiHrW80czfeisDWtgMUBak39g2wmG0AoEjCHk1fGR5N3GAys-z82Hsg6GtA";
+
+/* ---------------------------- Notificacoes push --------------------------- */
+/* Pede permissao ao browser, regista o service worker dedicado do FCM e
+   guarda o token resultante no perfil do utilizador (Firestore).
+   Devolve true/false conforme o sucesso; nunca lanca excecao para nao
+   bloquear o resto da app caso o browser nao suporte push (ex: Safari iOS
+   sem PWA instalada). */
+const enablePushNotifications = async (uid) => {
+  try {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) return false;
+    const supported = await isMessagingSupported().catch(() => false);
+    if (!supported) return false;
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return false;
+    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    const messaging = getMessaging(app);
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
+    if (!token) return false;
+    await setDoc(doc(db, "artifacts", APP_ID, "users", uid), { fcmTokens: arrayUnion(token), notifEnabled: true }, { merge: true });
+    return true;
+  } catch (e) { console.error("Erro a ativar notificacoes:", e); return false; }
+};
+const disablePushNotifications = async (uid) => {
+  try { await setDoc(doc(db, "artifacts", APP_ID, "users", uid), { notifEnabled: false }, { merge: true }); } catch (e) { /* noop */ }
+};
 
 /* ----------------------------- Design tokens ---------------------------- */
 const STYLES = `
@@ -360,13 +387,28 @@ const UserProfile = ({ user, onLogout }) => {
   const [loadingData, setLoadingData] = useState(true);
   const [msg, setMsg] = useState("");
   const [stats, setStats] = useState({ games: 0, wins: 0, mvps: 0, goals: 0, assists: 0 });
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifBlocked, setNotifBlocked] = useState(false);
   const fileRef = useRef(null);
+
+  const toggleNotifications = async () => {
+    setNotifLoading(true);
+    try {
+      if (notifEnabled) { await disablePushNotifications(user.uid); setNotifEnabled(false); }
+      else {
+        if (typeof Notification !== "undefined" && Notification.permission === "denied") { setNotifBlocked(true); setNotifLoading(false); return; }
+        const ok = await enablePushNotifications(user.uid);
+        setNotifEnabled(ok); if (!ok) setNotifBlocked(true);
+      }
+    } finally { setNotifLoading(false); }
+  };
 
   useEffect(() => {
     const run = async () => {
       try {
         const snap = await getDoc(doc(db, "artifacts", APP_ID, "users", user.uid));
-        if (snap.exists()) { const d = snap.data(); if (d.name) setName(d.name); if (d.photoUrl) setPhotoUrl(d.photoUrl); }
+        if (snap.exists()) { const d = snap.data(); if (d.name) setName(d.name); if (d.photoUrl) setPhotoUrl(d.photoUrl); setNotifEnabled(!!d.notifEnabled); }
         const gq = query(collection(db, "artifacts", APP_ID, "groups"), where("members", "array-contains", user.uid));
         const gs = await getDocs(gq);
         let games = 0, wins = 0, mvps = 0, goals = 0, assists = 0;
@@ -451,6 +493,17 @@ const UserProfile = ({ user, onLogout }) => {
           <Stat label="Jogos" value={stats.games} /><Stat label="Vitorias" value={stats.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${stats.games ? Math.round((stats.wins / stats.games) * 100) : 0}%`} color="var(--blue)" />
           <Stat label="Golos" value={stats.goals} color="var(--grass-bright)" /><Stat label="Assist." value={stats.assists} color="var(--blue)" /><Stat label="MVPs" value={stats.mvps} color="var(--gold)" />
         </div>
+      </div>
+      <div className="ft-card" style={{ padding: 22, marginTop: 16 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}>{notifEnabled ? <Bell size={16} style={{ color: "var(--grass-bright)" }} /> : <BellOff size={16} style={{ color: "var(--faint)" }} />} Notificações</h3>
+        <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>Recebe um aviso quando o jogo e confirmado, 24h antes de jogar, e quando chegam mensagens novas no chat.</p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a120f", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
+          <div><div style={{ fontSize: 13, fontWeight: 700 }}>Notificações push</div><div style={{ fontSize: 10, color: notifEnabled ? "var(--grass-bright)" : "var(--faint)" }}>{notifEnabled ? "Ativas" : "Inativas"}</div></div>
+          <button onClick={toggleNotifications} disabled={notifLoading} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: notifEnabled ? "var(--grass)" : "var(--raised)", color: notifEnabled ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>
+            {notifLoading ? <Loader2 size={14} style={{ animation: "ftspin 1s linear infinite" }} /> : (notifEnabled ? "Ativas" : "Ativar")}
+          </button>
+        </div>
+        {notifBlocked && <p style={{ fontSize: 11, color: "#ff9684", marginTop: 10 }}>As notificações estão bloqueadas no browser. Ativa-as nas definições do site (ícone de cadeado junto ao URL) e tenta novamente.</p>}
       </div>
       <button onClick={onLogout} className="ft-btn" style={{ width: "100%", background: "none", color: "#ff9684", padding: 14, marginTop: 18 }}><LogOut size={16} /> Terminar sessao</button>
     </div>
