@@ -17,9 +17,10 @@ import {
 } from "firebase/auth";
 import {
   getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc,
-  serverTimestamp, query, orderBy, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove, writeBatch,
+  serverTimestamp, query, orderBy, limitToLast, setDoc, getDoc, where, arrayUnion, getDocs, arrayRemove, writeBatch,
 } from "firebase/firestore";
 import { getMessaging, getToken, isSupported as isMessagingSupported } from "firebase/messaging";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 /* =========================================================================
    FUTEBOLADAS V3 - app completa (Firebase) com revamp visual + novas funcoes:
@@ -39,7 +40,6 @@ if (typeof window !== "undefined") {
       const last = sessionStorage.getItem("app_last_rescue");
       if (!last || Date.now() - parseInt(last) > 10000) {
         sessionStorage.setItem("app_last_rescue", Date.now().toString());
-        if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
         window.location.reload();
       }
     }
@@ -47,7 +47,7 @@ if (typeof window !== "undefined") {
   try {
     const stored = localStorage.getItem("app_version");
     if (stored !== APP_VERSION) {
-      if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister())).catch(() => {});
+      // nao desregistar service workers: isso mata a subscricao push do FCM
       if ("caches" in window) caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
       localStorage.setItem("app_version", APP_VERSION);
     }
@@ -66,7 +66,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 const APP_ID = "futeboladas-v3"; // <-- reset: novo namespace de dados (clean)
+
+/* Fotos de perfil vivem no Storage; o Firestore so guarda o URL (antes era base64 copiado para todo o lado). */
+const uploadAvatar = async (uid, blob) => {
+  const r = storageRef(storage, `avatars/${uid}.jpg`);
+  await uploadBytes(r, blob, { contentType: "image/jpeg" });
+  return `${await getDownloadURL(r)}&v=${Date.now()}`; // &v= fura a cache do browser, o caminho e sempre o mesmo
+};
 const VAPID_KEY = "BOp0T6S2cuvzGGJ4bcjDKl_bncxCmiHrW80czfeisDWtgMUBak39g2wmG0AoEjCHk1fGR5N3GAys-z82Hsg6GtA";
 
 /* ---------------------------- Notificacoes push --------------------------- */
@@ -416,6 +424,7 @@ const AuthScreen = () => {
 const UserProfile = ({ user, onLogout }) => {
   const [name, setName] = useState(user.displayName || "");
   const [photoUrl, setPhotoUrl] = useState(user.photoURL || "");
+  const [photoBlob, setPhotoBlob] = useState(null); // foto nova por enviar; photoUrl fica com a pre-visualizacao local
   const [uploading, setUploading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [msg, setMsg] = useState("");
@@ -481,7 +490,11 @@ const UserProfile = ({ user, onLogout }) => {
         if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } } else { if (h > MAX) { w *= MAX / h; h = MAX; } }
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        setPhotoUrl(canvas.toDataURL("image/jpeg", 0.8)); setUploading(false);
+        canvas.toBlob((blob) => {
+          setUploading(false);
+          if (!blob) return setMsg("Erro ao processar a imagem.");
+          setPhotoBlob(blob); setPhotoUrl(URL.createObjectURL(blob));
+        }, "image/jpeg", 0.8);
       };
       img.src = ev.target.result;
     };
@@ -492,9 +505,11 @@ const UserProfile = ({ user, onLogout }) => {
     setMsg(""); if (!name.trim()) return setMsg("O nome e obrigatorio.");
     try {
       setUploading(true);
-      try { await updateProfile(auth.currentUser, { displayName: name, photoURL: photoUrl || null }); }
-      catch { await updateProfile(auth.currentUser, { displayName: name }); } // photoURL pode exceder o limite do Firebase Auth; o Firestore continua a guardar a foto real
-      await setDoc(doc(db, "artifacts", APP_ID, "users", user.uid), { name, photoUrl, updatedAt: serverTimestamp() }, { merge: true });
+      let url = photoUrl;
+      const legacy = url?.startsWith("data:"); // foto antiga em base64 ainda nao migrada
+      if (photoBlob || legacy) { url = await uploadAvatar(user.uid, photoBlob || await (await fetch(url)).blob()); setPhotoUrl(url); setPhotoBlob(null); }
+      await updateProfile(auth.currentUser, { displayName: name, photoURL: url || null });
+      await setDoc(doc(db, "artifacts", APP_ID, "users", user.uid), { name, photoUrl: url, updatedAt: serverTimestamp() }, { merge: true });
       setMsg("Perfil atualizado com sucesso!");
     }
     catch (e) { console.error(e); setMsg("Erro ao guardar perfil."); } finally { setUploading(false); }
@@ -1709,7 +1724,7 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
   useEffect(() => {
     const unsubP = onSnapshot(groupRef("players"), (s) => setPlayers(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const unsubM = onSnapshot(query(groupRef("matches"), orderBy("createdAt", "desc")), (s) => setMatches(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const unsubMsg = onSnapshot(query(groupRef("messages"), orderBy("createdAt", "asc")), (s) => setMessages(s.docs.map((d) => { const x = d.data(); return { id: d.id, ...x, ts: x.createdAt?.seconds ? x.createdAt.seconds * 1000 : Date.now() }; })));
+    const unsubMsg = onSnapshot(query(groupRef("messages"), orderBy("createdAt", "asc"), limitToLast(100)), (s) => setMessages(s.docs.map((d) => { const x = d.data(); return { id: d.id, ...x, ts: x.createdAt?.seconds ? x.createdAt.seconds * 1000 : Date.now() }; })));
     const unsubG = onSnapshot(groupDoc("schedule", "next"), (s) => { if (s.exists()) setNextGame(s.data()); else setNextGame({ date: new Date().toISOString(), responses: {} }); });
     const unsubGroup = onSnapshot(doc(db, "artifacts", APP_ID, "groups", group.id), (s) => {
       if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true, groupMode: st.groupMode || "casual" }); }
@@ -1772,11 +1787,12 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
     try { localStorage.setItem(`lastRead_${group.id}`, String(now)); } catch { /* noop */ }
   };
 
-  const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { date: nextGame?.date || new Date().toISOString(), responses: { ...(nextGame?.responses || {}), [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); };
+  // Escritas so com a chave do proprio utilizador: set+merge e caminhos "a.b" fundem no servidor, sem apagar respostas concorrentes
+  const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { responses: { [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); };
   const sendMessage = async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); };
   const addTraining = async ({ date, local }) => { await addDoc(groupRef("trainings"), { date, local, responses: {}, createdAt: serverTimestamp() }); showToast("Treino marcado!"); };
   const deleteTraining = async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); };
-  const toggleTraining = async (id, status) => { const t = trainings.find((x) => x.id === id); await updateDoc(groupDoc("trainings", id), { responses: { ...(t?.responses || {}), [me.uid]: status } }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
+  const toggleTraining = async (id, status) => { await updateDoc(groupDoc("trainings", id), { [`responses.${me.uid}`]: status }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
   const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); };
   const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
   const saveLeagueResult = async (id, scoreA, scoreB, goals, mvp) => {
@@ -1796,15 +1812,15 @@ const GroupDashboard = ({ group, currentUser, onBack }) => {
 
   const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
   const joinAsPlayer = async () => { if (players.find((p) => p.uid === me.uid)) return showToast("Já estás no plantel!", "error"); let photo = me.photoURL; try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", me.uid)); if (ud.exists()) photo = ud.data().photoUrl || photo; } catch (e) { /* noop */ } await addDoc(groupRef("players"), { name: me.displayName || "Eu", uid: me.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste no plantel!"); };
-  const ratePlayer = async (p, r) => { await updateDoc(groupDoc("players", p.id), { votes: { ...(p.votes || {}), [me.uid]: r } }); showToast("Avaliação registada!"); };
+  const ratePlayer = async (p, r) => { await updateDoc(groupDoc("players", p.id), { [`votes.${me.uid}`]: r }); showToast("Avaliação registada!"); };
   const removePlayer = async (p) => { if (!amIAdmin) return; if (window.confirm(`Eliminar ${p.name}?`)) await deleteDoc(groupDoc("players", p.id)); };
   const toggleAdmin = async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc("players", p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); };
   const deleteMatch = async (id) => { if (!amIAdmin) return; if (window.confirm("Apagar jogo?")) await deleteDoc(groupDoc("matches", id)); };
-  const submitMvp = async (mid, pid) => { const m = matches.find((x) => x.id === mid); await updateDoc(groupDoc("matches", mid), { mvpVotes: { ...(m.mvpVotes || {}), [me.uid]: pid } }); showToast("Voto registado!"); };
-  const signUp = async () => { if (!myProfile || fixedIds.includes(myProfile.id)) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: [...fixedIds, myProfile.id], payments }, { merge: true }); showToast("Inscrito como fixo!"); };
-  const signOutFixed = async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: fixedIds.filter((id) => id !== myProfile.id), payments }, { merge: true }); showToast("Inscrição cancelada"); };
-  const payFixed = async (pid) => { await setDoc(groupDoc("treasury", periodKey), { payments: { ...payments, [pid]: true } }, { merge: true }); showToast(`${fixedLabel} paga!`); };
-  const payMatch = async (mid, pid) => { const m = matches.find((x) => x.id === mid); await updateDoc(groupDoc("matches", mid), { payments: { ...(m.payments || {}), [pid]: true } }); showToast("Jogo pago!"); };
+  const submitMvp = async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`mvpVotes.${me.uid}`]: pid }); showToast("Voto registado!"); };
+  const signUp = async () => { if (!myProfile || fixedIds.includes(myProfile.id)) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayUnion(myProfile.id) }, { merge: true }); showToast("Inscrito como fixo!"); };
+  const signOutFixed = async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayRemove(myProfile.id) }, { merge: true }); showToast("Inscrição cancelada"); };
+  const payFixed = async (pid) => { await setDoc(groupDoc("treasury", periodKey), { payments: { [pid]: true } }, { merge: true }); showToast(`${fixedLabel} paga!`); };
+  const payMatch = async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`payments.${pid}`]: true }); showToast("Jogo pago!"); };
 
   const saveMatch = async ({ teamA, teamB, scoreA, scoreB, goals }) => {
     if (nextGame?.frequency && nextGame.frequency !== "once" && nextGame.date) {
@@ -2024,6 +2040,19 @@ const MainApp = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => { const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); }); return () => unsub(); }, []);
+  // Manutencao no arranque: migra foto base64 antiga para o Storage e renova o token FCM (sem pedir permissao)
+  useEffect(() => {
+    if (!user) return;
+    const ref = doc(db, "artifacts", APP_ID, "users", user.uid);
+    getDoc(ref).then(async (s) => {
+      const d = s.data() || {};
+      if (d.notifEnabled && typeof Notification !== "undefined" && Notification.permission === "granted") enablePushNotifications(user.uid);
+      if (d.photoUrl?.startsWith("data:")) {
+        const url = await uploadAvatar(user.uid, await (await fetch(d.photoUrl)).blob());
+        await setDoc(ref, { photoUrl: url }, { merge: true });
+      }
+    }).catch((e) => console.error("Erro na manutencao do perfil:", e));
+  }, [user]);
   if (loading) return <div className="ft" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}><style>{STYLES}</style><Loader2 size={40} style={{ color: "var(--grass-bright)", animation: "ftspin 1s linear infinite" }} /></div>;
   return (
     <div className="ft" style={{ minHeight: "100vh" }}>

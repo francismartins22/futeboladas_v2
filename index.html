@@ -74,7 +74,8 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          // Unico SW da app: o do FCM. Dois SWs no mesmo scope "/" substituem-se e partem o push.
+          navigator.serviceWorker.register('/firebase-messaging-sw.js')
             .then(registration => {
               console.log('SW registado com sucesso:', registration.scope);
             })
