@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, setDoc, arrayUnion } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, arrayUnion } from "firebase/firestore";
 import { getMessaging, getToken, isSupported as isMessagingSupported } from "firebase/messaging";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -19,14 +19,17 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 auth.useDeviceLanguage(); // emails do Firebase (ex: repor palavra-passe) na lingua do telemovel
 
-export const db = getFirestore(app);
+// Cache local (IndexedDB): com rede fraca ou sem rede a app mostra os ultimos dados e as escritas ficam em fila ate voltar a ligacao
+export const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
 
 const storage = getStorage(app);
 
 export const APP_ID = "futeboladas-v3"; // <-- reset: novo namespace de dados (clean)
 
 // Entrar num grupo com codigo de convite (validado no servidor, ver functions/index.js)
-export const joinGroupFn = httpsCallable(getFunctions(app), "joinGroup");
+const functions = getFunctions(app);
+export const joinGroupFn = httpsCallable(functions, "joinGroup");
+export const deleteAccountFn = httpsCallable(functions, "deleteAccount");
 
 /* Fotos de perfil vivem no Storage; o Firestore so guarda o URL (antes era base64 copiado para todo o lado). */
 export const uploadAvatar = async (uid, blob) => {

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Send } from "lucide-react";
+import { Send, Bell, BellOff } from "lucide-react";
 import { firstName, timeStr } from "../utils";
 import { Avatar } from "../components/ui";
 
 /* ------------------------------- Chat ------------------------------------ */
-export const ChatTab = ({ messages, me, onSend, onMarkRead }) => {
+export const ChatTab = ({ messages, me, muted, onToggleMute, onSend, onMarkRead }) => {
   const [text, setText] = useState("");
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -12,6 +12,11 @@ export const ChatTab = ({ messages, me, onSend, onMarkRead }) => {
   const send = async () => { const t = text.trim(); if (!t) return; setText(""); if (!(await onSend(t))) setText(t); };
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 158px)" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 12px 0" }}>
+        <button onClick={onToggleMute} className="ft-btn" aria-pressed={muted} style={{ fontSize: 11, padding: "5px 10px", background: "none", color: muted ? "var(--gold)" : "var(--faint)", border: "1px solid var(--line)" }}>
+          {muted ? <><BellOff size={12} /> Notificações silenciadas</> : <><Bell size={12} /> Silenciar notificações</>}
+        </button>
+      </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
         {messages.length === 0 && <p style={{ textAlign: "center", color: "var(--faint)", fontStyle: "italic", fontSize: 13, marginTop: 20 }}>Ainda sem mensagens. Diz olá!</p>}
         {messages.map((m) => {

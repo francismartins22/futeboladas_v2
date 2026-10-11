@@ -2,7 +2,7 @@
 //   npm run test:rules   (precisa de Java 21+ no PATH; o projeto "demo-" nunca toca no Firebase real)
 import fs from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, getDocs, writeBatch, serverTimestamp, arrayUnion, arrayRemove, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, getDocs, writeBatch, serverTimestamp, arrayUnion, arrayRemove, Timestamp, deleteField } from "firebase/firestore";
 
 const env = await initializeTestEnvironment({
   projectId: "demo-futeboladas",
@@ -111,6 +111,32 @@ await t("membro nao responde por outro", () => no(setDoc(doc(as("M"), `${G}/sche
 await t("membro nao muda a data", () => no(setDoc(doc(as("M"), `${G}/schedule/next`), { date: "2027-01-01T00:00:00" }, { merge: true })));
 await t("membro confirma sem jogo marcado (cria doc)", () => ok(setDoc(doc(as("M"), `${R}/groups/g2/schedule/next`), { responses: { M: "going" } }, { merge: true })));
 await t("admin muda a data", () => ok(setDoc(doc(as("A"), `${G}/schedule/next`), { date: "2027-01-01T21:00:00", frequency: "weekly", responses: {} }, { merge: true })));
+
+// --- lista de espera ---
+const sched = (db) => doc(db, `${G}/schedule/next`);
+await t("membro confirma com hora do servidor", () => ok(setDoc(sched(as("M")), { responses: { M: "going" }, goingAt: { M: serverTimestamp() } }, { merge: true })));
+await t("membro nao passa a frente com hora falsa", () => no(setDoc(sched(as("M")), { responses: { M: "going" }, goingAt: { M: Timestamp.fromMillis(0) } }, { merge: true })));
+await t("membro nao mexe na hora de outro", () => no(setDoc(sched(as("M")), { goingAt: { O: serverTimestamp() } }, { merge: true })));
+await t("membro desiste (apaga a sua hora)", () => ok(setDoc(sched(as("M")), { responses: { M: "not_going" }, goingAt: { M: deleteField() } }, { merge: true })));
+await t("membro confirma sem jogo marcado com hora", () => ok(setDoc(doc(as("M"), `${R}/groups/g2/schedule/next`), { responses: { M: "going" }, goingAt: { M: serverTimestamp() } }, { merge: true })));
+await t("avancar a data limpa respostas e horas (mapas vazios com merge)", async () => {
+  await ok(setDoc(sched(as("M")), { responses: { M: "going" }, goingAt: { M: serverTimestamp() } }, { merge: true }));
+  await ok(setDoc(sched(as("A")), { date: "2027-01-08T21:00:00", responses: {}, goingAt: {} }, { merge: true }));
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const d = (await getDoc(doc(ctx.firestore(), `${G}/schedule/next`))).data();
+    if (Object.keys(d.responses).length || Object.keys(d.goingAt).length) throw new Error("respostas nao foram limpas: " + JSON.stringify(d.responses));
+  });
+});
+
+// --- sair do grupo ---
+await t("membro sai: marca o seu jogador e sai dos membros (batch)", async () => {
+  const db = as("M"); const b = writeBatch(db);
+  b.update(doc(db, `${G}/players/pM`), { left: true });
+  b.update(doc(db, G), { members: arrayRemove("M") });
+  await ok(b.commit());
+});
+await t("membro nao marca outro como saido", () => no(updateDoc(doc(as("M"), `${G}/players/pA`), { left: true })));
+await t("membro silencia o chat no seu perfil", () => ok(setDoc(doc(as("M"), `${R}/users/M`), { mutedChats: arrayUnion("g1") }, { merge: true })));
 
 // --- treinos e liga ---
 await t("membro responde ao treino", () => ok(updateDoc(doc(as("M"), `${G}/trainings/t1`), { "responses.M": "going" })));

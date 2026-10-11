@@ -16,11 +16,13 @@ const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
-const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten, onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
+const { getStorage } = require("firebase-admin/storage");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const { parseGameDate, formatTime, formatDate } = require("./dates");
+const { promoted } = require("./rsvp");
 
 initializeApp();
 const db = getFirestore();
@@ -30,12 +32,13 @@ const APP_ID = "futeboladas-v3";
 
 /* --------------------------- Helpers comuns ------------------------------ */
 
-// Devolve [{uid, tokens}] para os membros do grupo, exceto o uid a ignorar (opcional)
-async function getMemberTokens(groupId, excludeUid) {
+// Devolve [{uid, tokens}] para os membros do grupo.
+// excludeUid: ignora este utilizador; only: so estes uids; chat: ignora quem silenciou o chat deste grupo
+async function getMemberTokens(groupId, excludeUid, { only = null, chat = false } = {}) {
   const groupSnap = await db.doc(`artifacts/${APP_ID}/groups/${groupId}`).get();
   if (!groupSnap.exists) return [];
   const members = groupSnap.data().members || [];
-  const targets = members.filter((uid) => uid !== excludeUid);
+  const targets = members.filter((uid) => uid !== excludeUid && (!only || only.includes(uid)));
   if (targets.length === 0) return [];
 
   const userDocs = await Promise.all(targets.map((uid) => db.doc(`artifacts/${APP_ID}/users/${uid}`).get()));
@@ -44,6 +47,7 @@ async function getMemberTokens(groupId, excludeUid) {
     if (!snap.exists) return;
     const d = snap.data();
     if (d.notifEnabled === false) return; // utilizador desativou notificacoes
+    if (chat && (d.mutedChats || []).includes(groupId)) return; // silenciou o chat deste grupo
     const tokens = Array.isArray(d.fcmTokens) ? d.fcmTokens : [];
     if (tokens.length) out.push({ uid: targets[i], tokens });
   });
@@ -232,7 +236,7 @@ exports.onNewMessage = onDocumentCreated(
     const data = event.data.data();
     if (!data?.text || !data?.uid) return;
 
-    const memberTokens = await getMemberTokens(groupId, data.uid); // exclui o remetente
+    const memberTokens = await getMemberTokens(groupId, data.uid, { chat: true }); // exclui o remetente e quem silenciou
     if (memberTokens.length === 0) return;
 
     const groupSnap = await db.doc(`artifacts/${APP_ID}/groups/${groupId}`).get();
@@ -271,7 +275,8 @@ exports.joinGroup = onCall(async (request) => {
   const existing = await groupRef.collection("players").where("uid", "==", uid).limit(1).get();
   const batch = db.batch();
   batch.update(groupRef, { members: FieldValue.arrayUnion(uid) });
-  if (existing.empty) {
+  if (!existing.empty) batch.update(existing.docs[0].ref, { left: false }); // voltou ao grupo: reaparece no plantel
+  else {
     batch.set(groupRef.collection("players").doc(), {
       name, uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 },
       isAdmin: false, photoUrl, votes: {}, createdAt: FieldValue.serverTimestamp(),
@@ -280,4 +285,95 @@ exports.joinGroup = onCall(async (request) => {
   await batch.commit();
   logger.info(`Utilizador ${uid} entrou no grupo ${groupRef.id}`);
   return { groupId: groupRef.id, alreadyMember: false };
+});
+
+/* ===================== 5. LISTA DE ESPERA: ABRIU VAGA ===================== */
+
+// Quando alguem desiste (ou o admin aumenta o limite), avisa quem passou da lista de espera para convocado.
+exports.onWaitlistPromotion = onDocumentWritten(
+  "artifacts/{appId}/groups/{groupId}/schedule/next",
+  async (event) => {
+    const { appId, groupId } = event.params;
+    if (appId !== APP_ID) return;
+    const before = event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    if (!before || !after || before.date !== after.date) return; // jogo novo: as respostas recomecam
+
+    const groupSnap = await db.doc(`artifacts/${APP_ID}/groups/${groupId}`).get();
+    const maxPlayers = groupSnap.data()?.settings?.maxPlayers || 0;
+    const uids = promoted(before, after, maxPlayers);
+    if (uids.length === 0) return;
+
+    const memberTokens = await getMemberTokens(groupId, null, { only: uids });
+    await sendToMembers(
+      memberTokens,
+      { title: "Abriu uma vaga! ⚽", body: `Saíste da lista de espera: estás convocado para ${formatDate(after.date)}.` },
+      { type: "waitlist", groupId, url: "/" }
+    );
+    logger.info(`Lista de espera: ${uids.length} promovido(s) no grupo ${groupId}`);
+  }
+);
+
+/* ==================== 6. RGPD: GRUPOS APAGADOS E CONTAS ==================== */
+
+// O Firestore nao apaga subcolecoes com o documento: quando um grupo e apagado, apaga tudo o que tinha dentro.
+exports.onGroupDeleted = onDocumentDeleted(
+  "artifacts/{appId}/groups/{groupId}",
+  async (event) => {
+    if (event.params.appId !== APP_ID) return;
+    await db.recursiveDelete(event.data.ref);
+    logger.info(`Dados do grupo ${event.params.groupId} apagados`);
+  }
+);
+
+const EX_PLAYER = "Ex-jogador";
+
+// Tira os dados pessoais do utilizador de um grupo, mantendo os jogos e as contas coerentes para os outros.
+async function anonymizeInGroup(groupRef, uid, writer) {
+  const [players, messages] = await Promise.all([
+    groupRef.collection("players").where("uid", "==", uid).get(),
+    groupRef.collection("messages").where("uid", "==", uid).get(),
+  ]);
+  const pids = players.docs.map((d) => d.id);
+  players.docs.forEach((d) => writer.update(d.ref, { name: EX_PLAYER, photoUrl: null, uid: FieldValue.delete(), left: true }));
+  messages.docs.forEach((d) => writer.delete(d.ref));
+  if (pids.length) {
+    const matches = await groupRef.collection("matches").get(); // os jogos guardam o nome dos jogadores
+    matches.docs.forEach((m) => {
+      const d = m.data();
+      const fix = (team) => (team || []).map((p) => (pids.includes(p.id) ? { ...p, name: EX_PLAYER } : p));
+      if ([...(d.teamA || []), ...(d.teamB || [])].some((p) => pids.includes(p.id))) writer.update(m.ref, { teamA: fix(d.teamA), teamB: fix(d.teamB) });
+    });
+  }
+  const schedule = await groupRef.collection("schedule").doc("next").get();
+  if (schedule.exists) writer.update(schedule.ref, { [`responses.${uid}`]: FieldValue.delete(), [`goingAt.${uid}`]: FieldValue.delete() });
+  writer.update(groupRef, { members: FieldValue.arrayRemove(uid), admins: FieldValue.arrayRemove(uid) });
+}
+
+exports.deleteAccount = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sessao necessaria.");
+  const groups = await db.collection(`artifacts/${APP_ID}/groups`).get();
+
+  // Dono de um grupo com outros membros: nao se apaga o grupo dos outros sem ele decidir
+  const blocking = groups.docs.filter((g) => g.data().ownerId === uid && (g.data().members || []).some((m) => m !== uid));
+  if (blocking.length) {
+    throw new HttpsError("failed-precondition", `És dono de grupos com outros membros (${blocking.map((g) => g.data().name).join(", ")}). Apaga esses grupos primeiro.`);
+  }
+
+  const writer = db.bulkWriter();
+  for (const g of groups.docs) {
+    if (g.data().ownerId === uid) { await db.recursiveDelete(g.ref); continue; } // grupo so dele
+    // shortcut: percorre todos os grupos (tambem os que ja deixou); com milhares de grupos usar um indice collectionGroup em players.uid
+    const isMember = (g.data().members || []).includes(uid);
+    const hasPlayer = !(await g.ref.collection("players").where("uid", "==", uid).limit(1).get()).empty;
+    if (isMember || hasPlayer) await anonymizeInGroup(g.ref, uid, writer);
+  }
+  writer.delete(db.doc(`artifacts/${APP_ID}/users/${uid}`));
+  await writer.close();
+
+  await getStorage().bucket().file(`avatars/${uid}.jpg`).delete({ ignoreNotFound: true });
+  await getAuth().deleteUser(uid);
+  logger.info(`Conta ${uid} apagada`);
+  return { ok: true };
 });

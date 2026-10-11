@@ -23,6 +23,14 @@ service cloud.firestore {
         return changed().hasOnly([field])
           && request.resource.data[field].diff(resource.data.get(field, {})).affectedKeys().hasOnly([uid()]);
       }
+      // So mexe na propria chave do mapa `field` (o mapa pode ainda nao existir)
+      function ownKeyIn(field) {
+        return request.resource.data.get(field, {}).diff(resource == null ? {} : resource.data.get(field, {})).affectedKeys().hasOnly([uid()]);
+      }
+      // Lista de espera: a hora de chegada tem de ser a do servidor (ninguem passa a frente com uma data falsa)
+      function goingAtIsNow() {
+        return !(uid() in request.resource.data.get('goingAt', {})) || request.resource.data.goingAt[uid()] == request.time;
+      }
       function zeroStats() { return request.resource.data.stats == { 'games': 0, 'wins': 0, 'draws': 0, 'losses': 0 }; }
 
       // ---------------------------- Perfis ----------------------------
@@ -72,7 +80,7 @@ service cloud.firestore {
             (isOwner(gid))
             || (isAdmin(gid) && !changed().hasAny(['isAdmin']))
             || (isMember(gid) && onlyOwnKey('votes'))
-            || (isMember(gid) && resource.data.get('uid', null) == uid() && changed().hasOnly(['name', 'photoUrl']));
+            || (isMember(gid) && resource.data.get('uid', null) == uid() && changed().hasOnly(['name', 'photoUrl', 'left']));
           allow delete: if isAdmin(gid);
         }
 
@@ -95,9 +103,11 @@ service cloud.firestore {
         match /schedule/{docId} {
           allow read: if isMember(gid);
           allow create: if isAdmin(gid)
-            || (isMember(gid) && request.resource.data.keys().hasOnly(['responses'])
-              && request.resource.data.responses.keys().hasOnly([uid()]));
-          allow update: if isAdmin(gid) || (isMember(gid) && onlyOwnKey('responses'));
+            || (isMember(gid) && request.resource.data.keys().hasOnly(['responses', 'goingAt'])
+              && ownKeyIn('responses') && ownKeyIn('goingAt') && goingAtIsNow());
+          allow update: if isAdmin(gid)
+            || (isMember(gid) && changed().hasOnly(['responses', 'goingAt'])
+              && ownKeyIn('responses') && ownKeyIn('goingAt') && goingAtIsNow());
           allow delete: if isAdmin(gid);
         }
 

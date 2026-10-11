@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Users, CalendarCheck, Shield, Check, ArrowLeft, Crown, Copy, MessageSquare, Swords, Menu } from "lucide-react";
-import { collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc, serverTimestamp, query, orderBy, limitToLast, setDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc, serverTimestamp, query, orderBy, limitToLast, setDoc, getDoc, arrayUnion, arrayRemove, deleteField, writeBatch } from "firebase/firestore";
 import { db, APP_ID } from "../firebase";
 import { firstName, getCoordsFromUrl, newInviteCode, errorMessage } from "../utils";
 import { Toast, SubTabs } from "../components/ui";
@@ -40,6 +40,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   });
   const [leagueGames, setLeagueGames] = useState([]);
   const [trainings, setTrainings] = useState([]);
+  const [chatMuted, setChatMuted] = useState(false);
 
   const me = currentUser;
   const groupRef = (col) => collection(db, "artifacts", APP_ID, "groups", group.id, col);
@@ -61,18 +62,20 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     const unsubMsg = onSnapshot(query(groupRef("messages"), orderBy("createdAt", "asc"), limitToLast(100)), (s) => setMessages(s.docs.map((d) => { const x = d.data(); return { id: d.id, ...x, ts: x.createdAt?.seconds ? x.createdAt.seconds * 1000 : Date.now() }; })));
     const unsubG = onSnapshot(groupDoc("schedule", "next"), (s) => { if (s.exists()) setNextGame(s.data()); else setNextGame({ date: new Date().toISOString(), responses: {} }); });
     const unsubGroup = onSnapshot(doc(db, "artifacts", APP_ID, "groups", group.id), (s) => {
-      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true, groupMode: st.groupMode || "casual" }); setGroupMeta({ admins: d.admins || [], inviteCode: d.inviteCode || "" }); }
+      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true, groupMode: st.groupMode || "casual", maxPlayers: Number(st.maxPlayers) || 0 }); setGroupMeta({ admins: d.admins || [], inviteCode: d.inviteCode || "" }); }
     });
     const unsubLG = onSnapshot(query(groupRef("leagueGames"), orderBy("date", "asc")), (s) => setLeagueGames(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const unsubTr = onSnapshot(query(groupRef("trainings"), orderBy("date", "asc")), (s) => setTrainings(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); unsubLG(); unsubTr(); };
+    // notificacoes do chat silenciadas por grupo (users/{uid}.mutedChats, lido pela Cloud Function onNewMessage)
+    const unsubMe = onSnapshot(doc(db, "artifacts", APP_ID, "users", me.uid), (s) => setChatMuted((s.data()?.mutedChats || []).includes(group.id)));
+    return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); unsubLG(); unsubTr(); unsubMe(); };
   }, [group.id]);
 
   // As regras do Firestore usam a lista `admins` do grupo; o dono mantem-na igual aos isAdmin dos jogadores
   // (preenche grupos antigos e acompanha o "Promover admin").
   useEffect(() => {
     if (!isOwner || players.length === 0) return;
-    const want = players.filter((p) => p.isAdmin && p.uid && p.uid !== group.ownerId).map((p) => p.uid).sort();
+    const want = players.filter((p) => p.isAdmin && !p.left && p.uid && p.uid !== group.ownerId).map((p) => p.uid).sort();
     if (want.join() !== [...groupMeta.admins].sort().join()) updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { admins: want }).catch((e) => console.error("Erro a sincronizar admins:", e));
   }, [isOwner, players, groupMeta.admins, group.id, group.ownerId]);
 
@@ -100,14 +103,16 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     if (now.getTime() > gd.getTime() + tol) {
       const nd = new Date(gd); const step = nextGame.frequency === "biweekly" ? 14 : 7;
       while (nd.getTime() + tol < now.getTime()) nd.setDate(nd.getDate() + step);
-      if (nd.getTime() !== gd.getTime()) setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true }).catch((e) => console.error("Erro ao avancar a data:", e));
+      if (nd.getTime() !== gd.getTime()) setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {}, goingAt: {} }, { merge: true }).catch((e) => console.error("Erro ao avancar a data:", e));
     }
   }, [nextGame, amIAdmin]);
 
   const avg = (p) => { const v = Object.values(p.votes || {}); return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : 3; };
   const matchMVP = (m) => { const w = mvpWinnerId(m); const p = w && players.find((pl) => pl.id === w.id); return p ? { ...p, votes: w.votes } : null; };
-  const members = players.filter((p) => p.type !== "guest");
-  const guests = players.filter((p) => p.type === "guest");
+  // Quem saiu do grupo (left) desaparece do plantel, equipas e convocatorias, mas fica no historico e na tesouraria
+  const activePlayers = players.filter((p) => !p.left);
+  const members = activePlayers.filter((p) => p.type !== "guest");
+  const guests = activePlayers.filter((p) => p.type === "guest");
   const groupMode = settings.groupMode || "casual";
   const isLeague = groupMode === "league";
   const isWeekly = groupMode === "weekly";
@@ -137,7 +142,14 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   const safe = (fn) => async (...args) => {
     try { await fn(...args); return true; } catch (e) { console.error(e); showToast(errorMessage(e), "error"); return false; }
   };
-  const toggleSchedule = safe(async (status) => { await setDoc(groupDoc("schedule", "next"), { responses: { [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); });
+  const toggleSchedule = safe(async (status) => {
+    if (nextGame?.responses?.[me.uid] === status) return;
+    // goingAt = ordem de chegada para a lista de espera (as regras exigem a hora do servidor)
+    await setDoc(groupDoc("schedule", "next"), { responses: { [me.uid]: status }, goingAt: { [me.uid]: status === "going" ? serverTimestamp() : deleteField() } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); });
+  const toggleChatMute = safe(async () => {
+    await setDoc(doc(db, "artifacts", APP_ID, "users", me.uid), { mutedChats: chatMuted ? arrayRemove(group.id) : arrayUnion(group.id) }, { merge: true });
+    showToast(chatMuted ? "Notificações do chat ativas" : "Chat silenciado neste grupo");
+  });
   const sendMessage = safe(async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); });
   const addTraining = safe(async ({ date, local }) => { await addDoc(groupRef("trainings"), { date, local, responses: {}, createdAt: serverTimestamp() }); showToast("Treino marcado!"); });
   const deleteTraining = safe(async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); });
@@ -169,21 +181,27 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   const saveMatch = safe(async ({ teamA, teamB, scoreA, scoreB, goals }) => {
     if (nextGame?.frequency && nextGame.frequency !== "once" && nextGame.date) {
       const nd = new Date(nextGame.date); nd.setDate(nd.getDate() + (nextGame.frequency === "biweekly" ? 14 : 7));
-      await setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true });
+      await setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {}, goingAt: {} }, { merge: true });
     }
     const pays = {}; [...teamA, ...teamB].forEach((p) => { if (collectsFixed ? !fixedIds.includes(p.id) : true) pays[p.id] = false; });
     await addDoc(groupRef("matches"), { date: new Date().toISOString(), scoreA, scoreB, teamA: teamA.map((p) => ({ id: p.id, name: p.name })), teamB: teamB.map((p) => ({ id: p.id, name: p.name })), mvpVotes: {}, goals: goals || {}, payments: pays, fee, createdAt: serverTimestamp() });
     showToast("Jogo guardado! Próxima data atualizada."); setTab("history");
   });
 
-  const saveSettings = safe(async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl }) => {
+  const saveSettings = safe(async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, maxPlayers }) => {
     const sched = {}; if (date && time) sched.date = `${date}T${time}:00`; if (freq) sched.frequency = freq;
     if (Object.keys(sched).length) await setDoc(groupDoc("schedule", "next"), sched, { merge: true });
-    const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0, groupMode: settings.groupMode || "casual", leagueMode: settings.groupMode === "league" } };
+    const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0, maxPlayers: Math.max(0, parseInt(maxPlayers, 10) || 0), groupMode: settings.groupMode || "casual", leagueMode: settings.groupMode === "league" } };
     if (locationUrl) { gUpdate.locationUrl = locationUrl; const c = getCoordsFromUrl(locationUrl); if (c) gUpdate.location = c; }
     await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), gUpdate); showToast("Definições guardadas!");
   });
-  const leaveGroup = safe(async () => { if (isOwner) return; if (window.confirm("Sair do grupo?")) { await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { members: arrayRemove(me.uid) }); onBack(); } });
+  const leaveGroup = safe(async () => {
+    if (isOwner || !window.confirm("Sair do grupo?")) return;
+    const batch = writeBatch(db); // o jogador fica marcado como "saiu" (mantem historico e dividas); voltar com codigo reativa-o
+    if (myProfile) batch.update(groupDoc("players", myProfile.id), { left: true });
+    batch.update(doc(db, "artifacts", APP_ID, "groups", group.id), { members: arrayRemove(me.uid) });
+    await batch.commit(); onBack();
+  });
   const deleteGroup = safe(async () => { if (window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, "artifacts", APP_ID, "groups", group.id)); onBack(); } });
   const copyInvite = async () => {
     try {
@@ -229,15 +247,15 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
 
       {section.tabs.length > 1 && <div style={{ padding: "14px 16px 0", maxWidth: 480, margin: "0 auto" }}><SubTabs items={section.tabs} active={tab} onChange={goTo} /></div>}
       <div style={{ padding: tab === "chat" || tab === "tactics" ? 0 : 16, maxWidth: tab === "chat" ? 620 : 480, margin: "0 auto" }}>
-        {tab === "schedule" && !isLeague && <ScheduleTab next={nextGame} players={players} me={me} locationUrl={settings.locationUrl} onToggle={toggleSchedule} />}
+        {tab === "schedule" && !isLeague && <ScheduleTab next={nextGame} players={players} me={me} locationUrl={settings.locationUrl} maxPlayers={settings.maxPlayers} onToggle={toggleSchedule} />}
         {tab === "schedule" && isLeague && <LeagueScheduleTab leagueGames={leagueGames} me={me} players={players} />}
-        {tab === "chat" && <ChatTab messages={messages} me={me} onSend={sendMessage} onMarkRead={markChatRead} />}
+        {tab === "chat" && <ChatTab messages={messages} me={me} muted={chatMuted} onToggleMute={toggleChatMute} onSend={sendMessage} onMarkRead={markChatRead} />}
         {tab === "leaguecal" && isLeague && <LeagueCalendarTab leagueGames={leagueGames} members={members} amIAdmin={amIAdmin} onAdd={addLeagueGame} onDelete={deleteLeagueGame} onResult={saveLeagueResult} />}
         {tab === "lineup" && isLeague && <LineupTab members={members} amIAdmin={amIAdmin} leagueGames={leagueGames} onSaveLineup={saveLineup} />}
         {tab === "training" && <TrainingTab trainings={trainings} me={me} amIAdmin={amIAdmin} onAdd={addTraining} onDelete={deleteTraining} onToggle={toggleTraining} />}
-        {tab === "team" && !isLeague && <TeamTab players={players} next={nextGame} avg={avg} amIAdmin={amIAdmin} onSaveMatch={saveMatch} showToast={showToast} />}
+        {tab === "team" && !isLeague && <TeamTab players={activePlayers} next={nextGame} maxPlayers={settings.maxPlayers} avg={avg} amIAdmin={amIAdmin} onSaveMatch={saveMatch} showToast={showToast} />}
         {tab === "tactics" && <TacticsTab members={members} showToast={showToast} leagueGames={isLeague ? leagueGames : null} />}
-        {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
+        {tab === "players" && <PlayersTab members={members} guests={guests} players={activePlayers} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
         {tab === "history" && !isLeague && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onEdit={editMatch} onDelete={deleteMatch} />}
         {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} fixedIds={effectiveFixedIds} players={players} matches={matches} leagueGames={leagueGames} />}
         {tab === "members" && collectsFixed && <MembersTab fixedIds={fixedIds} players={players} myProfile={myProfile} paymentModel={settings.paymentModel} onSignUp={signUp} onSignOut={signOutFixed} />}

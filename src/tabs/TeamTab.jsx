@@ -3,13 +3,14 @@ import { Shuffle, Check, ArrowRight, Share2 } from "lucide-react";
 import { firstName } from "../utils";
 import { Avatar, Stepper } from "../components/ui";
 import { SoccerBall } from "../components/icons";
+import { rsvpLists } from "../rsvp";
 
 /* ------------------------------ Equipa ----------------------------------- */
-export const TeamTab = ({ players, next, avg, amIAdmin, onSaveMatch, showToast }) => {
+export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch, showToast }) => {
   const goingIds = useMemo(() => {
-    const uids = Object.entries(next?.responses || {}).filter(([, s]) => s === "going").map(([u]) => u);
+    const uids = rsvpLists(next, maxPlayers).confirmed; // so os convocados; a lista de espera fica de fora
     return players.filter((p) => p.uid && uids.includes(p.uid)).map((p) => p.id);
-  }, [next, players]);
+  }, [next, players, maxPlayers]);
   const [selected, setSelected] = useState([]);
   const [seeded, setSeeded] = useState(false);
   const [search, setSearch] = useState("");

@@ -42,3 +42,27 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+/* ------------------- Cache da app (abrir sem rede) -------------------
+   - Navegacao (index.html): rede primeiro; sem rede usa a ultima copia guardada.
+   - /assets/* (nome com hash, nunca muda) e icones: cache primeiro.
+   Tudo o resto (Firestore, Storage, APIs, outros dominios) vai sempre a rede.
+   shortcut: assets de versoes antigas acumulam na cache ate a app mudar de APP_VERSION (App.jsx limpa as caches nessa altura). */
+const APP_CACHE = "futeboladas-app-v1";
+
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
+  const save = (key, res) => { if (res.ok) { const copy = res.clone(); caches.open(APP_CACHE).then((c) => c.put(key, copy)); } return res; };
+
+  if (req.mode === "navigate") {
+    event.respondWith(fetch(req).then((res) => save("/", res)).catch(() => caches.match("/")));
+  } else if (url.pathname.startsWith("/assets/") || /^\/(pwa-\d+x\d+\.png|manifest\.json)$/.test(url.pathname)) {
+    event.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => save(req, res))));
+  }
+});

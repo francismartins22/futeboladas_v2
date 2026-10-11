@@ -1,13 +1,24 @@
 import { useState, useEffect, useRef } from "react";
-import { LogOut, Loader2, User, Camera, Save, Trophy, Bell, BellOff } from "lucide-react";
+import { LogOut, Loader2, User, Camera, Save, Trophy, Bell, BellOff, Trash2 } from "lucide-react";
 import { updateProfile } from "firebase/auth";
 import { collection, doc, serverTimestamp, query, setDoc, getDoc, where, getDocs } from "firebase/firestore";
-import { auth, db, APP_ID, uploadAvatar, enablePushNotifications, disablePushNotifications } from "../firebase";
+import { auth, db, APP_ID, uploadAvatar, enablePushNotifications, disablePushNotifications, deleteAccountFn } from "../firebase";
 import { Avatar } from "../components/ui";
 import { playerStats } from "../stats";
 
 /* ============================== PROFILE ================================== */
 export const UserProfile = ({ user, onLogout }) => {
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  // RGPD: apaga perfil, foto, mensagens e conta; nos grupos dos outros o nome passa a "Ex-jogador" (ver functions/index.js)
+  const deleteAccount = async () => {
+    setDeleteError("");
+    if (window.prompt("Isto apaga a tua conta, foto, mensagens e grupos onde és o único membro. Não dá para desfazer.\n\nEscreve APAGAR para confirmar:") !== "APAGAR") return;
+    setDeleting(true);
+    try { await deleteAccountFn(); onLogout(); }
+    catch (e) { console.error(e); setDeleteError(e.code === "functions/failed-precondition" ? e.message : "Não foi possível apagar a conta. Tenta novamente."); }
+    finally { setDeleting(false); }
+  };
   const [name, setName] = useState(user.displayName || "");
   const [photoUrl, setPhotoUrl] = useState(user.photoURL || "");
   const [photoBlob, setPhotoBlob] = useState(null); // foto nova por enviar; photoUrl fica com a pre-visualizacao local
@@ -135,6 +146,11 @@ export const UserProfile = ({ user, onLogout }) => {
         {notifBlocked && <p style={{ fontSize: 11, color: "#ff9684", marginTop: 10 }}>As notificações estão bloqueadas no browser. Ativa-as nas definições do site (ícone de cadeado junto ao URL) e tenta novamente.</p>}
       </div>
       <button onClick={onLogout} className="ft-btn" style={{ width: "100%", background: "none", color: "#ff9684", padding: 14, marginTop: 18 }}><LogOut size={16} /> Terminar sessao</button>
+      <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 18, marginTop: 8 }}>
+        <p style={{ fontSize: 12, color: "#ffb3a5", margin: "0 0 12px" }}>Apagar a conta remove os teus dados pessoais de todos os grupos. Os resultados dos jogos ficam, com o nome "Ex-jogador".</p>
+        {deleteError && <p role="alert" style={{ fontSize: 12, color: "#ff9684", margin: "0 0 12px" }}>{deleteError}</p>}
+        <button onClick={deleteAccount} disabled={deleting} className="ft-btn ft-danger" style={{ width: "100%", padding: 12 }}>{deleting ? <Loader2 size={16} style={{ animation: "ftspin 1s linear infinite" }} /> : <Trash2 size={16} />} Apagar conta</button>
+      </div>
     </div>
   );
 };

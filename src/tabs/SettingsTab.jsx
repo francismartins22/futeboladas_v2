@@ -11,10 +11,11 @@ export const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave
   const [date, setDate] = useState(next?.date ? new Date(next.date).toISOString().slice(0, 10) : "");
   const [time, setTime] = useState(next?.date ? new Date(next.date).toTimeString().slice(0, 5) : "21:00");
   const [freq, setFreq] = useState(next?.frequency || "weekly");
+  const [maxPlayers, setMaxPlayers] = useState(settings.maxPlayers || "");
   const [locationUrl, setLocationUrl] = useState(settings.locationUrl || "");
   const Label = ({ children }) => <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>{children}</label>;
   const MODELS = isLeague ? [["monthly", "Mensal"], ["season", "Epoca/Anual"]] : [["pergame", "Jogo-a-jogo"], ["monthly", "Mensal"], ["season", "Epoca"]];
-  const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl });
+  const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, maxPlayers });
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {amIAdmin && (
@@ -44,6 +45,11 @@ export const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave
           </div>
           <Label>Periodicidade</Label>
           <select className="ft-input" value={freq} onChange={(e) => setFreq(e.target.value)}><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select>
+          <div style={{ marginTop: 12 }}>
+            <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Limite de vagas</label>
+            <input type="number" min="0" step="1" className="ft-input" value={maxPlayers} onChange={(e) => setMaxPlayers(e.target.value)} placeholder="Sem limite" />
+            <p style={{ fontSize: 10, color: "var(--faint)", marginTop: 6 }}>Quem confirmar depois de esgotar fica na lista de espera e sobe sozinho se alguém desistir.</p>
+          </div>
         </div>
       )}
       {amIAdmin && (
