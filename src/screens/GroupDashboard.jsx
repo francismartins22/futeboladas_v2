@@ -6,6 +6,7 @@ import { firstName, getCoordsFromUrl, newInviteCode, errorMessage } from "../uti
 import { Toast, SubTabs } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
 import { mvpWinnerId, leagueParticipants } from "../stats";
+import { confirmDialog } from "../confirm";
 import { ChatTab } from "../tabs/ChatTab";
 import { TrainingTab } from "../tabs/TrainingTab";
 import { LeagueScheduleTab } from "../tabs/LeagueScheduleTab";
@@ -152,10 +153,10 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   });
   const sendMessage = safe(async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); });
   const addTraining = safe(async ({ date, local }) => { await addDoc(groupRef("trainings"), { date, local, responses: {}, createdAt: serverTimestamp() }); showToast("Treino marcado!"); });
-  const deleteTraining = safe(async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); });
+  const deleteTraining = safe(async (id) => { if (await confirmDialog({ title: "Apagar treino?", message: "As respostas a este treino também são apagadas.", confirmLabel: "Apagar", danger: true })) await deleteDoc(groupDoc("trainings", id)); });
   const toggleTraining = safe(async (id, status) => { await updateDoc(groupDoc("trainings", id), { [`responses.${me.uid}`]: status }); showToast(status === "going" ? "Confirmado!" : "Removido"); });
   const addLeagueGame = safe(async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); });
-  const deleteLeagueGame = safe(async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); });
+  const deleteLeagueGame = safe(async (id) => { if (await confirmDialog({ title: "Apagar jogo da liga?", message: "O resultado, a convocatória e os golos deste jogo são apagados e as estatísticas recalculadas.", confirmLabel: "Apagar", danger: true })) await deleteDoc(groupDoc("leagueGames", id)); });
   // Guarda tambem quem jogou (playerIds): as estatisticas sao calculadas a partir daqui (ver stats.js)
   const saveLeagueResult = safe(async (id, scoreA, scoreB, goals, mvp) => {
     const game = leagueGames.find((g) => g.id === id);
@@ -163,15 +164,15 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null, playerIds });
     showToast("Resultado guardado!");
   });
-  const saveLineup = safe(async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); });
+  const saveLineup = safe(async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatória guardada!"); });
 
   const addPlayer = safe(async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); });
   const joinAsPlayer = safe(async () => { if (players.find((p) => p.uid === me.uid)) return showToast("Já estás no plantel!", "error"); let photo = me.photoURL; try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", me.uid)); if (ud.exists()) photo = ud.data().photoUrl || photo; } catch (e) { /* noop */ } await addDoc(groupRef("players"), { name: me.displayName || "Eu", uid: me.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste no plantel!"); });
   const ratePlayer = safe(async (p, r) => { await updateDoc(groupDoc("players", p.id), { [`votes.${me.uid}`]: r }); showToast("Avaliação registada!"); });
-  const removePlayer = safe(async (p) => { if (!amIAdmin) return; if (window.confirm(`Eliminar ${p.name}?`)) await deleteDoc(groupDoc("players", p.id)); });
+  const removePlayer = safe(async (p) => { if (!amIAdmin) return; if (await confirmDialog({ title: `Eliminar ${p.name}?`, message: "O jogador sai do plantel. Os jogos em que participou mantêm-se.", confirmLabel: "Eliminar", danger: true })) await deleteDoc(groupDoc("players", p.id)); });
   const toggleAdmin = safe(async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc("players", p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); });
   const editMatch = safe(async (id, { scoreA, scoreB, goals }) => { await updateDoc(groupDoc("matches", id), { scoreA, scoreB, goals }); showToast("Resultado corrigido!"); });
-  const deleteMatch = safe(async (id) => { if (!amIAdmin) return; if (window.confirm("Apagar jogo?")) await deleteDoc(groupDoc("matches", id)); });
+  const deleteMatch = safe(async (id) => { if (!amIAdmin) return; if (await confirmDialog({ title: "Apagar jogo?", message: "O resultado, os golos, os votos de MVP e os pagamentos deste jogo são apagados.", confirmLabel: "Apagar", danger: true })) await deleteDoc(groupDoc("matches", id)); });
   const submitMvp = safe(async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`mvpVotes.${me.uid}`]: pid }); showToast("Voto registado!"); });
   const signUp = safe(async () => { if (!myProfile || fixedIds.includes(myProfile.id)) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayUnion(myProfile.id) }, { merge: true }); showToast("Inscrito como fixo!"); });
   const signOutFixed = safe(async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayRemove(myProfile.id) }, { merge: true }); showToast("Inscrição cancelada"); });
@@ -196,13 +197,13 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), gUpdate); showToast("Definições guardadas!");
   });
   const leaveGroup = safe(async () => {
-    if (isOwner || !window.confirm("Sair do grupo?")) return;
+    if (isOwner || !(await confirmDialog({ title: "Sair do grupo?", message: "Deixas de receber convocatórias. Para voltar precisas do código de convite.", confirmLabel: "Sair", danger: true }))) return;
     const batch = writeBatch(db); // o jogador fica marcado como "saiu" (mantem historico e dividas); voltar com codigo reativa-o
     if (myProfile) batch.update(groupDoc("players", myProfile.id), { left: true });
     batch.update(doc(db, "artifacts", APP_ID, "groups", group.id), { members: arrayRemove(me.uid) });
     await batch.commit(); onBack();
   });
-  const deleteGroup = safe(async () => { if (window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, "artifacts", APP_ID, "groups", group.id)); onBack(); } });
+  const deleteGroup = safe(async () => { if (await confirmDialog({ title: "Apagar o grupo para sempre?", message: "Apaga todos os jogadores, jogos, mensagens e pagamentos do grupo, para todos os membros. Não dá para desfazer.", confirmLabel: "Apagar grupo", danger: true, requireText: "APAGAR" })) { await deleteDoc(doc(db, "artifacts", APP_ID, "groups", group.id)); onBack(); } });
   const copyInvite = async () => {
     try {
       let code = groupMeta.inviteCode;
@@ -236,12 +237,12 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
       <Toast toast={toast} />
       <div className="ft-in" style={{ position: "sticky", top: 0, zIndex: 30, background: "rgba(13,20,17,.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={onBack} className="ft-btn ft-ghost" style={{ padding: 9, borderRadius: 12 }}><ArrowLeft size={18} /></button>
+          <button onClick={onBack} aria-label="Voltar aos grupos" className="ft-btn ft-ghost" style={{ padding: 11, borderRadius: 12 }}><ArrowLeft size={18} /></button>
           <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 7 }}><Users size={17} style={{ color: "var(--grass-bright)" }} /> {group.name}</h2>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {isOwner && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "4px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
-          <button onClick={copyInvite} className="ft-btn ft-ghost" style={{ fontSize: 11, padding: "4px 10px" }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copiado" : "Convidar"}</button>
+          {isOwner && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "4px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
+          <button onClick={copyInvite} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "4px 10px" }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copiado" : "Convidar"}</button>
         </div>
       </div>
 

@@ -73,7 +73,7 @@ export const GroupSelector = ({ user, onLogout }) => {
     <div style={{ minHeight: "100vh", padding: "20px 16px 110px", maxWidth: 880, margin: "0 auto" }}>
       <header className="ft-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)", marginBottom: 24 }}>
         <div>
-          <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneario</div>
+          <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneário</div>
           <h1 className="num" style={{ fontSize: 30, margin: "2px 0 0", color: "var(--chalk)" }}>OS TEUS GRUPOS</h1>
           <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Olá, <b style={{ color: "var(--text)" }}>{profileName || "Jogador"}</b></p>
         </div>
@@ -92,16 +92,16 @@ export const GroupSelector = ({ user, onLogout }) => {
               ].map(({ id, Icon, color, bg, label, sub }) => (
                 <button key={id} onClick={() => setGroupMode(id)} className="ft-btn ft-ghost" style={{ padding: "12px 14px", justifyContent: "flex-start", gap: 12 }}>
                   <div style={{ padding: 8, borderRadius: 10, background: bg, color, flexShrink: 0 }}><Icon size={18} /></div>
-                  <div style={{ textAlign: "left" }}><div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div><div style={{ fontSize: 11, color: "var(--dim)" }}>{sub}</div></div>
+                  <div style={{ textAlign: "left" }}><div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div><div style={{ fontSize: 12, color: "var(--dim)" }}>{sub}</div></div>
                 </button>
               ))}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--raised)", borderRadius: 10 }}>
-                <span style={{ fontSize: 11, color: "var(--dim)" }}>Modo:</span>
+                <span style={{ fontSize: 12, color: "var(--dim)" }}>Modo:</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: groupMode === "league" ? "var(--gold)" : groupMode === "weekly" ? "var(--grass-bright)" : "var(--blue)" }}>{groupMode === "league" ? "Liga" : groupMode === "weekly" ? "Semanal" : "Casual"}</span>
-                <button onClick={() => { setGroupMode(null); setNewGroup(""); setCreateError(""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--faint)", cursor: "pointer", fontSize: 11 }}>Mudar</button>
+                <button onClick={() => { setGroupMode(null); setNewGroup(""); setCreateError(""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--faint)", cursor: "pointer", fontSize: 12 }}>Mudar</button>
               </div>
               <form onSubmit={createGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="Nome do grupo..." autoFocus /><button type="submit" disabled={!newGroup.trim()} className="ft-btn ft-grass" style={{ padding: "0 18px" }}>Criar</button></form>
               {createError && <div style={{ fontSize: 12, background: "rgba(240,86,58,.12)", color: "#ff9684", border: "1px solid rgba(240,86,58,.3)", borderRadius: 10, padding: 8, display: "flex", gap: 6, alignItems: "center" }}><AlertCircle size={12} /> {createError}</div>}
@@ -122,7 +122,7 @@ export const GroupSelector = ({ user, onLogout }) => {
             <button key={g.id} onClick={() => setSelected(g)} className="ft-card ft-btn" style={{ padding: 20, textAlign: "left", alignItems: "stretch", flexDirection: "column", borderRadius: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 16 }}>
                 <div style={{ padding: 12, borderRadius: 14, background: g.settings?.groupMode === "league" ? "rgba(245,197,66,.15)" : g.settings?.groupMode === "weekly" ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", color: g.settings?.groupMode === "league" ? "var(--gold)" : g.settings?.groupMode === "weekly" ? "var(--grass-bright)" : "var(--blue)" }}>{g.settings?.groupMode === "league" ? <Trophy size={24} /> : g.settings?.groupMode === "weekly" ? <CalendarCheck size={24} /> : <Zap size={24} />}</div>
-                {g.ownerId === user.uid && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "3px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
+                {g.ownerId === user.uid && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "3px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
               </div>
               <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{g.name}</h3>
               <p style={{ fontSize: 12, color: "var(--dim)", margin: "4px 0 0" }}>{g.settings?.groupMode === "league" ? "Liga" : g.settings?.groupMode === "weekly" ? "Semanal" : "Casual"}</p>

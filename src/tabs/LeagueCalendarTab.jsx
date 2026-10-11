@@ -63,8 +63,8 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
         <div style={{ background: "rgba(0,0,0,.25)", padding: "6px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span className="eyebrow">{d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })} · {d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: g.home ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", color: g.home ? "var(--grass-bright)" : "var(--blue)" }}>{g.home ? "Casa" : "Fora"}</span>
-            {amIAdmin && <button onClick={() => onDelete(g.id)} className="ft-btn" style={{ background: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={12} /></button>}
+            <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: g.home ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", color: g.home ? "var(--grass-bright)" : "var(--blue)" }}>{g.home ? "Casa" : "Fora"}</span>
+            {amIAdmin && <button onClick={() => onDelete(g.id)} className="ft-btn" aria-label="Apagar jogo" style={{ background: "none", color: "var(--faint)", padding: 10, margin: "-10px -10px -10px 0" }}><Trash2 size={15} /></button>}
           </div>
         </div>
         <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
@@ -79,14 +79,14 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
         </div>
         {past && (scorers.length > 0 || g.mvp) && (
           <div style={{ padding: "0 16px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {g.mvp && <span style={{ fontSize: 11, color: "var(--gold)", background: "rgba(245,197,66,.12)", border: "1px solid rgba(245,197,66,.3)", borderRadius: 999, padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}><Trophy size={11} style={{ fill: "var(--gold)" }} /> MVP: {firstName(members.find((m) => m.id === g.mvp)?.name || "?")}</span>}
-            {scorers.map(([pid, v]) => { const nm = firstName(members.find((m) => m.id === pid)?.name || "?"); return (<span key={pid} style={{ fontSize: 11, color: "var(--dim)", background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "3px 10px" }}>{nm}{v.g ? <b style={{ color: "var(--grass-bright)" }}> {v.g}G</b> : ""}{v.a ? <b style={{ color: "var(--blue)" }}> {v.a}A</b> : ""}</span>); })}
+            {g.mvp && <span style={{ fontSize: 12, color: "var(--gold)", background: "rgba(245,197,66,.12)", border: "1px solid rgba(245,197,66,.3)", borderRadius: 999, padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}><Trophy size={11} style={{ fill: "var(--gold)" }} /> MVP: {firstName(members.find((m) => m.id === g.mvp)?.name || "?")}</span>}
+            {scorers.map(([pid, v]) => { const nm = firstName(members.find((m) => m.id === pid)?.name || "?"); return (<span key={pid} style={{ fontSize: 12, color: "var(--dim)", background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "3px 10px" }}>{nm}{v.g ? <b style={{ color: "var(--grass-bright)" }}> {v.g}G</b> : ""}{v.a ? <b style={{ color: "var(--blue)" }}> {v.a}A</b> : ""}</span>); })}
           </div>
         )}
         {editResult?.id === g.id && (
           <div className="ft-in" style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nos" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+              <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nós" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
               <span style={{ color: "var(--faint)" }}>-</span>
               <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
             </div>
@@ -100,7 +100,7 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
             </button>
             {showStats && (
               <div className="ft-raised ft-in" style={{ borderRadius: 12, padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 28, paddingRight: 4, marginBottom: 4 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 50, paddingRight: 16, marginBottom: 4 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
                 {calledPlayers(g).map((p) => (
                   <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderTop: "1px solid var(--line-soft)" }}>
                     <Avatar name={p.name} photo={p.photoUrl} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
@@ -112,7 +112,7 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
             )}
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => saveResult(g)} className="ft-btn ft-grass" style={{ flex: 1, padding: 11, fontSize: 13 }}>Guardar resultado</button>
-              <button onClick={() => setEditResult(null)} className="ft-btn ft-ghost" style={{ padding: 11 }}><X size={14} /></button>
+              <button onClick={() => setEditResult(null)} aria-label="Cancelar" className="ft-btn ft-ghost" style={{ padding: 11 }}><X size={14} /></button>
             </div>
           </div>
         )}
@@ -124,7 +124,7 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {played.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
-          {[["Pontos", totalPts, "var(--gold)"], ["Vitorias", wins, "var(--grass-bright)"], ["Empates", draws, "var(--blue)"], ["Derrotas", losses, "var(--danger)"]].map(([l, v, c]) => (
+          {[["Pontos", totalPts, "var(--gold)"], ["Vitórias", wins, "var(--grass-bright)"], ["Empates", draws, "var(--blue)"], ["Derrotas", losses, "var(--danger)"]].map(([l, v, c]) => (
             <div key={l} className="ft-raised" style={{ borderRadius: 14, padding: "10px 8px", textAlign: "center" }}>
               <div className="eyebrow" style={{ color: c }}>{l}</div>
               <div className="num" style={{ fontSize: 26, color: c }}>{v}</div>
@@ -140,7 +140,7 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
       )}
       {open && (
         <div className="ft-card ft-in" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Adversario</label><input className="ft-input" value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Nome da equipa adversaria..." /></div>
+          <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Adversário</label><input className="ft-input" value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Nome da equipa adversária..." /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Data</label><input type="date" className="ft-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Hora</label><input type="time" className="ft-input" value={time} onChange={(e) => setTime(e.target.value)} /></div>

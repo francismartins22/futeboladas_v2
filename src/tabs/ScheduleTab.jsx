@@ -23,7 +23,7 @@ export const ScheduleTab = ({ next, players, me, locationUrl, maxPlayers, onTogg
         <div style={{ position: "relative" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
             <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Próxima peladinha</span>
-            {diffMs > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--lime)", border: "1px solid rgba(198,242,74,.3)", background: "rgba(198,242,74,.08)", padding: "4px 10px", borderRadius: 999 }}>{days > 0 ? `faltam ${days}d ${hrs}h` : `hoje · ${Math.max(0, hrs)}h`}</span>}
+            {diffMs > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--lime)", border: "1px solid rgba(198,242,74,.3)", background: "rgba(198,242,74,.08)", padding: "4px 10px", borderRadius: 999 }}>{days > 0 ? `faltam ${days}d ${hrs}h` : `hoje · ${Math.max(0, hrs)}h`}</span>}
           </div>
           <div className="num" style={{ fontSize: 40, lineHeight: .95, color: "var(--chalk)", marginTop: 10, textTransform: "capitalize" }}>{date ? date.toLocaleDateString("pt-PT", { weekday: "long" }) : "A definir"}</div>
           {date && <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}><span className="num" style={{ fontSize: 22, color: "var(--text)" }}>{date.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })}</span><span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 700, color: "var(--grass-bright)" }}><Clock size={14} /> {date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span></div>}

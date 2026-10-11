@@ -5,12 +5,12 @@ const NavButton = ({ active, onClick, icon: Icon, label, badge, btnRef }) => (
     <div style={{ position: "relative" }}>
       <Icon size={22} className="tab-ico" strokeWidth={active ? 2.5 : 2} />
       {badge > 0 && (
-        <div style={{ position: "absolute", top: -5, right: -7, minWidth: 16, height: 16, borderRadius: 999, background: "var(--danger)", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", border: "1.5px solid var(--bg)", lineHeight: 1 }}>
+        <div style={{ position: "absolute", top: -6, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: "var(--danger)", color: "#fff", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", border: "1.5px solid var(--bg)", lineHeight: 1 }}>
           {badge > 99 ? "99+" : badge}
         </div>
       )}
     </div>
-    <span style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>{label}</span>
+    <span style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>{label}</span>
   </button>
 );
 

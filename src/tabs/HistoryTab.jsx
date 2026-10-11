@@ -26,9 +26,9 @@ export const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onEdit, on
             <div style={{ background: "rgba(0,0,0,.25)", padding: "7px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span className="eyebrow">{d.toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}</span>
               {amIAdmin && (
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setEdit({ id: m.id, sa: String(m.scoreA), sb: String(m.scoreB), goals: m.goals || {} })} className="ft-btn" title="Corrigir resultado" style={{ background: "none", color: "var(--faint)", padding: 2 }}><Pencil size={13} /></button>
-                  <button onClick={() => onDelete(m.id)} className="ft-btn" title="Apagar jogo" style={{ background: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={13} /></button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setEdit({ id: m.id, sa: String(m.scoreA), sb: String(m.scoreB), goals: m.goals || {} })} className="ft-btn" title="Corrigir resultado" aria-label="Corrigir resultado" style={{ background: "none", color: "var(--faint)", padding: 10, margin: "-10px 0" }}><Pencil size={15} /></button>
+                  <button onClick={() => onDelete(m.id)} className="ft-btn" title="Apagar jogo" aria-label="Apagar jogo" style={{ background: "none", color: "var(--faint)", padding: 10, margin: "-10px -10px -10px 0" }}><Trash2 size={15} /></button>
                 </div>
               )}
             </div>
@@ -44,7 +44,7 @@ export const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onEdit, on
                   <span style={{ color: "var(--faint)" }}>x</span>
                   <input type="number" min="0" value={edit.sb} onChange={(e) => setEdit({ ...edit, sb: e.target.value })} className="num ft-input" aria-label="Golos Preto" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 28, paddingRight: 4 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 50, paddingRight: 16 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
                 {allp.map((p) => (
                   <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px", borderTop: "1px solid var(--line-soft)" }}>
                     <Avatar name={p.name} size={24} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
@@ -60,12 +60,12 @@ export const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onEdit, on
             )}
             {scorers.length > 0 && (
               <div style={{ padding: "0 12px 12px", display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
-                {scorers.map(([pid, v]) => { const nm = firstName(allp.find((p) => p.id === pid)?.name || "?"); return (<span key={pid} style={{ fontSize: 11, color: "var(--dim)", background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "3px 10px" }}>{nm}{v.g ? <b style={{ color: "var(--grass-bright)" }}> {v.g}G</b> : ""}{v.a ? <b style={{ color: "var(--blue)" }}> {v.a}A</b> : ""}</span>); })}
+                {scorers.map(([pid, v]) => { const nm = firstName(allp.find((p) => p.id === pid)?.name || "?"); return (<span key={pid} style={{ fontSize: 12, color: "var(--dim)", background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "3px 10px" }}>{nm}{v.g ? <b style={{ color: "var(--grass-bright)" }}> {v.g}G</b> : ""}{v.a ? <b style={{ color: "var(--blue)" }}> {v.a}A</b> : ""}</span>); })}
               </div>
             )}
             <div style={{ background: "rgba(0,0,0,.2)", borderTop: "1px solid var(--line)", padding: 12, minHeight: 52, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {!open ? (mvp ? <div className="ft-pop" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--gold)" }}><Trophy size={15} style={{ fill: "var(--gold)" }} /><span style={{ fontSize: 13, fontWeight: 700 }}>MVP: {firstName(mvp.name)} - {mvp.votes} votos</span></div> : <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Votação encerrada</span>)
-                : myVote ? <div style={{ textAlign: "center" }}><div style={{ fontSize: 11, color: "var(--grass-bright)", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Check size={11} /> Voto registado</div><div style={{ fontSize: 10, color: "var(--faint)" }}>Resultado em {left}h</div></div>
+              {!open ? (mvp ? <div className="ft-pop" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--gold)" }}><Trophy size={15} style={{ fill: "var(--gold)" }} /><span style={{ fontSize: 13, fontWeight: 700 }}>MVP: {firstName(mvp.name)} - {mvp.votes} votos</span></div> : <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Votação encerrada</span>)
+                : myVote ? <div style={{ textAlign: "center" }}><div style={{ fontSize: 12, color: "var(--grass-bright)", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Check size={11} /> Voto registado</div><div style={{ fontSize: 12, color: "var(--faint)" }}>Resultado em {left}h</div></div>
                   : voting === m.id ? <div style={{ display: "flex", gap: 8, width: "100%" }}><select value={pick} onChange={(e) => setPick(e.target.value)} className="ft-input" style={{ padding: 8, fontSize: 12 }}><option value="">Quem foi o craque?</option>{allp.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button onClick={() => { if (pick) { onVote(m.id, pick); setVoting(null); setPick(""); } }} className="ft-btn" style={{ background: "var(--gold)", color: "#1a1300", padding: "0 16px", fontSize: 12 }}>Votar</button></div>
                     : <button onClick={() => setVoting(m.id)} className="ft-btn" style={{ background: "none", color: "var(--gold)", fontSize: 12, fontWeight: 700 }}><Star size={13} /> Votar MVP · faltam {left}h</button>}
             </div>

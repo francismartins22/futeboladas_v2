@@ -7,6 +7,7 @@ import { STYLES } from "./styles";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthScreen } from "./screens/AuthScreen";
 import { GroupSelector } from "./screens/GroupSelector";
+import { ConfirmDialogHost } from "./components/ConfirmDialog";
 
 /* =========================================================================
    FUTEBOLADAS V3 - app completa (Firebase) com revamp visual + novas funcoes:
@@ -63,6 +64,7 @@ const MainApp = () => {
     <div className="ft" style={{ minHeight: "100vh" }}>
       <style>{STYLES}</style>
       {!user ? <AuthScreen /> : <GroupSelector user={user} onLogout={() => signOut(auth)} />}
+      <ConfirmDialogHost />
     </div>
   );
 };

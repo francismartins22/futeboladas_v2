@@ -17,18 +17,18 @@ export const TrainingTab = ({ trainings, me, amIAdmin, onAdd, onDelete, onToggle
       <div key={t.id} className="ft-card" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ background: "rgba(0,0,0,.25)", padding: "6px 14px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span className="eyebrow">{d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })} · {d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
-          {amIAdmin && <button onClick={() => onDelete(t.id)} className="ft-btn" style={{ background: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={12} /></button>}
+          {amIAdmin && <button onClick={() => onDelete(t.id)} className="ft-btn" aria-label="Apagar treino" style={{ background: "none", color: "var(--faint)", padding: 10, margin: "-10px -10px -10px 0" }}><Trash2 size={15} /></button>}
         </div>
         <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ padding: 10, borderRadius: 12, background: "rgba(106,169,224,.12)", color: "var(--blue)" }}><Dumbbell size={18} /></div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700 }}>{t.local}</div>
-            <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Users size={11} /> {going} confirmados</div>
+            <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Users size={11} /> {going} confirmados</div>
           </div>
           {isFuture && (
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => onToggle(t.id, "going")} className="ft-btn" style={{ fontSize: 11, padding: "6px 10px", background: myResp === "going" ? "var(--grass)" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>Vou</button>
-              <button onClick={() => onToggle(t.id, "not_going")} className="ft-btn" style={{ fontSize: 11, padding: "6px 10px", background: myResp === "not_going" ? "var(--danger)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--dim)", border: "1px solid var(--line)" }}>Não vou</button>
+              <button onClick={() => onToggle(t.id, "going")} className="ft-btn" style={{ fontSize: 12, padding: "6px 10px", background: myResp === "going" ? "var(--grass)" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>Vou</button>
+              <button onClick={() => onToggle(t.id, "not_going")} className="ft-btn" style={{ fontSize: 12, padding: "6px 10px", background: myResp === "not_going" ? "var(--danger)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--dim)", border: "1px solid var(--line)" }}>Não vou</button>
             </div>
           )}
         </div>

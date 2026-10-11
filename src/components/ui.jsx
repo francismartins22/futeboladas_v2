@@ -18,7 +18,7 @@ export const Avatar = ({ name, photo, size = 36, ring }) => {
 export const StarRating = ({ value, onChange, readOnly, size = 16 }) => (
   <div style={{ display: "inline-flex", gap: 4 }}>
     {[1, 2, 3, 4, 5].map((s) => (
-      <button key={s} onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(s); }} disabled={readOnly} className="ft-btn" style={{ background: "none", padding: 0, borderRadius: 4 }}>
+      <button key={s} onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(s); }} disabled={readOnly} aria-label={`${s} ${s === 1 ? "estrela" : "estrelas"}`} className="ft-btn" style={{ background: "none", padding: 6, borderRadius: 8 }}>
         <Star size={size} style={{ fill: s <= value ? "var(--gold)" : "none", color: s <= value ? "var(--gold)" : "#3a4a43" }} />
       </button>
     ))}
@@ -27,9 +27,9 @@ export const StarRating = ({ value, onChange, readOnly, size = 16 }) => (
 
 export const Stepper = ({ val, onDec, onInc, color }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-    <button onClick={onDec} className="ft-btn ft-ghost" style={{ width: 26, height: 26, borderRadius: 8, padding: 0 }}><Minus size={12} /></button>
+    <button onClick={onDec} aria-label="Menos" className="ft-btn ft-ghost" style={{ width: 36, height: 36, borderRadius: 10, padding: 0 }}><Minus size={14} /></button>
     <span className="num" style={{ minWidth: 18, textAlign: "center", fontSize: 16, color: color || "var(--text)" }}>{val}</span>
-    <button onClick={onInc} className="ft-btn ft-ghost" style={{ width: 26, height: 26, borderRadius: 8, padding: 0 }}><Plus size={12} /></button>
+    <button onClick={onInc} aria-label="Mais" className="ft-btn ft-ghost" style={{ width: 36, height: 36, borderRadius: 10, padding: 0 }}><Plus size={14} /></button>
   </div>
 );
 

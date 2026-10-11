@@ -83,7 +83,7 @@ export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch,
         </button>
         {showStats && (
           <div className="ft-card ft-in" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 28, paddingRight: 4, marginBottom: 4 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 50, paddingRight: 16, marginBottom: 4 }}><span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Golos</span><span className="eyebrow" style={{ color: "var(--blue)" }}>Assist</span></div>
             {[...teams.A, ...teams.B].map((p) => (
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderTop: "1px solid var(--line-soft)" }}>
                 <Avatar name={p.name} photo={p.photoUrl} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>

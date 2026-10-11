@@ -20,7 +20,7 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, match
   const ach = [
     { ok: s.games >= 50, Icon: Trophy, c: "var(--gold)", t: "Lenda do clube", d: "+50 jogos realizados" },
     { ok: s.games >= 10, Icon: Medal, c: "var(--blue)", t: "Veterano", d: "+10 jogos realizados" },
-    { ok: winRate > 0.6 && s.games >= 5, Icon: Flame, c: "#ff8a4c", t: "Imparavel", d: "+60% vitorias (min. 5 jogos)" },
+    { ok: winRate > 0.6 && s.games >= 5, Icon: Flame, c: "#ff8a4c", t: "Imparável", d: "+60% vitórias (mín. 5 jogos)" },
     { ok: s.goals >= 10, Icon: SoccerBall, c: "var(--grass-bright)", t: "Goleador", d: "+10 golos marcados" },
     { ok: fixedIds.includes(myProfile?.id), Icon: ShieldCheck, c: "var(--grass-bright)", t: "Membro fixo", d: "Inscrito na época/mês atual" },
   ];
@@ -34,7 +34,7 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, match
           <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: 0 }}>{(myProfile?.name || "EU").toUpperCase()}</h2>
           <p className="eyebrow" style={{ marginTop: 4, marginBottom: 18 }}>Estatísticas de carreira</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
-            <Stat label="Jogos" value={s.games} /><Stat label="Vitorias" value={s.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${Math.round(winRate * 100)}%`} color="var(--blue)" />
+            <Stat label="Jogos" value={s.games} /><Stat label="Vitórias" value={s.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${Math.round(winRate * 100)}%`} color="var(--blue)" />
             <Stat label="Golos" value={s.goals} color="var(--grass-bright)" /><Stat label="Assist." value={s.assists} color="var(--blue)" /><Stat label="MVPs" value={s.mvps} color="var(--gold)" />
           </div>
           {amIAdmin && <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(106,169,224,.1)", border: "1px solid rgba(106,169,224,.3)", borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: "var(--blue)" }}><Star size={12} style={{ fill: "var(--blue)" }} /> Rating médio: {avg(myProfile || { votes: {} })}</div>}
@@ -60,7 +60,7 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, match
           {ach.map((a, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 14, border: "1px solid", borderColor: a.ok ? "rgba(245,197,66,.25)" : "var(--line)", background: a.ok ? "linear-gradient(90deg,rgba(245,197,66,.08),transparent)" : "rgba(0,0,0,.15)", opacity: a.ok ? 1 : .45, filter: a.ok ? "none" : "grayscale(1)" }}>
               <div style={{ padding: 9, borderRadius: "50%", background: "#0a120f", border: "1px solid var(--line)" }}><a.Icon size={17} color={a.c} style={{ color: a.c }} /></div>
-              <div style={{ textAlign: "left" }}><div style={{ fontSize: 13, fontWeight: 700 }}>{a.t}</div><div style={{ fontSize: 10, color: "var(--dim)" }}>{a.d}</div></div>
+              <div style={{ textAlign: "left" }}><div style={{ fontSize: 13, fontWeight: 700 }}>{a.t}</div><div style={{ fontSize: 12, color: "var(--dim)" }}>{a.d}</div></div>
               {a.ok && <CheckCircle size={16} style={{ marginLeft: "auto", color: "var(--grass-bright)" }} />}
             </div>
           ))}

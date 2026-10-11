@@ -41,16 +41,16 @@ export const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
       <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
       {role === "titular" && (
         <select value={lineup[p.id]?.pos || ""} onChange={(e) => setPos(p.id, e.target.value)}
-          className="ft-input" style={{ width: 72, padding: "4px 6px", fontSize: 11 }}>
+          className="ft-input" style={{ width: 72, padding: "4px 6px", fontSize: 12 }}>
           <option value="">Pos.</option>
           {POSITION_OPTS.map((po) => <option key={po} value={po}>{po}</option>)}
         </select>
       )}
       {amIAdmin && (
         <div style={{ display: "flex", gap: 4 }}>
-          {role !== "titular" && <button onClick={() => setRole(p.id, "titular")} className="ft-btn" style={{ fontSize: 10, padding: "4px 8px", background: "rgba(34,197,94,.15)", color: "var(--grass-bright)", border: "1px solid rgba(34,197,94,.3)" }}>Titular</button>}
-          {role !== "suplente" && <button onClick={() => setRole(p.id, "suplente")} className="ft-btn" style={{ fontSize: 10, padding: "4px 8px", background: "rgba(106,169,224,.15)", color: "var(--blue)", border: "1px solid rgba(106,169,224,.3)" }}>SUP</button>}
-          {role && <button onClick={() => clearPlayer(p.id)} className="ft-btn" style={{ padding: "4px 6px", background: "none", color: "var(--faint)" }}><X size={12} /></button>}
+          {role !== "titular" && <button onClick={() => setRole(p.id, "titular")} className="ft-btn" style={{ fontSize: 12, padding: "4px 8px", background: "rgba(34,197,94,.15)", color: "var(--grass-bright)", border: "1px solid rgba(34,197,94,.3)" }}>Titular</button>}
+          {role !== "suplente" && <button onClick={() => setRole(p.id, "suplente")} className="ft-btn" style={{ fontSize: 12, padding: "4px 8px", background: "rgba(106,169,224,.15)", color: "var(--blue)", border: "1px solid rgba(106,169,224,.3)" }}>SUP</button>}
+          {role && <button onClick={() => clearPlayer(p.id)} aria-label={`Tirar ${firstName(p.name)} da convocatória`} className="ft-btn" style={{ padding: 10, margin: "-6px -4px", background: "none", color: "var(--faint)" }}><X size={14} /></button>}
         </div>
       )}
     </div>
@@ -75,17 +75,17 @@ export const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
           <div className="ft-card" style={{ padding: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span className="eyebrow">Titulares <span style={{ color: titulares.length === size ? "var(--grass-bright)" : "var(--faint)" }}>({titulares.length}/{size})</span></span>
-              <span style={{ fontSize: 10, color: "var(--faint)" }}>Posição recomendada: {defaultPositions.join("-").replace("GR-", "GR · ")}</span>
+              <span style={{ fontSize: 12, color: "var(--faint)" }}>Posição recomendada: {defaultPositions.join("-").replace("GR-", "GR · ")}</span>
             </div>
-            {titulares.length === 0 ? <p style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Nenhum titular selecionado.</p> : titulares.map((p) => <PlayerRow key={p.id} p={p} role="titular" />)}
+            {titulares.length === 0 ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Nenhum titular selecionado.</p> : titulares.map((p) => <PlayerRow key={p.id} p={p} role="titular" />)}
           </div>
           <div className="ft-card" style={{ padding: 14 }}>
             <div className="eyebrow" style={{ marginBottom: 10 }}>Suplentes ({suplentes.length})</div>
-            {suplentes.length === 0 ? <p style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Nenhum suplente selecionado.</p> : suplentes.map((p) => <PlayerRow key={p.id} p={p} role="suplente" />)}
+            {suplentes.length === 0 ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Nenhum suplente selecionado.</p> : suplentes.map((p) => <PlayerRow key={p.id} p={p} role="suplente" />)}
           </div>
           <div className="ft-card" style={{ padding: 14 }}>
             <div className="eyebrow" style={{ marginBottom: 10 }}>Não convocados ({notCalled.length})</div>
-            {notCalled.length === 0 ? <p style={{ fontSize: 11, color: "var(--grass-bright)", fontSize: 12 }}>Toda a gente convocada!</p> : notCalled.map((p) => <PlayerRow key={p.id} p={p} role={null} />)}
+            {notCalled.length === 0 ? <p style={{ fontSize: 12, color: "var(--grass-bright)", fontSize: 12 }}>Toda a gente convocada!</p> : notCalled.map((p) => <PlayerRow key={p.id} p={p} role={null} />)}
           </div>
           {amIAdmin && (
             <button onClick={save} className="ft-btn ft-grass" style={{ width: "100%", padding: 14 }}>

@@ -47,7 +47,7 @@ export const WeatherWidget = ({ date, locationUrl }) => {
   }, [date, locationUrl]);
   if (!locationUrl) return null;
   if (loading) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, fontSize: 12, color: "var(--dim)" }}><Loader2 size={14} style={{ animation: "ftspin 1s linear infinite" }} /> A consultar o tempo...</div>;
-  if (error) return <div style={{ padding: 10, textAlign: "center", fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>{error}</div>;
+  if (error) return <div style={{ padding: 10, textAlign: "center", fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>{error}</div>;
   if (!weather) return null;
   const { Icon, label, color } = info(weather.code);
   return (
@@ -56,7 +56,7 @@ export const WeatherWidget = ({ date, locationUrl }) => {
         <Icon size={24} style={{ color }} />
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color }}>{label}</div>
-          <div style={{ fontSize: 11, color: "var(--dim)", display: "flex", gap: 10, marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: "var(--dim)", display: "flex", gap: 10, marginTop: 2 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Wind size={11} /> {weather.wind} km/h</span>
             {weather.precip > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--blue)" }}><Droplets size={11} /> {weather.precip}%</span>}
           </div>

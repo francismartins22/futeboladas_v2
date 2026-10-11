@@ -50,7 +50,7 @@ export const AuthScreen = () => {
             <div style={{ width: 76, height: 76, margin: "0 auto 16px", borderRadius: 22, transform: "rotate(-6deg)", background: "linear-gradient(135deg,var(--grass-2),#0c7a3a)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 16px 40px -12px rgba(34,197,94,.7)", border: "2px solid rgba(255,255,255,.15)" }}><SoccerBall size={42} color="#fff" /></div>
             <h1 className="num" style={{ fontSize: 46, lineHeight: .9, margin: 0, color: "var(--chalk)" }}>FUTEBOLADAS</h1>
             <div style={{ height: 3, width: 64, margin: "10px auto 0", background: "var(--lime)", borderRadius: 2 }} />
-            <p className="eyebrow" style={{ marginTop: 12, color: "var(--grass-bright)" }}>Gestor de peladas · V3</p>
+            <p className="eyebrow" style={{ marginTop: 12, color: "var(--grass-bright)" }}>Gestor de peladas</p>
           </div>
         </div>
         <div className="ft-card" style={{ padding: 24 }}>

@@ -5,7 +5,7 @@ export const STYLES = `
 .ft {
   --bg:#0a0f0e; --panel:#0d1411; --card:#111b16; --raised:#16221c;
   --line:#22312b; --line-soft:rgba(255,255,255,.06);
-  --text:#e9f0eb; --dim:#90a69b; --faint:#637a71;
+  --text:#e9f0eb; --dim:#90a69b; --faint:#7d958a;
   --grass:#16a34a; --grass-2:#22c55e; --grass-bright:#4ade80;
   --lime:#c6f24a; --gold:#f5c542; --chalk:#f5f8f6; --ink:#080b0a;
   --danger:#f0563a; --blue:#6aa9e0;
@@ -19,7 +19,7 @@ export const STYLES = `
 .ft *{box-sizing:border-box;}
 .ft ::-webkit-scrollbar{display:none;}
 .ft .num{font-family:'Anton',Impact,sans-serif;letter-spacing:.5px;font-weight:400;}
-.ft .eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);font-weight:700;}
+.ft .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);font-weight:700;}
 .ft-card{background:var(--card);border:1px solid var(--line);border-radius:20px;}
 .ft-raised{background:var(--raised);border:1px solid var(--line);}
 .ft-btn{border:none;cursor:pointer;font-family:inherit;border-radius:14px;font-weight:700;
@@ -33,7 +33,7 @@ export const STYLES = `
 .ft-danger{background:rgba(240,86,58,.12);color:#ff9684;border:1px solid rgba(240,86,58,.3);}
 .ft-danger:hover{background:rgba(240,86,58,.2);}
 .ft-input{width:100%;background:#0a120f;border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:border-color .15s;}
-.ft-input::placeholder{color:#46584f;}
+.ft-input::placeholder{color:#6f857a;}
 .ft-input:focus{border-color:var(--grass);}
 .pitch{position:relative;overflow:hidden;border-radius:22px;border:1px solid var(--line);
   background:radial-gradient(120% 80% at 50% -20%, rgba(34,197,94,.22), transparent 60%),linear-gradient(180deg,#0f2017,#0a1611);}
@@ -46,6 +46,8 @@ export const STYLES = `
 .navbtn[data-active="true"] .tab-ico{transform:translateY(-2px) scale(1.08);}
 @keyframes ftin{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 .ft-in{animation:ftin .35s cubic-bezier(.2,.7,.3,1) both;}
+/* 100dvh = altura visivel real no telemovel (sem a barra do browser); 100vh fica como recurso para browsers antigos */
+.chat-h{height:calc(100vh - 158px);height:calc(100dvh - 158px);}
 @keyframes ftpop{from{opacity:0;transform:scale(.9);}to{opacity:1;transform:scale(1);}}
 .ft-pop{animation:ftpop .25s ease both;}
 @keyframes ftspin{to{transform:rotate(360deg)}}

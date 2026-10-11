@@ -78,7 +78,7 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
 
   const Token = (t, black) => (
     <div key={t.id} onPointerDown={(e) => onTokenDown(e, t.id)} onPointerMove={(e) => onTokenMove(e, t.id)} onPointerUp={onTokenUp}
-      style={{ position: "absolute", left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%,-50%)", touchAction: "none", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, cursor: drawMode ? "crosshair" : "grab", userSelect: "none", zIndex: 5, background: black ? "#0c0f0e" : "var(--chalk)", color: black ? "#cfe8da" : "#0b0b0b", border: black ? "2px solid #3a4a43" : "2px solid #0b0b0b", boxShadow: "0 3px 8px rgba(0,0,0,.4)" }}>
+      style={{ position: "absolute", left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%,-50%)", touchAction: "none", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, cursor: drawMode ? "crosshair" : "grab", userSelect: "none", zIndex: 5, background: black ? "#0c0f0e" : "var(--chalk)", color: black ? "#cfe8da" : "#0b0b0b", border: black ? "2px solid #3a4a43" : "2px solid #0b0b0b", boxShadow: "0 3px 8px rgba(0,0,0,.4)" }}>
       {t.label}
       {!black && !drawMode && (
         <span onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); removeToBench(t); }}
@@ -90,10 +90,10 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
   return (
     <div className="ft-in" style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><TacticIcon size={18} /> Quadro tatico</h2>
+        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><TacticIcon size={18} /> Quadro tático</h2>
         <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" title="Desenhar" style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }}><Pencil size={16} /></button>
-          <button onClick={reset} className="ft-btn ft-ghost" title="Repor" style={{ padding: 9, borderRadius: 10 }}><RotateCcw size={16} /></button>
+          <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" title="Desenhar" aria-label="Modo desenho" aria-pressed={drawMode} style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }}><Pencil size={16} /></button>
+          <button onClick={reset} className="ft-btn ft-ghost" title="Repor" aria-label="Repor quadro" style={{ padding: 9, borderRadius: 10 }}><RotateCcw size={16} /></button>
         </div>
       </div>
 
@@ -104,7 +104,7 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
             <option value="">Selecionar jogo...</option>
             {upcoming.map((g) => <option key={g.id} value={g.id}>{new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} · vs {g.opponent}</option>)}
           </select>
-          {selectedGame?.lineup && <p style={{ fontSize: 10, color: "var(--grass-bright)", margin: "6px 0 0", display: "flex", alignItems: "center", gap: 4 }}><Check size={10} /> Convocatoria carregada automaticamente</p>}
+          {selectedGame?.lineup && <p style={{ fontSize: 12, color: "var(--grass-bright)", margin: "6px 0 0", display: "flex", alignItems: "center", gap: 4 }}><Check size={10} /> Convocatória carregada automaticamente</p>}
         </div>
       )}
 
@@ -134,7 +134,7 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
             <div style={{ background: "#fff", borderRadius: "50%", padding: 2, boxShadow: "0 2px 6px rgba(0,0,0,.5)" }}><SoccerBall size={18} color="#111" /></div>
           </div>
         )}
-        {drawMode && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(198,242,74,.9)", color: "#1a2200", fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 8, zIndex: 7 }}>MODO DESENHO</div>}
+        {drawMode && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(198,242,74,.9)", color: "#1a2200", fontSize: 12, fontWeight: 800, padding: "3px 8px", borderRadius: 8, zIndex: 7 }}>MODO DESENHO</div>}
       </div>
 
       <div className="ft-card" style={{ padding: 14 }}>
@@ -143,7 +143,7 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
           {bench.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>{isLeague ? "Sem suplentes na convocatória." : "Remove jogadores do campo (×) ou carrega o plantel."}</span>}
           {bench.map((b) => (
             <button key={b.id} onClick={() => addFromBench(b)} className="ft-btn" style={{ flexDirection: "column", gap: 4, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 12, padding: "8px 6px", minWidth: 56 }}>
-              <Avatar name={b.name || b.label} size={28} /><span style={{ fontSize: 10, fontWeight: 700 }}>{firstName(b.name || b.label)}</span>
+              <Avatar name={b.name || b.label} size={28} /><span style={{ fontSize: 12, fontWeight: 700 }}>{firstName(b.name || b.label)}</span>
             </button>
           ))}
         </div>
@@ -153,12 +153,12 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <button onClick={addBlank} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Plus size={14} /> Adicionar peça</button>
           {!isLeague && <button onClick={loadRoster} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>Carregar plantel</button>}
-          <button onClick={toggleOpp} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{showOpp ? "Tirar adversario" : isLeague ? "Adversario" : "Adversario (preto)"}</button>
-          <button onClick={() => setHasBall((b) => !b)} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasBall ? "Tirar bola" : "Por bola"}</button>
+          <button onClick={toggleOpp} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{showOpp ? "Tirar adversário" : isLeague ? "Adversário" : "Adversário (preto)"}</button>
+          <button onClick={() => setHasBall((b) => !b)} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}>{hasBall ? "Tirar bola" : "Pôr bola"}</button>
           {isLeague && <button onClick={() => setStrokes([])} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Pencil size={14} /> Limpar</button>}
         </div>
         {!isLeague && <button onClick={() => setStrokes([])} className="ft-btn ft-ghost" style={{ padding: 10, fontSize: 12 }}><Pencil size={14} /> Limpar desenho</button>}
-        {!isLeague && <p style={{ fontSize: 11, color: "var(--faint)", margin: 0 }}>Arrasta as pecas e a bola. O "x" envia o jogador para o banco; toca no banco para o repor.</p>}
+        {!isLeague && <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>Arrasta as peças e a bola. O "x" envia o jogador para o banco; toca no banco para o repor.</p>}
       </div>
     </div>
   );

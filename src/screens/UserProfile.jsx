@@ -5,6 +5,7 @@ import { collection, doc, serverTimestamp, query, setDoc, getDoc, where, getDocs
 import { auth, db, APP_ID, uploadAvatar, enablePushNotifications, disablePushNotifications, deleteAccountFn } from "../firebase";
 import { Avatar } from "../components/ui";
 import { playerStats } from "../stats";
+import { confirmDialog } from "../confirm";
 
 /* ============================== PROFILE ================================== */
 export const UserProfile = ({ user, onLogout }) => {
@@ -13,7 +14,7 @@ export const UserProfile = ({ user, onLogout }) => {
   // RGPD: apaga perfil, foto, mensagens e conta; nos grupos dos outros o nome passa a "Ex-jogador" (ver functions/index.js)
   const deleteAccount = async () => {
     setDeleteError("");
-    if (window.prompt("Isto apaga a tua conta, foto, mensagens e grupos onde és o único membro. Não dá para desfazer.\n\nEscreve APAGAR para confirmar:") !== "APAGAR") return;
+    if (!(await confirmDialog({ title: "Apagar a tua conta?", message: "Apaga a tua conta, foto, mensagens e os grupos onde és o único membro. Nos outros grupos o teu nome passa a \"Ex-jogador\". Não dá para desfazer.", confirmLabel: "Apagar conta", danger: true, requireText: "APAGAR" }))) return;
     setDeleting(true);
     try { await deleteAccountFn(); onLogout(); }
     catch (e) { console.error(e); setDeleteError(e.code === "functions/failed-precondition" ? e.message : "Não foi possível apagar a conta. Tenta novamente."); }
@@ -94,7 +95,7 @@ export const UserProfile = ({ user, onLogout }) => {
   };
 
   const save = async () => {
-    setMsg(""); if (!name.trim()) return setMsg("O nome e obrigatorio.");
+    setMsg(""); if (!name.trim()) return setMsg("O nome é obrigatório.");
     try {
       setUploading(true);
       let url = photoUrl;
@@ -115,12 +116,12 @@ export const UserProfile = ({ user, onLogout }) => {
       <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: "0 0 18px", display: "flex", alignItems: "center", gap: 10 }}><User size={22} style={{ color: "var(--grass-bright)" }} /> O MEU PERFIL</h2>
       <div className="ft-card" style={{ padding: 22, marginBottom: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}>
+          <div role="button" tabIndex={0} aria-label="Alterar foto de perfil" style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }}>
             <Avatar name={name || "Eu"} photo={photoUrl} size={92} />
             <div style={{ position: "absolute", bottom: -2, right: -2, background: "var(--grass)", padding: 8, borderRadius: "50%", border: "2px solid var(--card)" }}>{uploading ? <Loader2 size={15} color="#04130a" style={{ animation: "ftspin 1s linear infinite" }} /> : <Camera size={15} color="#04130a" />}</div>
           </div>
           <input type="file" ref={fileRef} onChange={handleImageUpload} accept="image/*" style={{ display: "none" }} />
-          <p style={{ fontSize: 11, color: "var(--faint)", marginTop: 10 }}>Toca para alterar a foto</p>
+          <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 10 }}>Toca para alterar a foto</p>
         </div>
         <div style={{ marginTop: 16 }}><label className="eyebrow">Nome de jogador</label><input className="ft-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="O teu nome..." style={{ marginTop: 6 }} /></div>
         {msg && <div style={{ marginTop: 12, textAlign: "center", fontSize: 13, padding: 8, borderRadius: 10, background: msg.includes("sucesso") ? "rgba(34,197,94,.12)" : "rgba(240,86,58,.12)", color: msg.includes("sucesso") ? "var(--grass-bright)" : "#ff9684" }}>{msg}</div>}
@@ -128,24 +129,24 @@ export const UserProfile = ({ user, onLogout }) => {
       </div>
       <div className="ft-card" style={{ padding: 22 }}>
         <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}><Trophy size={16} style={{ color: "var(--gold)" }} /> Números globais</h3>
-        <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>O somatório da tua carreira em todos os grupos.</p>
+        <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 14px" }}>O somatório da tua carreira em todos os grupos.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-          <Stat label="Jogos" value={stats.games} /><Stat label="Vitorias" value={stats.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${stats.games ? Math.round((stats.wins / stats.games) * 100) : 0}%`} color="var(--blue)" />
+          <Stat label="Jogos" value={stats.games} /><Stat label="Vitórias" value={stats.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${stats.games ? Math.round((stats.wins / stats.games) * 100) : 0}%`} color="var(--blue)" />
           <Stat label="Golos" value={stats.goals} color="var(--grass-bright)" /><Stat label="Assist." value={stats.assists} color="var(--blue)" /><Stat label="MVPs" value={stats.mvps} color="var(--gold)" />
         </div>
       </div>
       <div className="ft-card" style={{ padding: 22, marginTop: 16 }}>
         <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}>{notifEnabled ? <Bell size={16} style={{ color: "var(--grass-bright)" }} /> : <BellOff size={16} style={{ color: "var(--faint)" }} />} Notificações</h3>
-        <p style={{ fontSize: 11, color: "var(--dim)", margin: "0 0 14px" }}>Recebe um aviso quando o jogo e confirmado, 24h antes de jogar, e quando chegam mensagens novas no chat.</p>
+        <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 14px" }}>Recebe um aviso quando o jogo e confirmado, 24h antes de jogar, e quando chegam mensagens novas no chat.</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a120f", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
-          <div><div style={{ fontSize: 13, fontWeight: 700 }}>Notificações push</div><div style={{ fontSize: 10, color: notifEnabled ? "var(--grass-bright)" : "var(--faint)" }}>{notifEnabled ? "Ativas" : "Inativas"}</div></div>
+          <div><div style={{ fontSize: 13, fontWeight: 700 }}>Notificações push</div><div style={{ fontSize: 12, color: notifEnabled ? "var(--grass-bright)" : "var(--faint)" }}>{notifEnabled ? "Ativas" : "Inativas"}</div></div>
           <button onClick={toggleNotifications} disabled={notifLoading} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: notifEnabled ? "var(--grass)" : "var(--raised)", color: notifEnabled ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>
             {notifLoading ? <Loader2 size={14} style={{ animation: "ftspin 1s linear infinite" }} /> : (notifEnabled ? "Ativas" : "Ativar")}
           </button>
         </div>
-        {notifBlocked && <p style={{ fontSize: 11, color: "#ff9684", marginTop: 10 }}>As notificações estão bloqueadas no browser. Ativa-as nas definições do site (ícone de cadeado junto ao URL) e tenta novamente.</p>}
+        {notifBlocked && <p style={{ fontSize: 12, color: "#ff9684", marginTop: 10 }}>As notificações estão bloqueadas no browser. Ativa-as nas definições do site (ícone de cadeado junto ao URL) e tenta novamente.</p>}
       </div>
-      <button onClick={onLogout} className="ft-btn" style={{ width: "100%", background: "none", color: "#ff9684", padding: 14, marginTop: 18 }}><LogOut size={16} /> Terminar sessao</button>
+      <button onClick={onLogout} className="ft-btn" style={{ width: "100%", background: "none", color: "#ff9684", padding: 14, marginTop: 18 }}><LogOut size={16} /> Terminar sessão</button>
       <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 18, marginTop: 8 }}>
         <p style={{ fontSize: 12, color: "#ffb3a5", margin: "0 0 12px" }}>Apagar a conta remove os teus dados pessoais de todos os grupos. Os resultados dos jogos ficam, com o nome "Ex-jogador".</p>
         {deleteError && <p role="alert" style={{ fontSize: 12, color: "#ff9684", margin: "0 0 12px" }}>{deleteError}</p>}
