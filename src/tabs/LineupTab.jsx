@@ -31,7 +31,7 @@ export const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
 
   const save = async () => {
     if (!selectedGame) return;
-    await onSaveLineup(selectedGame.id, { size, lineup });
+    if (!(await onSaveLineup(selectedGame.id, { size, lineup }))) return;
     setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 

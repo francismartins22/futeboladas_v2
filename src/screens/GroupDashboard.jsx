@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Users, CalendarCheck, Shield, History as HistoryIcon, Check, ArrowLeft, Crown, Settings, Copy, Trophy, Wallet, ClipboardList, MessageSquare, ListOrdered, Swords, Dumbbell } from "lucide-react";
 import { collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc, serverTimestamp, query, orderBy, limitToLast, setDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db, APP_ID } from "../firebase";
-import { firstName, getCoordsFromUrl, newInviteCode } from "../utils";
+import { firstName, getCoordsFromUrl, newInviteCode, errorMessage } from "../utils";
 import { TacticIcon } from "../components/icons";
 import { Toast } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
@@ -100,7 +100,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     if (now.getTime() > gd.getTime() + tol) {
       const nd = new Date(gd); const step = nextGame.frequency === "biweekly" ? 14 : 7;
       while (nd.getTime() + tol < now.getTime()) nd.setDate(nd.getDate() + step);
-      if (nd.getTime() !== gd.getTime()) setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true });
+      if (nd.getTime() !== gd.getTime()) setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true }).catch((e) => console.error("Erro ao avancar a data:", e));
     }
   }, [nextGame, amIAdmin]);
 
@@ -130,14 +130,19 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
 
   // Escritas so com a chave do proprio utilizador: set+merge e caminhos "a.b" fundem no servidor, sem apagar respostas concorrentes
-  const toggleSchedule = async (status) => { await setDoc(groupDoc("schedule", "next"), { responses: { [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); };
-  const sendMessage = async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); };
-  const addTraining = async ({ date, local }) => { await addDoc(groupRef("trainings"), { date, local, responses: {}, createdAt: serverTimestamp() }); showToast("Treino marcado!"); };
-  const deleteTraining = async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); };
-  const toggleTraining = async (id, status) => { await updateDoc(groupDoc("trainings", id), { [`responses.${me.uid}`]: status }); showToast(status === "going" ? "Confirmado!" : "Removido"); };
-  const addLeagueGame = async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); };
-  const deleteLeagueGame = async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); };
-  const saveLeagueResult = async (id, scoreA, scoreB, goals, mvp) => {
+  // Todas as acoes passam por aqui: um erro (ex: regras do Firestore) vira toast em vez de falhar em silencio.
+  // Devolve false se falhou, para as tabs nao mostrarem "guardado" nem apagarem o que o utilizador escreveu.
+  const safe = (fn) => async (...args) => {
+    try { await fn(...args); return true; } catch (e) { console.error(e); showToast(errorMessage(e), "error"); return false; }
+  };
+  const toggleSchedule = safe(async (status) => { await setDoc(groupDoc("schedule", "next"), { responses: { [me.uid]: status } }, { merge: true }); showToast(status === "going" ? "Confirmado! Bora 💪" : "Removido da convocatória"); });
+  const sendMessage = safe(async (text) => { await addDoc(groupRef("messages"), { uid: me.uid, name: myProfile?.name || me.displayName || "Jogador", photoUrl: myProfile?.photoUrl || me.photoURL || null, text, createdAt: serverTimestamp() }); });
+  const addTraining = safe(async ({ date, local }) => { await addDoc(groupRef("trainings"), { date, local, responses: {}, createdAt: serverTimestamp() }); showToast("Treino marcado!"); });
+  const deleteTraining = safe(async (id) => { if (window.confirm("Apagar treino?")) await deleteDoc(groupDoc("trainings", id)); });
+  const toggleTraining = safe(async (id, status) => { await updateDoc(groupDoc("trainings", id), { [`responses.${me.uid}`]: status }); showToast(status === "going" ? "Confirmado!" : "Removido"); });
+  const addLeagueGame = safe(async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); });
+  const deleteLeagueGame = safe(async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); });
+  const saveLeagueResult = safe(async (id, scoreA, scoreB, goals, mvp) => {
     await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null });
     const game = leagueGames.find((g) => g.id === id);
     const calledIds = game?.lineup?.lineup ? Object.keys(game.lineup.lineup) : members.map((m) => m.id);
@@ -149,22 +154,22 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
       return updateDoc(groupDoc("players", pid), { stats: s });
     }));
     showToast("Resultado guardado!");
-  };
-  const saveLineup = async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); };
+  });
+  const saveLineup = safe(async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); });
 
-  const addPlayer = async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); };
-  const joinAsPlayer = async () => { if (players.find((p) => p.uid === me.uid)) return showToast("Já estás no plantel!", "error"); let photo = me.photoURL; try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", me.uid)); if (ud.exists()) photo = ud.data().photoUrl || photo; } catch (e) { /* noop */ } await addDoc(groupRef("players"), { name: me.displayName || "Eu", uid: me.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste no plantel!"); };
-  const ratePlayer = async (p, r) => { await updateDoc(groupDoc("players", p.id), { [`votes.${me.uid}`]: r }); showToast("Avaliação registada!"); };
-  const removePlayer = async (p) => { if (!amIAdmin) return; if (window.confirm(`Eliminar ${p.name}?`)) await deleteDoc(groupDoc("players", p.id)); };
-  const toggleAdmin = async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc("players", p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); };
-  const deleteMatch = async (id) => { if (!amIAdmin) return; if (window.confirm("Apagar jogo?")) await deleteDoc(groupDoc("matches", id)); };
-  const submitMvp = async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`mvpVotes.${me.uid}`]: pid }); showToast("Voto registado!"); };
-  const signUp = async () => { if (!myProfile || fixedIds.includes(myProfile.id)) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayUnion(myProfile.id) }, { merge: true }); showToast("Inscrito como fixo!"); };
-  const signOutFixed = async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayRemove(myProfile.id) }, { merge: true }); showToast("Inscrição cancelada"); };
-  const payFixed = async (pid) => { await setDoc(groupDoc("treasury", periodKey), { payments: { [pid]: true } }, { merge: true }); showToast(`${fixedLabel} paga!`); };
-  const payMatch = async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`payments.${pid}`]: true }); showToast("Jogo pago!"); };
+  const addPlayer = safe(async ({ name, type, hostId }) => { let finalName = name; if (type === "guest" && hostId) { const h = players.find((p) => p.id === hostId); if (h) finalName = `${name} (C - ${firstName(h.name)})`; } await addDoc(groupRef("players"), { name: finalName, type, hostId: hostId || null, stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, votes: {}, createdAt: serverTimestamp() }); showToast("Jogador adicionado!"); });
+  const joinAsPlayer = safe(async () => { if (players.find((p) => p.uid === me.uid)) return showToast("Já estás no plantel!", "error"); let photo = me.photoURL; try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", me.uid)); if (ud.exists()) photo = ud.data().photoUrl || photo; } catch (e) { /* noop */ } await addDoc(groupRef("players"), { name: me.displayName || "Eu", uid: me.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: isOwner, photoUrl: photo, votes: {}, createdAt: serverTimestamp() }); showToast("Entraste no plantel!"); });
+  const ratePlayer = safe(async (p, r) => { await updateDoc(groupDoc("players", p.id), { [`votes.${me.uid}`]: r }); showToast("Avaliação registada!"); });
+  const removePlayer = safe(async (p) => { if (!amIAdmin) return; if (window.confirm(`Eliminar ${p.name}?`)) await deleteDoc(groupDoc("players", p.id)); });
+  const toggleAdmin = safe(async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc("players", p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); });
+  const deleteMatch = safe(async (id) => { if (!amIAdmin) return; if (window.confirm("Apagar jogo?")) await deleteDoc(groupDoc("matches", id)); });
+  const submitMvp = safe(async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`mvpVotes.${me.uid}`]: pid }); showToast("Voto registado!"); });
+  const signUp = safe(async () => { if (!myProfile || fixedIds.includes(myProfile.id)) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayUnion(myProfile.id) }, { merge: true }); showToast("Inscrito como fixo!"); });
+  const signOutFixed = safe(async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayRemove(myProfile.id) }, { merge: true }); showToast("Inscrição cancelada"); });
+  const payFixed = safe(async (pid) => { await setDoc(groupDoc("treasury", periodKey), { payments: { [pid]: true } }, { merge: true }); showToast(`${fixedLabel} paga!`); });
+  const payMatch = safe(async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`payments.${pid}`]: true }); showToast("Jogo pago!"); });
 
-  const saveMatch = async ({ teamA, teamB, scoreA, scoreB, goals }) => {
+  const saveMatch = safe(async ({ teamA, teamB, scoreA, scoreB, goals }) => {
     if (nextGame?.frequency && nextGame.frequency !== "once" && nextGame.date) {
       const nd = new Date(nextGame.date); nd.setDate(nd.getDate() + (nextGame.frequency === "biweekly" ? 14 : 7));
       await setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true });
@@ -175,17 +180,17 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     const upd = (p, res) => { const s = { games: 0, wins: 0, draws: 0, losses: 0, ...(p.stats || {}) }; s.games++; if (res === "win") s.wins++; else if (res === "draw") s.draws++; else s.losses++; return updateDoc(groupDoc("players", p.id), { stats: s }); };
     await Promise.all([...teamA.map((p) => upd(p, w === "A" ? "win" : w === "draw" ? "draw" : "loss")), ...teamB.map((p) => upd(p, w === "B" ? "win" : w === "draw" ? "draw" : "loss"))]);
     showToast("Jogo guardado! Próxima data atualizada."); setTab("history");
-  };
+  });
 
-  const saveSettings = async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl }) => {
+  const saveSettings = safe(async ({ paymentModel, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl }) => {
     const sched = {}; if (date && time) sched.date = `${date}T${time}:00`; if (freq) sched.frequency = freq;
     if (Object.keys(sched).length) await setDoc(groupDoc("schedule", "next"), sched, { merge: true });
     const gUpdate = { settings: { paymentModel, monthlyFee: parseFloat(monthlyFee) || 0, seasonFee: parseFloat(seasonFee) || 0, guestFee: parseFloat(guestFee) || 0, groupMode: settings.groupMode || "casual", leagueMode: settings.groupMode === "league" } };
     if (locationUrl) { gUpdate.locationUrl = locationUrl; const c = getCoordsFromUrl(locationUrl); if (c) gUpdate.location = c; }
     await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), gUpdate); showToast("Definições guardadas!");
-  };
-  const leaveGroup = async () => { if (isOwner) return; if (window.confirm("Sair do grupo?")) { await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { members: arrayRemove(me.uid) }); onBack(); } };
-  const deleteGroup = async () => { if (window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, "artifacts", APP_ID, "groups", group.id)); onBack(); } };
+  });
+  const leaveGroup = safe(async () => { if (isOwner) return; if (window.confirm("Sair do grupo?")) { await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { members: arrayRemove(me.uid) }); onBack(); } });
+  const deleteGroup = safe(async () => { if (window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, "artifacts", APP_ID, "groups", group.id)); onBack(); } });
   const copyInvite = async () => {
     try {
       let code = groupMeta.inviteCode;

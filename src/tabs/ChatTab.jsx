@@ -9,7 +9,7 @@ export const ChatTab = ({ messages, me, onSend, onMarkRead }) => {
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { onMarkRead?.(); }, []);
-  const send = () => { if (!text.trim()) return; onSend(text.trim()); setText(""); };
+  const send = async () => { const t = text.trim(); if (!t) return; setText(""); if (!(await onSend(t))) setText(t); };
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 158px)" }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>

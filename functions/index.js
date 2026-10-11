@@ -20,6 +20,7 @@ const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
+const { parseGameDate, formatTime, formatDate } = require("./dates");
 
 initializeApp();
 const db = getFirestore();
@@ -92,16 +93,6 @@ async function sendToMembers(memberTokens, notification, data = {}) {
   );
 }
 
-function formatDate(iso) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" }) +
-      " às " + d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
 /* ====================== 1. JOGO/TREINO CONFIRMADO ======================== */
 
 exports.onScheduleConfirmed = onDocumentWritten(
@@ -160,7 +151,7 @@ exports.reminder24h = onSchedule("every 60 minutes", async () => {
   const windowStart = now + 23 * 3600 * 1000;
   const windowEnd = now + 24 * 3600 * 1000;
   const inWindow = (iso) => {
-    const t = new Date(iso).getTime();
+    const t = parseGameDate(iso).getTime();
     return t >= windowStart && t <= windowEnd;
   };
 
@@ -179,14 +170,14 @@ exports.reminder24h = onSchedule("every 60 minutes", async () => {
         if (memberTokens.length > 0) {
           await sendToMembers(
             memberTokens,
-            { title: "Falta 1 dia! ⏰", body: `A pelada é já amanhã às ${new Date(data.date).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}.` },
+            { title: "Falta 1 dia! ⏰", body: `A pelada é já amanhã às ${formatTime(data.date)}.` },
             { type: "reminder_schedule", groupId, url: "/" }
           );
         }
         await schedRef.update({ reminderSent: true });
       }
       // reset do flag quando a data muda para a frente (proximo ciclo recorrente)
-      if (data.date && !inWindow(data.date) && data.reminderSent && new Date(data.date).getTime() > now) {
+      if (data.date && !inWindow(data.date) && data.reminderSent && parseGameDate(data.date).getTime() > now) {
         await schedRef.update({ reminderSent: false });
       }
     }
@@ -201,7 +192,7 @@ exports.reminder24h = onSchedule("every 60 minutes", async () => {
         if (memberTokens.length > 0) {
           await sendToMembers(
             memberTokens,
-            { title: "Jogo oficial amanhã! 🏆", body: `vs ${data.opponent} · ${new Date(data.date).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}` },
+            { title: "Jogo oficial amanhã! 🏆", body: `vs ${data.opponent} · ${formatTime(data.date)}` },
             { type: "reminder_league", groupId, url: "/" }
           );
         }
@@ -218,7 +209,7 @@ exports.reminder24h = onSchedule("every 60 minutes", async () => {
         if (memberTokens.length > 0) {
           await sendToMembers(
             memberTokens,
-            { title: "Treino amanhã! 🏃", body: `${data.local} · ${new Date(data.date).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}` },
+            { title: "Treino amanhã! 🏃", body: `${data.local} · ${formatTime(data.date)}` },
             { type: "reminder_training", groupId, url: "/" }
           );
         }

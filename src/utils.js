@@ -9,7 +9,15 @@ export const initials = (n) => (n || "?").replace(/\(.*$/, "").trim().split(/\s+
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const newInviteCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => CODE_CHARS[b % 32]).join("");
 
-export const timeStr =(ts) => new Date(ts).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+// Mensagem para o utilizador a partir de um erro do Firebase (codigos "permission-denied" ou "functions/permission-denied")
+export const errorMessage = (e) => {
+  const code = e?.code || "";
+  if (code.endsWith("permission-denied")) return "Sem permissão para fazer isto.";
+  if (code.endsWith("unavailable")) return "Sem ligação. Tenta novamente.";
+  return "Algo correu mal. Tenta novamente.";
+};
+
+export const timeStr = (ts) => new Date(ts).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 
 export const rnd = () => Math.random().toString(36).slice(2, 7);
 
