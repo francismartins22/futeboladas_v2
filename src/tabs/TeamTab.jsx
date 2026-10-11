@@ -5,7 +5,7 @@ import { Avatar, Stepper } from "../components/ui";
 import { SoccerBall } from "../components/icons";
 
 /* ------------------------------ Equipa ----------------------------------- */
-export const TeamTab = ({ players, next, avg, onSaveMatch, showToast }) => {
+export const TeamTab = ({ players, next, avg, amIAdmin, onSaveMatch, showToast }) => {
   const goingIds = useMemo(() => {
     const uids = Object.entries(next?.responses || {}).filter(([, s]) => s === "going").map(([u]) => u);
     return players.filter((p) => p.uid && uids.includes(p.uid)).map((p) => p.id);
@@ -92,7 +92,9 @@ export const TeamTab = ({ players, next, avg, onSaveMatch, showToast }) => {
             ))}
           </div>
         )}
-        <button onClick={finish} className="ft-btn ft-grass" style={{ width: "100%", padding: 14 }}>Terminar jogo</button>
+        {amIAdmin
+          ? <button onClick={finish} className="ft-btn ft-grass" style={{ width: "100%", padding: 14 }}>Terminar jogo</button>
+          : <p style={{ textAlign: "center", fontSize: 12, color: "var(--faint)", margin: 0 }}>Só os admins podem guardar o resultado.</p>}
       </div>
     );
   }

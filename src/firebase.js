@@ -3,6 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc, arrayUnion } from "firebase/firestore";
 import { getMessaging, getToken, isSupported as isMessagingSupported } from "firebase/messaging";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCgfsrpIIj0XWp7Uc2FNGgKIibtWriHR_c",
@@ -22,6 +23,9 @@ export const db = getFirestore(app);
 const storage = getStorage(app);
 
 export const APP_ID = "futeboladas-v3"; // <-- reset: novo namespace de dados (clean)
+
+// Entrar num grupo com codigo de convite (validado no servidor, ver functions/index.js)
+export const joinGroupFn = httpsCallable(getFunctions(app), "joinGroup");
 
 /* Fotos de perfil vivem no Storage; o Firestore so guarda o URL (antes era base64 copiado para todo o lado). */
 export const uploadAvatar = async (uid, blob) => {

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Users, CalendarCheck, Shield, History as HistoryIcon, Check, ArrowLeft, Crown, Settings, Copy, Trophy, Wallet, ClipboardList, MessageSquare, ListOrdered, Swords, Dumbbell } from "lucide-react";
 import { collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc, serverTimestamp, query, orderBy, limitToLast, setDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db, APP_ID } from "../firebase";
-import { firstName, getCoordsFromUrl } from "../utils";
+import { firstName, getCoordsFromUrl, newInviteCode } from "../utils";
 import { TacticIcon } from "../components/icons";
 import { Toast } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
@@ -34,6 +34,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   const [payments, setPayments] = useState({});
   const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
   const [copied, setCopied] = useState(false);
+  const [groupMeta, setGroupMeta] = useState({ admins: group.admins || [], inviteCode: group.inviteCode || "" });
   const [lastReadTs, setLastReadTs] = useState(() => {
     try { return parseInt(localStorage.getItem(`lastRead_${group.id}`) || "0"); } catch { return 0; }
   });
@@ -60,12 +61,20 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     const unsubMsg = onSnapshot(query(groupRef("messages"), orderBy("createdAt", "asc"), limitToLast(100)), (s) => setMessages(s.docs.map((d) => { const x = d.data(); return { id: d.id, ...x, ts: x.createdAt?.seconds ? x.createdAt.seconds * 1000 : Date.now() }; })));
     const unsubG = onSnapshot(groupDoc("schedule", "next"), (s) => { if (s.exists()) setNextGame(s.data()); else setNextGame({ date: new Date().toISOString(), responses: {} }); });
     const unsubGroup = onSnapshot(doc(db, "artifacts", APP_ID, "groups", group.id), (s) => {
-      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true, groupMode: st.groupMode || "casual" }); }
+      if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true, groupMode: st.groupMode || "casual" }); setGroupMeta({ admins: d.admins || [], inviteCode: d.inviteCode || "" }); }
     });
     const unsubLG = onSnapshot(query(groupRef("leagueGames"), orderBy("date", "asc")), (s) => setLeagueGames(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const unsubTr = onSnapshot(query(groupRef("trainings"), orderBy("date", "asc")), (s) => setTrainings(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     return () => { unsubP(); unsubM(); unsubMsg(); unsubG(); unsubGroup(); unsubLG(); unsubTr(); };
   }, [group.id]);
+
+  // As regras do Firestore usam a lista `admins` do grupo; o dono mantem-na igual aos isAdmin dos jogadores
+  // (preenche grupos antigos e acompanha o "Promover admin").
+  useEffect(() => {
+    if (!isOwner || players.length === 0) return;
+    const want = players.filter((p) => p.isAdmin && p.uid && p.uid !== group.ownerId).map((p) => p.uid).sort();
+    if (want.join() !== [...groupMeta.admins].sort().join()) updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { admins: want }).catch((e) => console.error("Erro a sincronizar admins:", e));
+  }, [isOwner, players, groupMeta.admins, group.id, group.ownerId]);
 
   useEffect(() => {
     const unsub = onSnapshot(groupDoc("treasury", periodKey), (s) => { if (s.exists()) { const d = s.data(); setFixedIds(Array.isArray(d.fixedIds) ? d.fixedIds : []); setPayments(d.payments || {}); } else { setFixedIds([]); setPayments({}); } });
@@ -177,7 +186,14 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   };
   const leaveGroup = async () => { if (isOwner) return; if (window.confirm("Sair do grupo?")) { await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { members: arrayRemove(me.uid) }); onBack(); } };
   const deleteGroup = async () => { if (window.confirm("Apagar grupo para sempre?")) { await deleteDoc(doc(db, "artifacts", APP_ID, "groups", group.id)); onBack(); } };
-  const copyInvite = () => { navigator.clipboard?.writeText(group.id).then(() => { setCopied(true); showToast("Código copiado!"); setTimeout(() => setCopied(false), 1800); }).catch(() => showToast("Erro", "error")); };
+  const copyInvite = async () => {
+    try {
+      let code = groupMeta.inviteCode;
+      if (!code) { code = newInviteCode(); await updateDoc(doc(db, "artifacts", APP_ID, "groups", group.id), { inviteCode: code }); } // grupos antigos
+      await navigator.clipboard.writeText(code);
+      setCopied(true); showToast(`Código ${code} copiado!`); setTimeout(() => setCopied(false), 1800);
+    } catch (e) { console.error(e); showToast("Erro ao copiar o código", "error"); }
+  };
 
   const TABS = [
     { id: "schedule", icon: CalendarCheck, label: "Agenda", badge: pendingRsvp },
@@ -217,7 +233,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
         {tab === "leaguecal" && isLeague && <LeagueCalendarTab leagueGames={leagueGames} members={members} amIAdmin={amIAdmin} onAdd={addLeagueGame} onDelete={deleteLeagueGame} onResult={saveLeagueResult} />}
         {tab === "lineup" && isLeague && <LineupTab members={members} amIAdmin={amIAdmin} leagueGames={leagueGames} onSaveLineup={saveLineup} />}
         {tab === "training" && <TrainingTab trainings={trainings} me={me} amIAdmin={amIAdmin} onAdd={addTraining} onDelete={deleteTraining} onToggle={toggleTraining} />}
-        {tab === "team" && !isLeague && <TeamTab players={players} next={nextGame} avg={avg} onSaveMatch={saveMatch} showToast={showToast} />}
+        {tab === "team" && !isLeague && <TeamTab players={players} next={nextGame} avg={avg} amIAdmin={amIAdmin} onSaveMatch={saveMatch} showToast={showToast} />}
         {tab === "tactics" && <TacticsTab members={members} showToast={showToast} leagueGames={isLeague ? leagueGames : null} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
         {tab === "history" && !isLeague && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onDelete={deleteMatch} />}

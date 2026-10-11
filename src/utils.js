@@ -5,7 +5,11 @@ export const avatarHue = (name) => { let h = 0; for (const c of name || "") h = 
 
 export const initials = (n) => (n || "?").replace(/\(.*$/, "").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
-export const timeStr = (ts) => new Date(ts).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+// Codigo de convite aleatorio (8 chars, sem 0/O/1/I para nao confundir). 32 simbolos => sem enviesamento do modulo.
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const newInviteCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => CODE_CHARS[b % 32]).join("");
+
+export const timeStr =(ts) => new Date(ts).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 
 export const rnd = () => Math.random().toString(36).slice(2, 7);
 

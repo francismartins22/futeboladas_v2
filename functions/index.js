@@ -13,10 +13,12 @@
  */
 
 const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 
 initializeApp();
@@ -253,3 +255,38 @@ exports.onNewMessage = onDocumentCreated(
     logger.info(`Notificacao de chat enviada para o grupo ${groupId}`);
   }
 );
+
+/* ======================== 4. ENTRAR NUM GRUPO ============================= */
+
+// As regras do Firestore nao deixam ninguem acrescentar-se aos membros de um grupo;
+// a entrada passa por aqui, onde o codigo de convite e validado.
+exports.joinGroup = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sessao necessaria.");
+  const code = String(request.data?.code || "").trim().toUpperCase();
+  if (!/^[A-Z0-9]{8}$/.test(code)) throw new HttpsError("not-found", "Codigo invalido.");
+
+  const groupsSnap = await db.collection(`artifacts/${APP_ID}/groups`).where("inviteCode", "==", code).limit(1).get();
+  if (groupsSnap.empty) throw new HttpsError("not-found", "Codigo invalido.");
+  const groupRef = groupsSnap.docs[0].ref;
+  if ((groupsSnap.docs[0].data().members || []).includes(uid)) return { groupId: groupRef.id, alreadyMember: true };
+
+  // mesmo perfil de jogador que a app criava antes no cliente
+  const userSnap = await db.doc(`artifacts/${APP_ID}/users/${uid}`).get();
+  const authUser = await getAuth().getUser(uid);
+  const name = userSnap.data()?.name || authUser.displayName || "Novo Jogador";
+  const photoUrl = userSnap.data()?.photoUrl || authUser.photoURL || null;
+
+  const existing = await groupRef.collection("players").where("uid", "==", uid).limit(1).get();
+  const batch = db.batch();
+  batch.update(groupRef, { members: FieldValue.arrayUnion(uid) });
+  if (existing.empty) {
+    batch.set(groupRef.collection("players").doc(), {
+      name, uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 },
+      isAdmin: false, photoUrl, votes: {}, createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+  await batch.commit();
+  logger.info(`Utilizador ${uid} entrou no grupo ${groupRef.id}`);
+  return { groupId: groupRef.id, alreadyMember: false };
+});

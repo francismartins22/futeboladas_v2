@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Users, CalendarCheck, UserPlus, ArrowRight, LayoutGrid, User, Crown, Trophy, AlertCircle, PlusCircle, Zap } from "lucide-react";
-import { collection, addDoc, doc, updateDoc, onSnapshot, serverTimestamp, query, getDoc, where, arrayUnion, getDocs, writeBatch } from "firebase/firestore";
-import { db, APP_ID } from "../firebase";
+import { collection, doc, onSnapshot, serverTimestamp, query, getDoc, where, writeBatch } from "firebase/firestore";
+import { db, APP_ID, joinGroupFn } from "../firebase";
+import { newInviteCode } from "../utils";
 import { Avatar } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
 import { UserProfile } from "./UserProfile";
@@ -38,9 +39,11 @@ export const GroupSelector = ({ user, onLogout }) => {
     if (!customId) return setCreateError("Nome inválido para criar ID.");
     try {
       const groupRef = doc(db, "artifacts", APP_ID, "groups", customId);
-      if ((await getDoc(groupRef)).exists()) return setCreateError("Já existe um grupo com esse nome. Tenta outro.");
+      // sem permissao = o grupo existe e nao sou membro (as regras so deixam ler ids livres ou grupos meus)
+      const taken = await getDoc(groupRef).then((s) => s.exists(), (err) => { if (err.code === "permission-denied") return true; throw err; });
+      if (taken) return setCreateError("Já existe um grupo com esse nome. Tenta outro.");
       const batch = writeBatch(db);
-      batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], settings: { paymentModel: groupMode === "casual" ? "pergame" : "monthly", monthlyFee: 0, seasonFee: 0, guestFee: 4.5, groupMode: groupMode || "casual", leagueMode: groupMode === "league" }, createdAt: serverTimestamp() });
+      batch.set(groupRef, { name: newGroup, ownerId: user.uid, members: [user.uid], inviteCode: newInviteCode(), settings: { paymentModel: groupMode === "casual" ? "pergame" : "monthly", monthlyFee: 0, seasonFee: 0, guestFee: 4.5, groupMode: groupMode || "casual", leagueMode: groupMode === "league" }, createdAt: serverTimestamp() });
       const playerRef = doc(collection(db, "artifacts", APP_ID, "groups", customId, "players"));
       batch.set(playerRef, { name: user.displayName || "Eu", uid: user.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: true, photoUrl: user.photoURL || null, votes: {}, createdAt: serverTimestamp() });
       await batch.commit();
@@ -51,19 +54,10 @@ export const GroupSelector = ({ user, onLogout }) => {
   const joinGroup = async (e) => {
     e.preventDefault(); if (!joinCode.trim()) return; setMsg("");
     try {
-      const id = joinCode.trim(); const ref = doc(db, "artifacts", APP_ID, "groups", id); const snap = await getDoc(ref);
-      if (!snap.exists()) return setMsg("Grupo não encontrado. Verifica o código.");
-      const data = snap.data();
-      if (data.members?.includes(user.uid)) return setMsg("Já pertences a este grupo!");
-      await updateDoc(ref, { members: arrayUnion(user.uid) });
-      const pq = query(collection(db, "artifacts", APP_ID, "groups", id, "players"), where("uid", "==", user.uid));
-      if ((await getDocs(pq)).empty) {
-        let name = user.displayName || "Novo Jogador", photo = user.photoURL;
-        try { const ud = await getDoc(doc(db, "artifacts", APP_ID, "users", user.uid)); if (ud.exists()) { const d = ud.data(); if (d.name) name = d.name; if (d.photoUrl) photo = d.photoUrl; } } catch (e) { /* noop */ }
-        await addDoc(collection(db, "artifacts", APP_ID, "groups", id, "players"), { name, uid: user.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: false, photoUrl: photo, votes: {}, createdAt: serverTimestamp() });
-      }
-      setMsg("Entraste no grupo!"); setJoinCode("");
-    } catch (err) { console.error(err); setMsg("Erro ao entrar."); }
+      // a entrada e validada na Cloud Function joinGroup (as regras nao deixam ninguem acrescentar-se a um grupo)
+      const { data } = await joinGroupFn({ code: joinCode.trim().toUpperCase() });
+      setMsg(data.alreadyMember ? "Já pertences a este grupo!" : "Entraste no grupo!"); if (!data.alreadyMember) setJoinCode("");
+    } catch (err) { console.error(err); setMsg(err.code === "functions/not-found" ? "Código inválido. Pede o código atual a um admin do grupo." : "Erro ao entrar."); }
   };
 
   if (selected) return <GroupDashboard group={selected} currentUser={user} onBack={() => setSelected(null)} />;
