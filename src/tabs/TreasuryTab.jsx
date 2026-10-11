@@ -6,7 +6,7 @@ export const TreasuryTab = ({ players, matches, collectsFixed, fixedIds, payment
   const debtsOf = (pid) => {
     const arr = [];
     if (collectsFixed && fixedIds.includes(pid) && !payments[pid]) arr.push({ id: "fixed", desc: fixedLabel, amount: fixedFee, pay: () => onPayFixed(pid) });
-    matches.forEach((m) => { if (m.payments?.[pid] === false) arr.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString("pt-PT", { day: "numeric", month: "numeric" })}`, amount: fee, pay: () => onPayMatch(m.id, pid) }); });
+    matches.forEach((m) => { if (m.payments?.[pid] === false) arr.push({ id: m.id, desc: `Jogo ${new Date(m.date).toLocaleDateString("pt-PT", { day: "numeric", month: "numeric" })}`, amount: m.fee ?? fee, pay: () => onPayMatch(m.id, pid) }); });
     return arr;
   };
   const withDebt = players.map((p) => ({ ...p, debts: debtsOf(p.id) })).filter((p) => p.debts.length).sort((a, b) => b.debts.reduce((s, d) => s + d.amount, 0) - a.debts.reduce((s, d) => s + d.amount, 0));

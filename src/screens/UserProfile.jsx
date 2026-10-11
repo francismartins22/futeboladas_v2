@@ -4,6 +4,7 @@ import { updateProfile } from "firebase/auth";
 import { collection, doc, serverTimestamp, query, setDoc, getDoc, where, getDocs } from "firebase/firestore";
 import { auth, db, APP_ID, uploadAvatar, enablePushNotifications, disablePushNotifications } from "../firebase";
 import { Avatar } from "../components/ui";
+import { playerStats } from "../stats";
 
 /* ============================== PROFILE ================================== */
 export const UserProfile = ({ user, onLogout }) => {
@@ -38,23 +39,18 @@ export const UserProfile = ({ user, onLogout }) => {
         if (snap.exists()) { const d = snap.data(); if (d.name) setName(d.name); if (d.photoUrl) setPhotoUrl(d.photoUrl); setNotifEnabled(!!d.notifEnabled); }
         const gq = query(collection(db, "artifacts", APP_ID, "groups"), where("members", "array-contains", user.uid));
         const gs = await getDocs(gq);
-        let games = 0, wins = 0, mvps = 0, goals = 0, assists = 0;
-        for (const gdoc of gs.docs) {
-          const gref = gdoc.ref;
-          const pq = query(collection(gref, "players"), where("uid", "==", user.uid));
-          const ps = await getDocs(pq);
-          let myId = null;
-          ps.forEach((p) => { const d = p.data(); if (d.stats) { games += d.stats.games || 0; wins += d.stats.wins || 0; } myId = p.id; });
-          if (myId) {
-            const ms = await getDocs(collection(gref, "matches"));
-            ms.forEach((m) => {
-              const d = m.data();
-              if (d.goals?.[myId]) { goals += d.goals[myId].g || 0; assists += d.goals[myId].a || 0; }
-              if (d.mvpVotes) { const c = {}; Object.values(d.mvpVotes).forEach((pid) => (c[pid] = (c[pid] || 0) + 1)); let mx = 0, win = null; Object.entries(c).forEach(([pid, n]) => { if (n > mx) { mx = n; win = pid; } }); if (win === myId) mvps++; }
-            });
-          }
-        }
-        setStats({ games, wins, mvps, goals, assists });
+        // Somatorio de todos os grupos, calculado a partir dos jogos (ver stats.js); grupos lidos em paralelo
+        const perGroup = await Promise.all(gs.docs.map(async (gdoc) => {
+          const [ps, ms, ls] = await Promise.all(["players", "matches", "leagueGames"].map((c) => getDocs(collection(gdoc.ref, c))));
+          const players = ps.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const mine = players.find((p) => p.uid === user.uid);
+          if (!mine) return null;
+          const memberIds = players.filter((p) => p.type !== "guest").map((p) => p.id);
+          return playerStats(mine.id, ms.docs.map((d) => d.data()), ls.docs.map((d) => d.data()), memberIds);
+        }));
+        const total = { games: 0, wins: 0, mvps: 0, goals: 0, assists: 0 };
+        perGroup.filter(Boolean).forEach((st) => Object.keys(total).forEach((k) => (total[k] += st[k])));
+        setStats(total);
       } catch (e) { console.error(e); } finally { setLoadingData(false); }
     };
     run();

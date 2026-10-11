@@ -3,10 +3,12 @@ import { Star, Trophy, CheckCircle, Award, Flame, Medal, ShieldCheck } from "luc
 import { firstName } from "../utils";
 import { Avatar } from "../components/ui";
 import { SoccerBall } from "../components/icons";
+import { playerStats } from "../stats";
 
 /* ----------------------------- Carreira ---------------------------------- */
-export const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, players, matches, leagueGames }) => {
-  const s = myProfile?.stats || {};
+export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, matches, leagueGames }) => {
+  const memberIds = players.filter((p) => p.type !== "guest").map((p) => p.id);
+  const s = playerStats(myProfile?.id, matches, leagueGames, memberIds);
   const winRate = s.games ? s.wins / s.games : 0;
   const scorerMap = useMemo(() => {
     const map = {};
@@ -14,13 +16,12 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, play
     (leagueGames || []).forEach((g) => Object.entries(g.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; }));
     return map;
   }, [matches, leagueGames]);
-  const mine = scorerMap[myProfile?.id] || { g: 0, a: 0 };
   const top = Object.entries(scorerMap).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name })).filter((x) => x.name).sort((a, b) => b.g - a.g || b.a - a.a).slice(0, 5);
   const ach = [
     { ok: s.games >= 50, Icon: Trophy, c: "var(--gold)", t: "Lenda do clube", d: "+50 jogos realizados" },
     { ok: s.games >= 10, Icon: Medal, c: "var(--blue)", t: "Veterano", d: "+10 jogos realizados" },
     { ok: winRate > 0.6 && s.games >= 5, Icon: Flame, c: "#ff8a4c", t: "Imparavel", d: "+60% vitorias (min. 5 jogos)" },
-    { ok: mine.g >= 10, Icon: SoccerBall, c: "var(--grass-bright)", t: "Goleador", d: "+10 golos marcados" },
+    { ok: s.goals >= 10, Icon: SoccerBall, c: "var(--grass-bright)", t: "Goleador", d: "+10 golos marcados" },
     { ok: fixedIds.includes(myProfile?.id), Icon: ShieldCheck, c: "var(--grass-bright)", t: "Membro fixo", d: "Inscrito na época/mês atual" },
   ];
   const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 12, padding: 10, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 22, color: color || "var(--text)" }}>{value}</div></div>);
@@ -33,8 +34,8 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, mvpCount, fixedIds, play
           <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: 0 }}>{(myProfile?.name || "EU").toUpperCase()}</h2>
           <p className="eyebrow" style={{ marginTop: 4, marginBottom: 18 }}>Estatísticas de carreira</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
-            <Stat label="Jogos" value={s.games || 0} /><Stat label="Vitorias" value={s.wins || 0} color="var(--grass-bright)" /><Stat label="Win %" value={`${Math.round(winRate * 100)}%`} color="var(--blue)" />
-            <Stat label="Golos" value={mine.g} color="var(--grass-bright)" /><Stat label="Assist." value={mine.a} color="var(--blue)" /><Stat label="MVPs" value={mvpCount(myProfile?.id)} color="var(--gold)" />
+            <Stat label="Jogos" value={s.games} /><Stat label="Vitorias" value={s.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${Math.round(winRate * 100)}%`} color="var(--blue)" />
+            <Stat label="Golos" value={s.goals} color="var(--grass-bright)" /><Stat label="Assist." value={s.assists} color="var(--blue)" /><Stat label="MVPs" value={s.mvps} color="var(--gold)" />
           </div>
           {amIAdmin && <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(106,169,224,.1)", border: "1px solid rgba(106,169,224,.3)", borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: "var(--blue)" }}><Star size={12} style={{ fill: "var(--blue)" }} /> Rating médio: {avg(myProfile || { votes: {} })}</div>}
         </div>

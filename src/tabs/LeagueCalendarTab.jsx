@@ -34,14 +34,15 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
     setOpponent(""); setDate(""); setOpen(false);
   };
   const startResult = (g) => {
-    setEditResult(g); setSa(""); setSb(""); setMvp(""); setShowStats(false);
+    // jogo ja jogado: abre preenchido para corrigir
+    setEditResult(g); setSa(g.scoreA ?? ""); setSb(g.scoreB ?? ""); setMvp(g.mvp || ""); setShowStats(!!g.goals && Object.keys(g.goals).length > 0);
     const lineupIds = g.lineup?.lineup ? Object.entries(g.lineup.lineup).filter(([, v]) => v.role === "titular" || v.role === "suplente").map(([id]) => id) : members.map((m) => m.id);
-    const gs = {}; lineupIds.forEach((id) => (gs[id] = { g: 0, a: 0 })); setGstats(gs);
+    const gs = {}; lineupIds.forEach((id) => (gs[id] = { g: 0, a: 0, ...g.goals?.[id] })); setGstats(gs);
   };
   const bump = (pid, key, d) => setGstats((g) => ({ ...g, [pid]: { ...g[pid], [key]: Math.max(0, (g[pid]?.[key] || 0) + d) } }));
-  const saveResult = (g) => {
+  const saveResult = async (g) => {
     if (sa === "" || sb === "") return;
-    onResult(g.id, parseInt(sa, 10), parseInt(sb, 10), gstats, mvp || null);
+    if (!(await onResult(g.id, parseInt(sa, 10), parseInt(sb, 10), gstats, mvp || null))) return;
     setEditResult(null); setSa(""); setSb(""); setGstats({}); setMvp("");
   };
 
@@ -72,8 +73,8 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
             <div style={{ fontSize: 15, fontWeight: 800 }}>vs {g.opponent}</div>
             {past && <div className="num" style={{ fontSize: 26, color: "var(--chalk)", marginTop: 2 }}>{g.scoreA} <span style={{ color: "var(--faint)", fontWeight: 300 }}>-</span> {g.scoreB}</div>}
           </div>
-          {!past && amIAdmin && editResult?.id !== g.id && (
-            <button onClick={() => startResult(g)} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "8px 12px" }}>Resultado</button>
+          {amIAdmin && editResult?.id !== g.id && (
+            <button onClick={() => startResult(g)} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "8px 12px" }}>{past ? "Corrigir" : "Resultado"}</button>
           )}
         </div>
         {past && (scorers.length > 0 || g.mvp) && (

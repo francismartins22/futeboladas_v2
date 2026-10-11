@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'functions', 'public']), // functions tem o seu proprio ESLint (Node/CommonJS); public sao service workers
   {
     files: ['**/*.{js,jsx}'],
     extends: [

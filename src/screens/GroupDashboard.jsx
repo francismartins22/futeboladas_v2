@@ -6,6 +6,7 @@ import { firstName, getCoordsFromUrl, newInviteCode, errorMessage } from "../uti
 import { TacticIcon } from "../components/icons";
 import { Toast } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
+import { mvpWinnerId, leagueParticipants } from "../stats";
 import { ChatTab } from "../tabs/ChatTab";
 import { TrainingTab } from "../tabs/TrainingTab";
 import { LeagueScheduleTab } from "../tabs/LeagueScheduleTab";
@@ -105,18 +106,20 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   }, [nextGame, amIAdmin]);
 
   const avg = (p) => { const v = Object.values(p.votes || {}); return v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : 3; };
-  const matchMVP = (m) => { if (!m.mvpVotes) return null; const c = {}; Object.values(m.mvpVotes).forEach((id) => (c[id] = (c[id] || 0) + 1)); let mx = 0, win = null; Object.entries(c).forEach(([id, n]) => { if (n > mx) { mx = n; win = id; } }); const p = players.find((pl) => pl.id === win); return p ? { ...p, votes: mx } : null; };
-  const mvpCount = (pid) => matches.filter((m) => matchMVP(m)?.id === pid).length + leagueGames.filter((g) => g.mvp === pid).length;
+  const matchMVP = (m) => { const w = mvpWinnerId(m); const p = w && players.find((pl) => pl.id === w.id); return p ? { ...p, votes: w.votes } : null; };
   const members = players.filter((p) => p.type !== "guest");
   const guests = players.filter((p) => p.type === "guest");
   const groupMode = settings.groupMode || "casual";
   const isLeague = groupMode === "league";
   const isWeekly = groupMode === "weekly";
   const effectiveFixedIds = isLeague ? members.map((p) => p.id) : fixedIds;
-  const playerDebt = (pid) => { let t = 0; if (collectsFixed && effectiveFixedIds.includes(pid) && !payments[pid]) t += fixedFee; if (!isLeague) matches.forEach((m) => { if (m.payments?.[pid] === false) t += fee; }); return t; };
+  // Precos congelados: cada jogo guarda o seu `fee` e cada mensalidade paga guarda o valor pago (jogos/pagamentos antigos usam o preco atual)
+  const matchFee = (m) => m.fee ?? fee;
+  const paidAmount = (v) => (typeof v === "number" ? v : v ? fixedFee : 0);
+  const playerDebt = (pid) => { let t = 0; if (collectsFixed && effectiveFixedIds.includes(pid) && !payments[pid]) t += fixedFee; if (!isLeague) matches.forEach((m) => { if (m.payments?.[pid] === false) t += matchFee(m); }); return t; };
   const totalDebt = players.reduce((s, p) => s + playerDebt(p.id), 0);
-  const guestRevenue = matches.reduce((s, m) => s + (m.payments ? Object.values(m.payments).filter((v) => v === true).length * fee : 0), 0);
-  const fixedRevenue = collectsFixed ? effectiveFixedIds.filter((id) => payments[id]).length * fixedFee : 0;
+  const guestRevenue = matches.reduce((s, m) => s + (m.payments ? Object.values(m.payments).filter((v) => v === true).length * matchFee(m) : 0), 0);
+  const fixedRevenue = collectsFixed ? effectiveFixedIds.reduce((s, id) => s + paidAmount(payments[id]), 0) : 0;
   const totalRevenue = guestRevenue + fixedRevenue;
 
   // badges de notificacao in-app
@@ -142,17 +145,11 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   const toggleTraining = safe(async (id, status) => { await updateDoc(groupDoc("trainings", id), { [`responses.${me.uid}`]: status }); showToast(status === "going" ? "Confirmado!" : "Removido"); });
   const addLeagueGame = safe(async ({ opponent, date, home }) => { await addDoc(groupRef("leagueGames"), { opponent, date, home, scoreA: null, scoreB: null, lineup: null, createdAt: serverTimestamp() }); showToast("Jogo adicionado ao calendário!"); });
   const deleteLeagueGame = safe(async (id) => { if (window.confirm("Apagar jogo da liga?")) await deleteDoc(groupDoc("leagueGames", id)); });
+  // Guarda tambem quem jogou (playerIds): as estatisticas sao calculadas a partir daqui (ver stats.js)
   const saveLeagueResult = safe(async (id, scoreA, scoreB, goals, mvp) => {
-    await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null });
     const game = leagueGames.find((g) => g.id === id);
-    const calledIds = game?.lineup?.lineup ? Object.keys(game.lineup.lineup) : members.map((m) => m.id);
-    const result = scoreA > scoreB ? "win" : scoreA < scoreB ? "loss" : "draw";
-    await Promise.all(calledIds.map((pid) => {
-      const p = players.find((pl) => pl.id === pid); if (!p) return Promise.resolve();
-      const s = { games: 0, wins: 0, draws: 0, losses: 0, ...(p.stats || {}) };
-      s.games++; if (result === "win") s.wins++; else if (result === "draw") s.draws++; else s.losses++;
-      return updateDoc(groupDoc("players", pid), { stats: s });
-    }));
+    const playerIds = leagueParticipants(game || {}, members.map((m) => m.id)); // ao corrigir mantem os ja gravados
+    await updateDoc(groupDoc("leagueGames", id), { scoreA, scoreB, goals: goals || {}, mvp: mvp || null, playerIds });
     showToast("Resultado guardado!");
   });
   const saveLineup = safe(async (gameId, data) => { await updateDoc(groupDoc("leagueGames", gameId), { lineup: data }); showToast("Convocatoria guardada!"); });
@@ -162,11 +159,12 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   const ratePlayer = safe(async (p, r) => { await updateDoc(groupDoc("players", p.id), { [`votes.${me.uid}`]: r }); showToast("Avaliação registada!"); });
   const removePlayer = safe(async (p) => { if (!amIAdmin) return; if (window.confirm(`Eliminar ${p.name}?`)) await deleteDoc(groupDoc("players", p.id)); });
   const toggleAdmin = safe(async (p) => { if (!isOwner || p.uid === group.ownerId) return; await updateDoc(groupDoc("players", p.id), { isAdmin: !p.isAdmin }); showToast("Admin alterado"); });
+  const editMatch = safe(async (id, { scoreA, scoreB, goals }) => { await updateDoc(groupDoc("matches", id), { scoreA, scoreB, goals }); showToast("Resultado corrigido!"); });
   const deleteMatch = safe(async (id) => { if (!amIAdmin) return; if (window.confirm("Apagar jogo?")) await deleteDoc(groupDoc("matches", id)); });
   const submitMvp = safe(async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`mvpVotes.${me.uid}`]: pid }); showToast("Voto registado!"); });
   const signUp = safe(async () => { if (!myProfile || fixedIds.includes(myProfile.id)) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayUnion(myProfile.id) }, { merge: true }); showToast("Inscrito como fixo!"); });
   const signOutFixed = safe(async () => { if (!myProfile) return; await setDoc(groupDoc("treasury", periodKey), { fixedIds: arrayRemove(myProfile.id) }, { merge: true }); showToast("Inscrição cancelada"); });
-  const payFixed = safe(async (pid) => { await setDoc(groupDoc("treasury", periodKey), { payments: { [pid]: true } }, { merge: true }); showToast(`${fixedLabel} paga!`); });
+  const payFixed = safe(async (pid) => { await setDoc(groupDoc("treasury", periodKey), { payments: { [pid]: fixedFee } }, { merge: true }); showToast(`${fixedLabel} paga!`); });
   const payMatch = safe(async (mid, pid) => { await updateDoc(groupDoc("matches", mid), { [`payments.${pid}`]: true }); showToast("Jogo pago!"); });
 
   const saveMatch = safe(async ({ teamA, teamB, scoreA, scoreB, goals }) => {
@@ -175,10 +173,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
       await setDoc(groupDoc("schedule", "next"), { date: nd.toISOString(), frequency: nextGame.frequency, responses: {} }, { merge: true });
     }
     const pays = {}; [...teamA, ...teamB].forEach((p) => { if (collectsFixed ? !fixedIds.includes(p.id) : true) pays[p.id] = false; });
-    await addDoc(groupRef("matches"), { date: new Date().toISOString(), scoreA, scoreB, teamA: teamA.map((p) => ({ id: p.id, name: p.name })), teamB: teamB.map((p) => ({ id: p.id, name: p.name })), mvpVotes: {}, goals: goals || {}, payments: pays, createdAt: serverTimestamp() });
-    const w = scoreA > scoreB ? "A" : scoreB > scoreA ? "B" : "draw";
-    const upd = (p, res) => { const s = { games: 0, wins: 0, draws: 0, losses: 0, ...(p.stats || {}) }; s.games++; if (res === "win") s.wins++; else if (res === "draw") s.draws++; else s.losses++; return updateDoc(groupDoc("players", p.id), { stats: s }); };
-    await Promise.all([...teamA.map((p) => upd(p, w === "A" ? "win" : w === "draw" ? "draw" : "loss")), ...teamB.map((p) => upd(p, w === "B" ? "win" : w === "draw" ? "draw" : "loss"))]);
+    await addDoc(groupRef("matches"), { date: new Date().toISOString(), scoreA, scoreB, teamA: teamA.map((p) => ({ id: p.id, name: p.name })), teamB: teamB.map((p) => ({ id: p.id, name: p.name })), mvpVotes: {}, goals: goals || {}, payments: pays, fee, createdAt: serverTimestamp() });
     showToast("Jogo guardado! Próxima data atualizada."); setTab("history");
   });
 
@@ -241,8 +236,8 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
         {tab === "team" && !isLeague && <TeamTab players={players} next={nextGame} avg={avg} amIAdmin={amIAdmin} onSaveMatch={saveMatch} showToast={showToast} />}
         {tab === "tactics" && <TacticsTab members={members} showToast={showToast} leagueGames={isLeague ? leagueGames : null} />}
         {tab === "players" && <PlayersTab members={members} guests={guests} players={players} me={me} amIAdmin={amIAdmin} isOwner={isOwner} ownerId={group.ownerId} avg={avg} onAdd={addPlayer} onJoin={joinAsPlayer} onRate={ratePlayer} onRemove={removePlayer} onToggleAdmin={toggleAdmin} />}
-        {tab === "history" && !isLeague && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onDelete={deleteMatch} />}
-        {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} mvpCount={mvpCount} fixedIds={effectiveFixedIds} players={players} matches={matches} leagueGames={leagueGames} />}
+        {tab === "history" && !isLeague && <HistoryTab matches={matches} matchMVP={matchMVP} amIAdmin={amIAdmin} me={me} onVote={submitMvp} onEdit={editMatch} onDelete={deleteMatch} />}
+        {tab === "trophies" && <TrophiesTab myProfile={myProfile} amIAdmin={amIAdmin} avg={avg} fixedIds={effectiveFixedIds} players={players} matches={matches} leagueGames={leagueGames} />}
         {tab === "members" && collectsFixed && <MembersTab fixedIds={fixedIds} players={players} myProfile={myProfile} paymentModel={settings.paymentModel} onSignUp={signUp} onSignOut={signOutFixed} />}
         {tab === "treasury" && amIAdmin && <TreasuryTab players={players} matches={isLeague ? [] : matches} collectsFixed={collectsFixed} fixedIds={effectiveFixedIds} payments={payments} fixedFee={fixedFee} fee={fee} fixedLabel={fixedLabel} totalRevenue={totalRevenue} totalDebt={totalDebt} currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} paymentModel={settings.paymentModel} onPayFixed={payFixed} onPayMatch={payMatch} />}
         {tab === "settings" && <SettingsTab settings={settings} next={nextGame} isOwner={isOwner} amIAdmin={amIAdmin} onSave={saveSettings} onLeave={leaveGroup} onDelete={deleteGroup} />}
