@@ -42,3 +42,13 @@ export const Toast = ({ toast }) => !toast.show ? null : (
     color: toast.type === "error" ? "#fff" : "#04130a",
   }}>{toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}{toast.msg}</div>
 );
+
+// Sub-separadores dentro de uma secao da barra de baixo (ex: Jogo -> Equipas / Tatica / Resultados)
+export const SubTabs = ({ items, active, onChange }) => (
+  <div role="tablist" style={{ display: "flex", gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
+    {items.map((t) => (
+      <button key={t.id} role="tab" aria-selected={active === t.id} onClick={() => onChange(t.id)} className="ft-btn"
+        style={{ flex: 1, padding: "8px 4px", fontSize: 12, background: active === t.id ? "var(--grass)" : "none", color: active === t.id ? "#04130a" : "var(--faint)" }}>{t.label}</button>
+    ))}
+  </div>
+);

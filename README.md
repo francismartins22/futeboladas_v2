@@ -1,16 +1,60 @@
-# React + Vite
+# Futeboladas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+App (PWA) para gerir peladas e equipas de futebol amador: agenda e confirmações, equipas equilibradas, quadro tático, resultados, MVP, liga com convocatórias, treinos, chat, tesouraria e notificações push.
 
-Currently, two official plugins are available:
+React 19 + Vite, Firebase (Auth, Firestore, Storage, Cloud Functions, Cloud Messaging). Alojada no Vercel a partir do branch `main`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Correr localmente
 
-## React Compiler
+```bash
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Script | O que faz |
+|---|---|
+| `npm run dev` | servidor de desenvolvimento (usa o projeto Firebase real) |
+| `npm run build` | build de produção para `dist/` |
+| `npm run lint` | ESLint do frontend |
+| `npm test` | testes unitários (`src/**/*.test.js`, ex: estatísticas) |
+| `npm run test:rules` | testa `firestore.rules` no emulador (precisa de **Java 21+**; usa um projeto `demo-`, nunca toca nos dados reais) |
+| `cd functions && npm test` | testes das Cloud Functions (datas/fuso horário) |
 
-## Expanding the ESLint configuration
+## Estrutura
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```
+src/
+  App.jsx            arranque e raiz
+  firebase.js        config do Firebase, push, upload de fotos, joinGroup
+  stats.js           estatísticas calculadas a partir dos jogos
+  utils.js, styles.js
+  components/        UI partilhada (Avatar, Toast, BottomNav, SubTabs, ...)
+  screens/           AuthScreen, GroupSelector, GroupDashboard, UserProfile
+  tabs/              um ficheiro por separador do grupo
+functions/           Cloud Functions (notificações, lembrete 24h, entrar com código)
+tests/               testes das regras do Firestore
+firestore.rules      quem pode ler/escrever o quê
+storage.rules        fotos de perfil
+```
+
+Os dados vivem em `artifacts/futeboladas-v3/` no Firestore (`users`, `groups/{id}/players|matches|messages|schedule|leagueGames|trainings|treasury`).
+
+## Publicar
+
+- **App:** push para `main` → o Vercel publica sozinho (os outros branches geram previews).
+- **Firebase** (projeto `futeboladas-v2-dev`, ver `.firebaserc`):
+
+```bash
+npx firebase-tools login
+npx firebase-tools deploy --only functions
+npx firebase-tools deploy --only firestore:rules,storage
+```
+
+Ao mudar regras e app ao mesmo tempo, publica **primeiro a app** e só depois as regras (a app antiga pode não funcionar com regras novas). No Windows/PowerShell usa `npx.cmd` se o `npx` for bloqueado pela política de scripts.
+
+## Permissões (resumo de `firestore.rules`)
+
+- **Não-membros:** não veem nada. Entrar num grupo só com o código de convite (Cloud Function `joinGroup`).
+- **Membros:** RSVP próprio, chat, votar MVP (48h), avaliar jogadores, inscrever-se como fixo, adicionar convidados.
+- **Admins** (`group.admins` + dono): resultados, pagamentos, definições, liga, treinos, apagar jogos/jogadores.
+- **Dono:** promover admins e apagar o grupo.

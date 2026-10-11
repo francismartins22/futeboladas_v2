@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
-import { Users, CalendarCheck, Shield, History as HistoryIcon, Check, ArrowLeft, Crown, Settings, Copy, Trophy, Wallet, ClipboardList, MessageSquare, ListOrdered, Swords, Dumbbell } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Users, CalendarCheck, Shield, Check, ArrowLeft, Crown, Copy, MessageSquare, Swords, Menu } from "lucide-react";
 import { collection, addDoc, doc, updateDoc, onSnapshot, deleteDoc, serverTimestamp, query, orderBy, limitToLast, setDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db, APP_ID } from "../firebase";
 import { firstName, getCoordsFromUrl, newInviteCode, errorMessage } from "../utils";
-import { TacticIcon } from "../components/icons";
-import { Toast } from "../components/ui";
+import { Toast, SubTabs } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
 import { mvpWinnerId, leagueParticipants } from "../stats";
 import { ChatTab } from "../tabs/ChatTab";
@@ -195,22 +194,24 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     } catch (e) { console.error(e); showToast("Erro ao copiar o código", "error"); }
   };
 
-  const TABS = [
-    { id: "schedule", icon: CalendarCheck, label: "Agenda", badge: pendingRsvp },
-    { id: "chat", icon: MessageSquare, label: "Chat", badge: tab === "chat" ? 0 : unreadChat },
-    ...(!isLeague ? [{ id: "team", icon: Shield, label: "Equipa" }] : []),
-    { id: "tactics", icon: TacticIcon, label: "Tatica" },
-    { id: "players", icon: Users, label: "Plantel" },
-    ...(!isLeague ? [{ id: "history", icon: HistoryIcon, label: "Jogos" }] : []),
-    { id: "trophies", icon: Trophy, label: "Carreira" },
-    ...(isLeague ? [{ id: "leaguecal", icon: ListOrdered, label: "Liga" }] : []),
-    ...(isLeague ? [{ id: "lineup", icon: Swords, label: "Convoc." }] : []),
-    ...(isLeague ? [{ id: "training", icon: Dumbbell, label: "Treinos" }] : []),
-    ...(collectsFixed && !isLeague ? [{ id: "members", icon: ClipboardList, label: "Inscricoes" }] : []),
-    ...(amIAdmin ? [{ id: "treasury", icon: Wallet, label: "Tesouraria", badge: myDebt }] : []),
-    { id: "settings", icon: Settings, label: "Definicoes" },
+  // 5 secoes na barra de baixo; cada uma agrupa separadores (antes eram ate 13 numa barra a deslizar)
+  const SECTIONS = [
+    { id: "agenda", icon: CalendarCheck, label: "Agenda", badge: pendingRsvp,
+      tabs: [{ id: "schedule", label: isLeague ? "Próximo jogo" : "Próxima pelada" }, ...(isLeague ? [{ id: "training", label: "Treinos" }] : [])] },
+    { id: "jogo", icon: isLeague ? Swords : Shield, label: isLeague ? "Liga" : "Jogo",
+      tabs: isLeague
+        ? [{ id: "leaguecal", label: "Calendário" }, { id: "lineup", label: "Convocatória" }, { id: "tactics", label: "Tática" }]
+        : [{ id: "team", label: "Equipas" }, { id: "tactics", label: "Tática" }, { id: "history", label: "Resultados" }] },
+    { id: "chat", icon: MessageSquare, label: "Chat", badge: tab === "chat" ? 0 : unreadChat, tabs: [{ id: "chat", label: "Chat" }] },
+    { id: "plantel", icon: Users, label: "Plantel", tabs: [{ id: "players", label: "Jogadores" }, { id: "trophies", label: "Carreira" }] },
+    { id: "mais", icon: Menu, label: "Mais", badge: amIAdmin ? myDebt : 0,
+      tabs: [...(collectsFixed && !isLeague ? [{ id: "members", label: "Inscrições" }] : []), ...(amIAdmin ? [{ id: "treasury", label: "Tesouraria" }] : []), { id: "settings", label: "Definições" }] },
   ];
-  useEffect(() => { if (!TABS.find((t) => t.id === tab)) setTab("schedule"); }, [collectsFixed, amIAdmin]); // eslint-disable-line
+  const section = SECTIONS.find((sec) => sec.tabs.some((t) => t.id === tab)) || SECTIONS[0];
+  const lastTabOf = useRef({}); // cada secao reabre no ultimo separador visitado
+  const goTo = (id) => { lastTabOf.current[section.id] = id; setTab(id); };
+  const openSection = (sec) => setTab(sec.tabs.find((t) => t.id === lastTabOf.current[sec.id])?.id || sec.tabs[0].id);
+  useEffect(() => { if (!SECTIONS.some((sec) => sec.tabs.some((t) => t.id === tab))) setTab("schedule"); }, [collectsFixed, amIAdmin]); // eslint-disable-line
 
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 96 }}>
@@ -226,6 +227,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
         </div>
       </div>
 
+      {section.tabs.length > 1 && <div style={{ padding: "14px 16px 0", maxWidth: 480, margin: "0 auto" }}><SubTabs items={section.tabs} active={tab} onChange={goTo} /></div>}
       <div style={{ padding: tab === "chat" || tab === "tactics" ? 0 : 16, maxWidth: tab === "chat" ? 620 : 480, margin: "0 auto" }}>
         {tab === "schedule" && !isLeague && <ScheduleTab next={nextGame} players={players} me={me} locationUrl={settings.locationUrl} onToggle={toggleSchedule} />}
         {tab === "schedule" && isLeague && <LeagueScheduleTab leagueGames={leagueGames} me={me} players={players} />}
@@ -243,7 +245,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
         {tab === "settings" && <SettingsTab settings={settings} next={nextGame} isOwner={isOwner} amIAdmin={amIAdmin} onSave={saveSettings} onLeave={leaveGroup} onDelete={deleteGroup} />}
       </div>
 
-      <BottomNav items={TABS.map((t) => ({ ...t, active: tab === t.id, onClick: () => setTab(t.id) }))} />
+      <BottomNav items={SECTIONS.map((sec) => ({ ...sec, active: sec.id === section.id, onClick: () => openSection(sec) }))} />
     </div>
   );
 };

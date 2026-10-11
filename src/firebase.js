@@ -17,6 +17,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+auth.useDeviceLanguage(); // emails do Firebase (ex: repor palavra-passe) na lingua do telemovel
 
 export const db = getFirestore(app);
 

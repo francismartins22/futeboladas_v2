@@ -29,7 +29,7 @@ export const BottomNav = ({ items }) => {
 
   return (
     <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, background: "rgba(10,15,14,.92)", backdropFilter: "blur(12px)", borderTop: "1px solid var(--line)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div ref={scrollerRef} style={{ display: "flex", overflowX: "auto", justifyContent: "flex-start", gap: 2, padding: "8px 10px", maxWidth: 760, margin: "0 auto" }}>
+      <div ref={scrollerRef} style={{ display: "flex", overflowX: "auto", justifyContent: "space-around", gap: 2, padding: "8px 10px", maxWidth: 760, margin: "0 auto" }}>
         {items.map((it) => <NavButton key={it.id} active={it.active} onClick={it.onClick} icon={it.icon} label={it.label} badge={it.badge} btnRef={(el) => (btnRefs.current[it.id] = el)} />)}
       </div>
     </div>
