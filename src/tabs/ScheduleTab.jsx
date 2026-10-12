@@ -1,4 +1,4 @@
-import { Clock, MapPin } from "lucide-react";
+import { Clock, MapPin, CheckCircle, XCircle } from "lucide-react";
 import { firstName } from "../utils";
 import { MapPreview } from "../components/MapPreview";
 import { Avatar } from "../components/ui";
@@ -32,24 +32,30 @@ export const ScheduleTab = ({ next, players, me, locationUrl, maxPlayers, onTogg
       {date && <WeatherWidget date={next.date} locationUrl={locationUrl} />}
       {locationUrl && <MapPreview locationUrl={locationUrl} />}
       {locationUrl && <button onClick={() => window.open(locationUrl, "_blank")} className="ft-card ft-btn" style={{ padding: 14, justifyContent: "center", gap: 8, color: "var(--grass-bright)", fontWeight: 700 }}><MapPin size={16} style={{ color: "var(--danger)" }} /> Ver campo no mapa</button>}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <button onClick={() => onToggle("going")} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "going" ? "var(--grass-bright)" : "var(--line)", background: myResp === "going" ? "linear-gradient(135deg,var(--grass-2),var(--grass))" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--text)" }}><span style={{ fontSize: 22 }}>{"\u{1F44D}"}</span><span style={{ fontWeight: 800 }}>{full && myResp !== "going" ? "Lista de espera" : "Vou jogar"}</span></button>
-        <button onClick={() => onToggle("not_going")} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "not_going" ? "var(--danger)" : "var(--line)", background: myResp === "not_going" ? "rgba(240,86,58,.85)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--text)" }}><span style={{ fontSize: 22 }}>{"\u{1F6AB}"}</span><span style={{ fontWeight: 800 }}>Não vou</span></button>
-      </div>
-      {myWaitPos > 0 && <div role="status" style={{ background: "rgba(245,197,66,.1)", border: "1px solid rgba(245,197,66,.3)", color: "var(--gold)", padding: 12, borderRadius: 14, fontSize: 13, fontWeight: 700, textAlign: "center" }}>Estás em {myWaitPos}.º na lista de espera. Avisamos-te se abrir uma vaga.</div>}
-      <div className="ft-card" style={{ padding: 16 }}>
-        <div className="eyebrow" style={{ marginBottom: 12 }}>Convocados - {confirmed.length}{maxPlayers > 0 ? `/${maxPlayers}` : ""}{full ? " · completo" : ""}</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {confirmed.map((uid) => Chip(uid))}
-          {confirmed.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Ainda ninguém confirmou.</span>}
+      {!date ? (
+        <div style={{ textAlign: "center", padding: "28px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--dim)", fontSize: 14 }}>
+          Ainda não há pelada marcada.<br /><span style={{ fontSize: 12, color: "var(--faint)" }}>O admin marca a data em Mais → Definições.</span>
         </div>
-      </div>
-      {waiting.length > 0 && (
+      ) : (<>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <button onClick={() => onToggle("going")} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "going" ? "var(--grass-bright)" : "var(--line)", background: myResp === "going" ? "linear-gradient(135deg,var(--grass-2),var(--grass))" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--text)" }}><CheckCircle size={24} aria-hidden="true" /><span style={{ fontWeight: 800 }}>{full && myResp !== "going" ? "Lista de espera" : "Vou jogar"}</span></button>
+          <button onClick={() => onToggle("not_going")} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "not_going" ? "var(--danger)" : "var(--line)", background: myResp === "not_going" ? "rgba(240,86,58,.85)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--text)" }}><XCircle size={24} aria-hidden="true" /><span style={{ fontWeight: 800 }}>Não vou</span></button>
+        </div>
+        {myWaitPos > 0 && <div role="status" style={{ background: "rgba(245,197,66,.1)", border: "1px solid rgba(245,197,66,.3)", color: "var(--gold)", padding: 12, borderRadius: 14, fontSize: 13, fontWeight: 700, textAlign: "center" }}>Estás em {myWaitPos}.º na lista de espera. Avisamos-te se abrir uma vaga.</div>}
         <div className="ft-card" style={{ padding: 16 }}>
-          <div className="eyebrow" style={{ marginBottom: 12, color: "var(--gold)" }}>Lista de espera - {waiting.length}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{waiting.map((uid, i) => Chip(uid, i + 1))}</div>
+          <div className="eyebrow" style={{ marginBottom: 12 }}>Convocados - {confirmed.length}{maxPlayers > 0 ? `/${maxPlayers}` : ""}{full ? " · completo" : ""}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {confirmed.map((uid) => Chip(uid))}
+            {confirmed.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Ainda ninguém confirmou.</span>}
+          </div>
         </div>
-      )}
+        {waiting.length > 0 && (
+          <div className="ft-card" style={{ padding: 16 }}>
+            <div className="eyebrow" style={{ marginBottom: 12, color: "var(--gold)" }}>Lista de espera - {waiting.length}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{waiting.map((uid, i) => Chip(uid, i + 1))}</div>
+          </div>
+        )}
+      </>)}
     </div>
   );
 };

@@ -1,9 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { Send, Bell, BellOff } from "lucide-react";
 import { firstName, timeStr } from "../utils";
 import { Avatar } from "../components/ui";
 
 /* ------------------------------- Chat ------------------------------------ */
+const dayKey = (ts) => new Date(ts).toDateString();
+const dayLabel = (ts) => {
+  const d = new Date(ts), today = new Date(), yesterday = new Date(Date.now() - 864e5);
+  if (d.toDateString() === today.toDateString()) return "Hoje";
+  if (d.toDateString() === yesterday.toDateString()) return "Ontem";
+  return d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+};
 export const ChatTab = ({ messages, me, muted, onToggleMute, onSend, onMarkRead }) => {
   const [text, setText] = useState("");
   const endRef = useRef(null);
@@ -19,17 +26,25 @@ export const ChatTab = ({ messages, me, muted, onToggleMute, onSend, onMarkRead 
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
         {messages.length === 0 && <p style={{ textAlign: "center", color: "var(--faint)", fontStyle: "italic", fontSize: 13, marginTop: 20 }}>Ainda sem mensagens. Diz olá!</p>}
-        {messages.map((m) => {
+        {messages.map((m, i) => {
           const mine = m.uid === me.uid;
+          const prev = messages[i - 1], next = messages[i + 1];
+          const newDay = !prev || dayKey(prev.ts) !== dayKey(m.ts);
+          // mensagens seguidas da mesma pessoa (mesmo dia, ate 5 min) ficam agrupadas: nome no inicio, avatar no fim
+          const joined = (a, b) => a && b && a.uid === b.uid && dayKey(a.ts) === dayKey(b.ts) && Math.abs(b.ts - a.ts) < 5 * 60e3;
+          const first = !joined(prev, m), last = !joined(m, next);
           return (
-            <div key={m.id} style={{ display: "flex", gap: 8, flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end" }}>
-              {!mine && <Avatar name={m.name} photo={m.photoUrl} size={30} />}
+            <Fragment key={m.id}>
+              {newDay && <div className="eyebrow" style={{ textAlign: "center", margin: "6px 0" }}>{dayLabel(m.ts)}</div>}
+            <div style={{ display: "flex", gap: 8, flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end", marginTop: first ? 0 : -8 }}>
+              {!mine && (last ? <Avatar name={m.name} photo={m.photoUrl} size={30} /> : <div style={{ width: 30, flexShrink: 0 }} />)}
               <div style={{ maxWidth: "74%" }}>
-                {!mine && <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 3, marginLeft: 4, fontWeight: 700 }}>{firstName(m.name)}</div>}
+                {!mine && first && <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 3, marginLeft: 4, fontWeight: 700 }}>{firstName(m.name)}</div>}
                 <div style={{ padding: "9px 13px", borderRadius: 16, fontSize: 14, lineHeight: 1.35, background: mine ? "linear-gradient(135deg,var(--grass-2),var(--grass))" : "var(--raised)", color: mine ? "#04130a" : "var(--text)", border: mine ? "none" : "1px solid var(--line)", borderBottomRightRadius: mine ? 4 : 16, borderBottomLeftRadius: mine ? 16 : 4 }}>{m.text}</div>
-                <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 3, textAlign: mine ? "right" : "left", padding: "0 4px" }}>{m.ts ? timeStr(m.ts) : ""}</div>
+                {last && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 3, textAlign: mine ? "right" : "left", padding: "0 4px" }}>{m.ts ? timeStr(m.ts) : ""}</div>}
               </div>
             </div>
+            </Fragment>
           );
         })}
         <div ref={endRef} />

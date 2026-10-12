@@ -62,7 +62,7 @@ export const WeatherWidget = ({ date, locationUrl }) => {
           </div>
         </div>
       </div>
-      <div className="num" style={{ fontSize: 30, lineHeight: 1, display: "flex", alignItems: "flex-start" }}>{weather.temp}<span style={{ fontSize: 13, color: "var(--faint)", marginTop: 4 }}>C</span></div>
+      <div className="num" style={{ fontSize: 30, lineHeight: 1, display: "flex", alignItems: "flex-start" }}>{weather.temp}<span style={{ fontSize: 13, color: "var(--faint)", marginTop: 4 }}>°C</span></div>
     </div>
   );
 };

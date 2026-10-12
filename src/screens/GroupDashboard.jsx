@@ -61,7 +61,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
     const unsubP = onSnapshot(groupRef("players"), (s) => setPlayers(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const unsubM = onSnapshot(query(groupRef("matches"), orderBy("createdAt", "desc")), (s) => setMatches(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const unsubMsg = onSnapshot(query(groupRef("messages"), orderBy("createdAt", "asc"), limitToLast(100)), (s) => setMessages(s.docs.map((d) => { const x = d.data(); return { id: d.id, ...x, ts: x.createdAt?.seconds ? x.createdAt.seconds * 1000 : Date.now() }; })));
-    const unsubG = onSnapshot(groupDoc("schedule", "next"), (s) => { if (s.exists()) setNextGame(s.data()); else setNextGame({ date: new Date().toISOString(), responses: {} }); });
+    const unsubG = onSnapshot(groupDoc("schedule", "next"), (s) => { if (s.exists()) setNextGame(s.data()); else setNextGame({ responses: {} }); });
     const unsubGroup = onSnapshot(doc(db, "artifacts", APP_ID, "groups", group.id), (s) => {
       if (s.exists()) { const d = s.data(); const st = d.settings || {}; setSettings({ paymentModel: st.paymentModel || "monthly", monthlyFee: st.monthlyFee ?? 0, seasonFee: st.seasonFee ?? 0, guestFee: st.guestFee ?? 4.5, locationUrl: d.locationUrl || "", leagueMode: st.leagueMode === true, groupMode: st.groupMode || "casual", maxPlayers: Number(st.maxPlayers) || 0 }); setGroupMeta({ admins: d.admins || [], inviteCode: d.inviteCode || "" }); }
     });

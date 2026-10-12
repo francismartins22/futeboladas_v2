@@ -7,7 +7,11 @@ import { SoccerBall, PitchLines } from "../components/icons";
 /* ========================= AGENDA MODO LIGA ============================== */
 export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
   const now = new Date();
-  const next = [...leagueGames].filter((g) => g.scoreA == null).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+  // Jogos sem resultado: os que ja passaram (3h de margem para o jogo acabar) ficam a pedir resultado, nao sao "proximo jogo"
+  const unplayed = [...leagueGames].filter((g) => g.scoreA == null).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const isOver = (g) => new Date(g.date).getTime() < now.getTime() - 3 * 36e5;
+  const next = unplayed.find((g) => !isOver(g));
+  const pending = unplayed.filter(isOver);
   const last = [...leagueGames].filter((g) => g.scoreA != null).sort((a, b) => new Date(b.date) - new Date(a.date))[0];
   const played = leagueGames.filter((g) => g.scoreA != null);
   const wins = played.filter((g) => g.scoreA > g.scoreB).length;
@@ -21,14 +25,14 @@ export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
       Object.entries(g.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0, mvp: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; });
       if (g.mvp) { if (!map[g.mvp]) map[g.mvp] = { g: 0, a: 0, mvp: 0 }; map[g.mvp].mvp += 1; }
     });
-    return Object.entries(map).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name })).filter((x) => x.name);
+    return Object.entries(map).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name, photoUrl: players.find((p) => p.id === pid)?.photoUrl })).filter((x) => x.name);
   }, [played, players]);
   const topGoals = [...stats].sort((a, b) => b.g - a.g).filter((p) => p.g > 0).slice(0, 3);
   const topAssists = [...stats].sort((a, b) => b.a - a.a).filter((p) => p.a > 0).slice(0, 3);
   const topMvp = [...stats].sort((a, b) => b.mvp - a.mvp).filter((p) => p.mvp > 0).slice(0, 3);
   const hasRanking = topGoals.length > 0 || topAssists.length > 0 || topMvp.length > 0;
 
-  if (!next && !last) return (
+  if (!next && !last && pending.length === 0) return (
     <div className="ft-in" style={{ textAlign: "center", padding: "60px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--faint)", fontSize: 13 }}>
       <ListOrdered size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
       <p>Ainda sem jogos no calendário.<br />Adiciona jogos no separador Liga.</p>
@@ -36,6 +40,15 @@ export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
   );
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {pending.length > 0 && (
+        <div role="status" style={{ background: "rgba(245,197,66,.08)", border: "1px solid rgba(245,197,66,.3)", borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+          <Clock size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
+          <div style={{ fontSize: 13 }}>
+            <div style={{ fontWeight: 700, color: "var(--gold)" }}>Falta registar o resultado</div>
+            <div style={{ color: "var(--dim)" }}>{pending.map((g) => `vs ${g.opponent} · ${new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "numeric" })}`).join(", ")}</div>
+          </div>
+        </div>
+      )}
       {next && (
         <div className="pitch" style={{ padding: 22 }}>
           <PitchLines /><div className="stripe" />
@@ -43,14 +56,14 @@ export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
             <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Próximo jogo oficial</span>
             <div className="num" style={{ fontSize: 36, lineHeight: .95, color: "var(--chalk)", marginTop: 8 }}>vs {next.opponent}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {new Date(next.date).toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {new Date(next.date).toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })} · {new Date(next.date).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: next.home ? "var(--grass-bright)" : "var(--blue)", background: next.home ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", padding: "3px 10px", borderRadius: 8 }}>{next.home ? "Casa" : "Fora"}</span>
             </div>
           </div>
         </div>
       )}
       {played.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 }}>
           {[["Pts", pts, "var(--gold)"], ["V", wins, "var(--grass-bright)"], ["E", draws, "var(--blue)"], ["D", losses, "var(--danger)"]].map(([l, v, c]) => (
             <div key={l} className="ft-raised" style={{ borderRadius: 14, padding: "10px 8px", textAlign: "center" }}><div className="eyebrow" style={{ color: c }}>{l}</div><div className="num" style={{ fontSize: 26, color: c }}>{v}</div></div>
           ))}
@@ -76,7 +89,7 @@ export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
                   {topGoals.map((p, i) => (
                     <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span className="num" style={{ width: 18, textAlign: "center", fontSize: 14, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
-                      <Avatar name={p.name} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                      <Avatar name={p.name} photo={p.photoUrl} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "var(--grass-bright)" }}>{p.g}G</span>
                     </div>
                   ))}
@@ -90,7 +103,7 @@ export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
                   {topAssists.map((p, i) => (
                     <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span className="num" style={{ width: 18, textAlign: "center", fontSize: 14, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
-                      <Avatar name={p.name} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                      <Avatar name={p.name} photo={p.photoUrl} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "var(--blue)" }}>{p.a}A</span>
                     </div>
                   ))}
@@ -104,7 +117,7 @@ export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
                   {topMvp.map((p, i) => (
                     <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span className="num" style={{ width: 18, textAlign: "center", fontSize: 14, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
-                      <Avatar name={p.name} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
+                      <Avatar name={p.name} photo={p.photoUrl} size={26} /><span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)" }}>{p.mvp}</span>
                     </div>
                   ))}

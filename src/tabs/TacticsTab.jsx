@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Plus, Check, RotateCcw, Pencil, X } from "lucide-react";
 import { firstName, initials, rnd } from "../utils";
 import { Avatar } from "../components/ui";
-import { SoccerBall, TacticIcon } from "../components/icons";
+import { SoccerBall } from "../components/icons";
 
 /* ------------------------------ Tatica ----------------------------------- */
 const FORMATIONS = {
@@ -89,14 +89,6 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
 
   return (
     <div className="ft-in" style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><TacticIcon size={18} /> Quadro tático</h2>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" title="Desenhar" aria-label="Modo desenho" aria-pressed={drawMode} style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }}><Pencil size={16} /></button>
-          <button onClick={reset} className="ft-btn ft-ghost" title="Repor" aria-label="Repor quadro" style={{ padding: 9, borderRadius: 10 }}><RotateCcw size={16} /></button>
-        </div>
-      </div>
-
       {upcoming.length > 0 && (
         <div className="ft-card" style={{ padding: 12 }}>
           <div className="eyebrow" style={{ marginBottom: 6 }}>Jogo oficial (carrega convocatória)</div>
@@ -108,8 +100,12 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
-        {[5, 7, 11].map((n) => <button key={n} onClick={() => applySize(n)} className="ft-btn" style={{ padding: "8px 4px", fontSize: 12, background: size === n ? "var(--grass)" : "none", color: size === n ? "#04130a" : "var(--faint)" }}>{n}x{n}</button>)}
+      {/* Uma so barra: tamanho do campo (pilulas, diferentes dos sub-separadores) + desenhar/repor */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {[5, 7, 11].map((n) => <button key={n} onClick={() => applySize(n)} aria-pressed={size === n} className="ft-btn" style={{ padding: "8px 12px", fontSize: 12, borderRadius: 999, background: "none", border: `1px solid ${size === n ? "var(--lime)" : "var(--line)"}`, color: size === n ? "var(--lime)" : "var(--faint)" }}>{n}×{n}</button>)}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setDrawMode((d) => !d)} className="ft-btn" title="Desenhar" aria-label="Modo desenho" aria-pressed={drawMode} style={{ padding: 9, borderRadius: 10, background: drawMode ? "var(--lime)" : "var(--raised)", color: drawMode ? "#1a2200" : "var(--text)", border: "1px solid var(--line)" }}><Pencil size={16} /></button>
+        <button onClick={reset} className="ft-btn ft-ghost" title="Repor" aria-label="Repor quadro" style={{ padding: 9, borderRadius: 10 }}><RotateCcw size={16} /></button>
       </div>
 
       <div ref={boardRef} onPointerDown={onBoardDown} onPointerMove={onBoardMove} onPointerUp={onBoardUp}

@@ -16,7 +16,7 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, match
     (leagueGames || []).forEach((g) => Object.entries(g.goals || {}).forEach(([pid, v]) => { if (!map[pid]) map[pid] = { g: 0, a: 0 }; map[pid].g += v.g || 0; map[pid].a += v.a || 0; }));
     return map;
   }, [matches, leagueGames]);
-  const top = Object.entries(scorerMap).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name })).filter((x) => x.name).sort((a, b) => b.g - a.g || b.a - a.a).slice(0, 5);
+  const top = Object.entries(scorerMap).map(([pid, v]) => ({ pid, ...v, name: players.find((p) => p.id === pid)?.name, photoUrl: players.find((p) => p.id === pid)?.photoUrl })).filter((x) => x.name).sort((a, b) => b.g - a.g || b.a - a.a).slice(0, 5);
   const ach = [
     { ok: s.games >= 50, Icon: Trophy, c: "var(--gold)", t: "Lenda do clube", d: "+50 jogos realizados" },
     { ok: s.games >= 10, Icon: Medal, c: "var(--blue)", t: "Veterano", d: "+10 jogos realizados" },
@@ -47,7 +47,7 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, match
             {top.map((p, i) => (
               <div key={p.pid} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span className="num" style={{ width: 22, textAlign: "center", fontSize: 16, color: i === 0 ? "var(--gold)" : "var(--faint)" }}>{i + 1}</span>
-                <Avatar name={p.name} size={30} /><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{firstName(p.name)}</span>
+                <Avatar name={p.name} photo={p.photoUrl} size={30} /><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{firstName(p.name)}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--grass-bright)" }}>{p.g}G</span><span style={{ fontSize: 13, fontWeight: 700, color: "var(--blue)" }}>{p.a}A</span>
               </div>
             ))}

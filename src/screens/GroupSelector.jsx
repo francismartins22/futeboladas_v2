@@ -1,16 +1,49 @@
 import { useState, useEffect } from "react";
 import { Users, CalendarCheck, UserPlus, ArrowRight, LayoutGrid, User, Crown, Trophy, AlertCircle, PlusCircle, Zap } from "lucide-react";
-import { collection, doc, onSnapshot, serverTimestamp, query, getDoc, where, writeBatch } from "firebase/firestore";
+import { collection, doc, onSnapshot, serverTimestamp, query, getDoc, getDocs, where, writeBatch } from "firebase/firestore";
 import { db, APP_ID, joinGroupFn } from "../firebase";
 import { newInviteCode } from "../utils";
+import { rsvpLists } from "../rsvp";
 import { Avatar } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
 import { UserProfile } from "./UserProfile";
 import { GroupDashboard } from "./GroupDashboard";
 
 /* ============================ GROUP SELECTOR ============================= */
+const MODES = {
+  casual: { Icon: Zap, color: "var(--blue)", bg: "rgba(106,169,224,.15)", label: "Casual" },
+  weekly: { Icon: CalendarCheck, color: "var(--grass-bright)", bg: "rgba(34,197,94,.15)", label: "Semanal" },
+  league: { Icon: Trophy, color: "var(--gold)", bg: "rgba(245,197,66,.15)", label: "Liga" },
+};
+const when = (iso) => { const d = new Date(iso); return `${d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })} · ${d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}`; };
+
+// "Proximo jogo" no cartao do grupo (uma leitura por grupo; a cache local do Firestore torna as seguintes instantaneas)
+const GroupNextLine = ({ group }) => {
+  const [line, setLine] = useState(null);
+  useEffect(() => {
+    const base = ["artifacts", APP_ID, "groups", group.id];
+    const now = Date.now();
+    const load = group.settings?.groupMode === "league"
+      ? getDocs(query(collection(db, ...base, "leagueGames"), where("scoreA", "==", null))).then((s) => {
+        const g = s.docs.map((d) => d.data()).filter((x) => new Date(x.date).getTime() > now).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+        return g ? `vs ${g.opponent} · ${when(g.date)}` : "Sem jogos marcados";
+      })
+      : getDoc(doc(db, ...base, "schedule", "next")).then((s) => {
+        const n = s.data();
+        if (!n?.date || new Date(n.date).getTime() < now - 3 * 36e5) return "Sem jogo marcado";
+        const max = Number(group.settings?.maxPlayers) || 0;
+        const going = rsvpLists(n, max).confirmed.length;
+        return `${when(n.date)} · ${going}${max ? `/${max}` : ""} confirmados`;
+      });
+    load.then(setLine).catch(() => setLine(""));
+  }, [group.id, group.settings?.groupMode, group.settings?.maxPlayers]);
+  const mode = MODES[group.settings?.groupMode] || MODES.casual;
+  return <p style={{ fontSize: 12, color: "var(--dim)", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><span style={{ color: mode.color, fontWeight: 700 }}>{mode.label}</span>{line ? ` · ${line}` : ""}</p>;
+};
+
 export const GroupSelector = ({ user, onLogout }) => {
   const [view, setView] = useState("groups");
+  const [panel, setPanel] = useState(null); // "create" | "join" | null
   const [groups, setGroups] = useState([]);
   const [newGroup, setNewGroup] = useState("");
   const [groupMode, setGroupMode] = useState(null);
@@ -79,9 +112,34 @@ export const GroupSelector = ({ user, onLogout }) => {
         </div>
         <button onClick={() => setView("profile")} className="ft-btn" style={{ background: "none", padding: 0 }}><Avatar name={profileName || "Eu"} photo={profilePhoto} size={44} /></button>
       </header>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 14, marginBottom: 26 }}>
-        <div className="ft-card" style={{ padding: 18 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 14px" }}><PlusCircle size={16} style={{ color: "var(--grass-bright)" }} /> Criar grupo</h2>
+      {groups.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed var(--line)", borderRadius: 18, marginBottom: 16 }}><Users size={40} style={{ color: "var(--faint)", marginBottom: 10 }} /><p style={{ color: "var(--dim)", fontSize: 14, margin: 0 }}>Cria um grupo ou pede um código a um amigo!</p></div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 10, marginBottom: 16 }}>
+          {groups.map((g) => {
+            const mode = MODES[g.settings?.groupMode] || MODES.casual;
+            return (
+              <button key={g.id} onClick={() => setSelected(g)} className="ft-card ft-btn" style={{ padding: 14, textAlign: "left", justifyContent: "flex-start", gap: 14, borderRadius: 18 }}>
+                <div style={{ padding: 11, borderRadius: 14, background: mode.bg, color: mode.color, flexShrink: 0 }}><mode.Icon size={22} /></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</h3>
+                    {g.ownerId === user.uid && <Crown size={13} aria-label="Dono" style={{ color: "var(--gold)", flexShrink: 0 }} />}
+                  </div>
+                  <GroupNextLine group={g} />
+                </div>
+                <ArrowRight size={16} style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <button onClick={() => setPanel(panel === "create" ? null : "create")} aria-expanded={panel === "create"} className="ft-btn ft-ghost" style={{ padding: 13, fontSize: 13, borderColor: panel === "create" ? "var(--grass)" : undefined }}><PlusCircle size={16} style={{ color: "var(--grass-bright)" }} /> Criar grupo</button>
+        <button onClick={() => setPanel(panel === "join" ? null : "join")} aria-expanded={panel === "join"} className="ft-btn ft-ghost" style={{ padding: 13, fontSize: 13, borderColor: panel === "join" ? "var(--blue)" : undefined }}><UserPlus size={16} style={{ color: "var(--blue)" }} /> Usar código</button>
+      </div>
+      {panel && <div className="ft-in" style={{ marginTop: 10 }}>
+        {panel === "create" && <div className="ft-card" style={{ padding: 18 }}>
           {!groupMode ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 6px" }}>Qual é o tipo de grupo?</p>
@@ -107,30 +165,12 @@ export const GroupSelector = ({ user, onLogout }) => {
               {createError && <div style={{ fontSize: 12, background: "rgba(240,86,58,.12)", color: "#ff9684", border: "1px solid rgba(240,86,58,.3)", borderRadius: 10, padding: 8, display: "flex", gap: 6, alignItems: "center" }}><AlertCircle size={12} /> {createError}</div>}
             </div>
           )}
-        </div>
-        <div className="ft-card" style={{ padding: 18 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}><UserPlus size={16} style={{ color: "var(--blue)" }} /> Entrar com código</h2>
+        </div>}
+        {panel === "join" && <div className="ft-card" style={{ padding: 18 }}>
           <form onSubmit={joinGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Código do convite..." /><button type="submit" disabled={!joinCode.trim()} className="ft-btn ft-ghost" style={{ padding: "0 18px", color: "var(--blue)" }}>Entrar</button></form>
           {msg && <p style={{ fontSize: 12, color: "var(--grass-bright)", marginTop: 8 }}>{msg}</p>}
-        </div>
-      </div>
-      {groups.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", border: "2px dashed var(--line)", borderRadius: 18 }}><Users size={44} style={{ color: "var(--faint)", marginBottom: 12 }} /><p style={{ color: "var(--dim)", fontSize: 14 }}>Cria um grupo ou pede um código a um amigo!</p></div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 14 }}>
-          {groups.map((g) => (
-            <button key={g.id} onClick={() => setSelected(g)} className="ft-card ft-btn" style={{ padding: 20, textAlign: "left", alignItems: "stretch", flexDirection: "column", borderRadius: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 16 }}>
-                <div style={{ padding: 12, borderRadius: 14, background: g.settings?.groupMode === "league" ? "rgba(245,197,66,.15)" : g.settings?.groupMode === "weekly" ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", color: g.settings?.groupMode === "league" ? "var(--gold)" : g.settings?.groupMode === "weekly" ? "var(--grass-bright)" : "var(--blue)" }}>{g.settings?.groupMode === "league" ? <Trophy size={24} /> : g.settings?.groupMode === "weekly" ? <CalendarCheck size={24} /> : <Zap size={24} />}</div>
-                {g.ownerId === user.uid && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "3px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
-              </div>
-              <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{g.name}</h3>
-              <p style={{ fontSize: 12, color: "var(--dim)", margin: "4px 0 0" }}>{g.settings?.groupMode === "league" ? "Liga" : g.settings?.groupMode === "weekly" ? "Semanal" : "Casual"}</p>
-              <p style={{ fontSize: 12, color: "var(--faint)", margin: "4px 0 0", display: "flex", alignItems: "center", gap: 4 }}>Entrar no grupo <ArrowRight size={12} /></p>
-            </button>
-          ))}
-        </div>
-      )}
+        </div>}
+      </div>}
       <BottomNav items={[{ id: "groups", icon: LayoutGrid, label: "Grupos", active: true, onClick: () => setView("groups") }, { id: "profile", icon: User, label: "Perfil", active: false, onClick: () => setView("profile") }]} />
     </div>
   );

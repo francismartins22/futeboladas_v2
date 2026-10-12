@@ -123,8 +123,8 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {played.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
-          {[["Pontos", totalPts, "var(--gold)"], ["Vitórias", wins, "var(--grass-bright)"], ["Empates", draws, "var(--blue)"], ["Derrotas", losses, "var(--danger)"]].map(([l, v, c]) => (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 }}>
+          {[["Pts", totalPts, "var(--gold)"], ["V", wins, "var(--grass-bright)"], ["E", draws, "var(--blue)"], ["D", losses, "var(--danger)"]].map(([l, v, c]) => (
             <div key={l} className="ft-raised" style={{ borderRadius: 14, padding: "10px 8px", textAlign: "center" }}>
               <div className="eyebrow" style={{ color: c }}>{l}</div>
               <div className="num" style={{ fontSize: 26, color: c }}>{v}</div>

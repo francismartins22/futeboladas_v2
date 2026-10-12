@@ -30,3 +30,6 @@ export const getCoordsFromUrl = (url) => {
     return null;
   } catch { return null; }
 };
+
+// Dinheiro no formato portugues: 4.5 -> "4,50 €"
+export const eur = (n) => (Number(n) || 0).toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
