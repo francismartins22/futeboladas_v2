@@ -4,6 +4,7 @@ import { firstName } from "../utils";
 import { Avatar, Stepper } from "../components/ui";
 import { SoccerBall } from "../components/icons";
 import { rsvpLists } from "../rsvp";
+import { confirmDialog } from "../confirm";
 
 /* ------------------------------ Equipa ----------------------------------- */
 export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch, showToast }) => {
@@ -40,6 +41,12 @@ export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch,
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).then(() => showToast("Copiado! Cola no WhatsApp.")).catch(() => showToast("Erro ao copiar", "error"));
     else showToast("Erro ao copiar", "error");
   };
+  // cancelar perde as equipas, o resultado e os golos ja marcados: pede confirmacao se ja ha algo escrito
+  const cancel = async () => {
+    const dirty = sa !== "" || sb !== "" || Object.values(gstats).some((v) => v.g || v.a);
+    if (dirty && !(await confirmDialog({ title: "Cancelar o jogo?", message: "As equipas, o resultado e os golos que marcaste são descartados.", confirmLabel: "Descartar", danger: true }))) return;
+    setTeams(null); setSa(""); setSb("");
+  };
   const finish = () => {
     if (sa === "" || sb === "") return showToast("Insere o resultado", "error");
     onSaveMatch({ teamA: teams.A, teamB: teams.B, scoreA: parseInt(sa, 10), scoreB: parseInt(sb, 10), goals: gstats });
@@ -47,7 +54,7 @@ export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch,
   const Grid = (list) => list.length === 0 ? null : (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
       {list.map((p) => { const on = selected.includes(p.id); return (
-        <button key={p.id} onClick={() => toggle(p.id)} className="ft-btn" style={{ justifyContent: "flex-start", gap: 8, padding: 10, border: "1px solid", borderColor: on ? "var(--grass-bright)" : "var(--line)", background: on ? "rgba(34,197,94,.14)" : "var(--card)", color: on ? "var(--text)" : "var(--dim)" }}>
+        <button key={p.id} onClick={() => toggle(p.id)} aria-pressed={on} className="ft-btn" style={{ justifyContent: "flex-start", gap: 8, padding: 10, border: "1px solid", borderColor: on ? "var(--grass-bright)" : "var(--line)", background: on ? "rgba(34,197,94,.14)" : "var(--card)", color: on ? "var(--text)" : "var(--dim)" }}>
           <div style={{ width: 16, height: 16, borderRadius: "50%", border: "1px solid", borderColor: on ? "var(--grass-bright)" : "#4a5a52", background: on ? "var(--grass-bright)" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={10} color="#04130a" />}</div>
           <span style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{firstName(p.name)}</span>
         </button>); })}
@@ -58,7 +65,7 @@ export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch,
       <div className="ft-pop" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ fontSize: 17, fontWeight: 800, display: "flex", gap: 8, margin: 0, alignItems: "center" }}><SoccerBall size={18} color="var(--gold)" /> Jogo a decorrer</h3>
-          <button onClick={() => setTeams(null)} style={{ background: "none", border: "none", color: "#ff9684", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+          <button onClick={cancel} className="ft-link" style={{ color: "var(--danger-ink)", fontSize: 12, fontWeight: 600, margin: -8 }}>Cancelar</button>
         </div>
         <button onClick={share} className="ft-btn" style={{ background: "rgba(106,169,224,.14)", border: "1px solid rgba(106,169,224,.3)", color: "var(--blue)", padding: 11 }}><Share2 size={16} /> Partilhar equipas</button>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -72,12 +79,12 @@ export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch,
         <div className="ft-card" style={{ padding: 18 }}>
           <div className="eyebrow" style={{ textAlign: "center", marginBottom: 12 }}>Resultado final</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
-            <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="0" className="num" style={{ width: 64, height: 64, textAlign: "center", fontSize: 30, background: "#0a120f", border: "1px solid var(--line)", borderRadius: 14, color: "var(--chalk)", outline: "none" }} />
-            <span style={{ color: "var(--faint)", fontWeight: 300, fontSize: 22 }}>x</span>
-            <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="0" className="num" style={{ width: 64, height: 64, textAlign: "center", fontSize: 30, background: "#0a120f", border: "1px solid var(--line)", borderRadius: 14, color: "var(--chalk)", outline: "none" }} />
+            <input type="number" min="0" inputMode="numeric" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="0" aria-label="Golos Branco" className="num ft-input" style={{ width: 64, height: 64, padding: 0, textAlign: "center", fontSize: 30, borderRadius: 14, color: "var(--chalk)" }} />
+            <span aria-hidden="true" style={{ color: "var(--faint)", fontWeight: 300, fontSize: 22 }}>x</span>
+            <input type="number" min="0" inputMode="numeric" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="0" aria-label="Golos Preto" className="num ft-input" style={{ width: 64, height: 64, padding: 0, textAlign: "center", fontSize: 30, borderRadius: 14, color: "var(--chalk)" }} />
           </div>
         </div>
-        <button onClick={() => setShowStats((s) => !s)} className="ft-btn ft-ghost" style={{ padding: 12, justifyContent: "space-between" }}>
+        <button onClick={() => setShowStats((s) => !s)} aria-expanded={showStats} className="ft-btn ft-ghost" style={{ padding: 12, justifyContent: "space-between" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8 }}><SoccerBall size={15} color="var(--grass-bright)" /> Golos & assistências (opcional)</span>
           <span style={{ transform: showStats ? "rotate(90deg)" : "none", transition: "transform .2s" }}><ArrowRight size={16} /></span>
         </button>
@@ -106,8 +113,9 @@ export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch,
           <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>Selecionar - {selected.length}</h3>
           <button onClick={generate} className="ft-btn ft-grass" style={{ fontSize: 12, padding: "8px 14px" }}><Shuffle size={14} /> Criar equipas</button>
         </div>
-        <input className="ft-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar jogador..." />
+        <input className="ft-input" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar jogador..." aria-label="Procurar jogador" />
       </div>
+      {search && filt(players).length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", margin: 0 }}>Nenhum jogador com “{search}”.</p>}
       {filt(members).length > 0 && <div><div className="eyebrow" style={{ marginBottom: 8 }}>Membros</div>{Grid(filt(members))}</div>}
       {filt(guests).length > 0 && <div><div className="eyebrow" style={{ marginBottom: 8 }}>Convidados</div>{Grid(filt(guests))}</div>}
     </div>

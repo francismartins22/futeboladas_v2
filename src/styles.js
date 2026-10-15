@@ -8,14 +8,20 @@ export const STYLES = `
   --text:#e9f0eb; --dim:#90a69b; --faint:#7d958a;
   --grass:#16a34a; --grass-2:#22c55e; --grass-bright:#4ade80;
   --lime:#c6f24a; --gold:#f5c542; --chalk:#f5f8f6; --ink:#080b0a;
-  --danger:#f0563a; --blue:#6aa9e0;
+  --danger:#f0563a; --danger-ink:#ff9684; --blue:#6aa9e0;
+  --focus:#c6f24a;
   font-family:'Inter',system-ui,sans-serif; color:var(--text);
   background:
     radial-gradient(1200px 600px at 50% -10%, rgba(34,197,94,.10), transparent 60%),
     radial-gradient(900px 500px at 90% 110%, rgba(34,197,94,.05), transparent 55%),
     var(--bg);
-  min-height:100vh; -webkit-font-smoothing:antialiased;
+  min-height:100vh; -webkit-font-smoothing:antialiased; caret-color:var(--grass-bright);
+  color-scheme:dark; /* calendario, relogio e menus nativos (date/time/select) em modo escuro */
 }
+.ft ::selection{background:rgba(198,242,74,.35);color:var(--chalk);}
+/* Anel de foco so para teclado (rato/toque nao o mostram) */
+.ft :focus{outline:none;}
+.ft :focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
 .ft *{box-sizing:border-box;}
 .ft ::-webkit-scrollbar{display:none;}
 .ft .num{font-family:'Anton',Impact,sans-serif;letter-spacing:.5px;font-weight:400;}
@@ -24,17 +30,22 @@ export const STYLES = `
 .ft-raised{background:var(--raised);border:1px solid var(--line);}
 .ft-btn{border:none;cursor:pointer;font-family:inherit;border-radius:14px;font-weight:700;
   transition:transform .12s ease,background .15s ease,opacity .15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;}
-.ft-btn:active{transform:scale(.96);}
+.ft-btn:active:not(:disabled){transform:scale(.96);}
 .ft-btn:disabled{opacity:.45;cursor:not-allowed;}
 .ft-grass{background:linear-gradient(135deg,var(--grass-2),var(--grass));color:#04130a;box-shadow:0 8px 24px -10px rgba(34,197,94,.6);}
 .ft-grass:hover{background:linear-gradient(135deg,var(--grass-bright),var(--grass-2));}
 .ft-ghost{background:var(--raised);color:var(--text);border:1px solid var(--line);}
 .ft-ghost:hover{border-color:#33473f;}
-.ft-danger{background:rgba(240,86,58,.12);color:#ff9684;border:1px solid rgba(240,86,58,.3);}
+.ft-danger{background:rgba(240,86,58,.12);color:var(--danger-ink);border:1px solid rgba(240,86,58,.3);}
 .ft-danger:hover{background:rgba(240,86,58,.2);}
 .ft-input{width:100%;background:#0a120f;border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:border-color .15s;}
-.ft-input::placeholder{color:#6f857a;}
+.ft-input::placeholder{color:var(--faint);}
 .ft-input:focus{border-color:var(--grass);}
+.ft-input:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(34,197,94,.3);}
+/* 16px em ecras de toque: abaixo disso o iPhone faz zoom ao tocar no campo */
+@media (pointer:coarse){.ft-input{font-size:16px;}}
+.ft-link{background:none;border:none;cursor:pointer;font-family:inherit;padding:8px;border-radius:8px;}
+.ft-link:hover{text-decoration:underline;text-underline-offset:3px;}
 .pitch{position:relative;overflow:hidden;border-radius:22px;border:1px solid var(--line);
   background:radial-gradient(120% 80% at 50% -20%, rgba(34,197,94,.22), transparent 60%),linear-gradient(180deg,#0f2017,#0a1611);}
 .pitch .lines{position:absolute;inset:0;opacity:.5;pointer-events:none;}
@@ -51,5 +62,5 @@ export const STYLES = `
 @keyframes ftpop{from{opacity:0;transform:scale(.9);}to{opacity:1;transform:scale(1);}}
 .ft-pop{animation:ftpop .25s ease both;}
 @keyframes ftspin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion: reduce){.ft-in,.ft-pop{animation:none;}}
+@media (prefers-reduced-motion: reduce){.ft-in,.ft-pop{animation:none;}.ft-btn,.tab-ico{transition:none;}.ft-btn:active:not(:disabled){transform:none;}}
 `;

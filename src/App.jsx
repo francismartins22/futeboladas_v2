@@ -59,7 +59,7 @@ const MainApp = () => {
       }
     }).catch((e) => console.error("Erro na manutencao do perfil:", e));
   }, [user]);
-  if (loading) return <div className="ft" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}><style>{STYLES}</style><Loader2 size={40} style={{ color: "var(--grass-bright)", animation: "ftspin 1s linear infinite" }} /></div>;
+  if (loading) return <div className="ft" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}><style>{STYLES}</style><Loader2 size={40} role="status" aria-label="A carregar" style={{ color: "var(--grass-bright)", animation: "ftspin 1s linear infinite" }} /></div>;
   return (
     <div className="ft" style={{ minHeight: "100vh" }}>
       <style>{STYLES}</style>

@@ -35,8 +35,8 @@ export const Stepper = ({ val, onDec, onInc, color }) => (
 
 /* ------------------------------ Toast / Nav ------------------------------ */
 export const Toast = ({ toast }) => !toast.show ? null : (
-  <div className="ft-pop" style={{
-    position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 80, padding: "12px 18px", borderRadius: 14,
+  <div className="ft-pop" role={toast.type === "error" ? "alert" : "status"} style={{
+    position: "fixed", top: "calc(16px + env(safe-area-inset-top))", left: "50%", transform: "translateX(-50%)", zIndex: 80, padding: "12px 18px", borderRadius: 14, maxWidth: "calc(100vw - 32px)", width: "max-content",
     fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, boxShadow: "0 12px 30px -8px rgba(0,0,0,.6)",
     background: toast.type === "error" ? "var(--danger)" : "linear-gradient(135deg,var(--grass-bright),var(--grass-2))",
     color: toast.type === "error" ? "#fff" : "#04130a",

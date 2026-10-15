@@ -6,6 +6,8 @@ import { SoccerBall } from "../components/icons";
 import { playerStats } from "../stats";
 
 /* ----------------------------- Carreira ---------------------------------- */
+const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 12, padding: 10, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 22, color: color || "var(--text)" }}>{value}</div></div>);
+
 export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, matches, leagueGames }) => {
   const memberIds = players.filter((p) => p.type !== "guest").map((p) => p.id);
   const s = playerStats(myProfile?.id, matches, leagueGames, memberIds);
@@ -24,7 +26,6 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, match
     { ok: s.goals >= 10, Icon: SoccerBall, c: "var(--grass-bright)", t: "Goleador", d: "+10 golos marcados" },
     { ok: fixedIds.includes(myProfile?.id), Icon: ShieldCheck, c: "var(--grass-bright)", t: "Membro fixo", d: "Inscrito na época/mês atual" },
   ];
-  const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 12, padding: 10, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 22, color: color || "var(--text)" }}>{value}</div></div>);
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="ft-card" style={{ padding: 22, position: "relative", overflow: "hidden" }}>

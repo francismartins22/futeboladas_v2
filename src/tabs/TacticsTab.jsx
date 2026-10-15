@@ -81,8 +81,8 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
       style={{ position: "absolute", left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%,-50%)", touchAction: "none", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, cursor: drawMode ? "crosshair" : "grab", userSelect: "none", zIndex: 5, background: black ? "#0c0f0e" : "var(--chalk)", color: black ? "#cfe8da" : "#0b0b0b", border: black ? "2px solid #3a4a43" : "2px solid #0b0b0b", boxShadow: "0 3px 8px rgba(0,0,0,.4)" }}>
       {t.label}
       {!black && !drawMode && (
-        <span onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); removeToBench(t); }}
-          style={{ position: "absolute", top: -7, right: -7, width: 16, height: 16, borderRadius: "50%", background: "var(--danger)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,.4)" }}><X size={10} /></span>
+        <button type="button" aria-label={`Mandar ${t.name || t.label} para o banco`} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); removeToBench(t); }}
+          style={{ position: "absolute", top: -7, right: -7, width: 16, height: 16, padding: 0, border: "none", borderRadius: "50%", background: "var(--danger)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,.4)" }}><X size={10} /></button>
       )}
     </div>
   );
@@ -92,7 +92,7 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
       {upcoming.length > 0 && (
         <div className="ft-card" style={{ padding: 12 }}>
           <div className="eyebrow" style={{ marginBottom: 6 }}>Jogo oficial (carrega convocatória)</div>
-          <select className="ft-input" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)} style={{ padding: "8px 10px", fontSize: 12 }}>
+          <select className="ft-input" aria-label="Jogo oficial" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)} style={{ padding: "8px 10px", fontSize: 12 }}>
             <option value="">Selecionar jogo...</option>
             {upcoming.map((g) => <option key={g.id} value={g.id}>{new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} · vs {g.opponent}</option>)}
           </select>
@@ -138,7 +138,7 @@ export const TacticsTab = ({ members, showToast, leagueGames }) => {
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, minHeight: 40 }}>
           {bench.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>{isLeague ? "Sem suplentes na convocatória." : "Remove jogadores do campo (×) ou carrega o plantel."}</span>}
           {bench.map((b) => (
-            <button key={b.id} onClick={() => addFromBench(b)} className="ft-btn" style={{ flexDirection: "column", gap: 4, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 12, padding: "8px 6px", minWidth: 56 }}>
+            <button key={b.id} onClick={() => addFromBench(b)} aria-label={`Pôr ${b.name || b.label} em campo`} className="ft-btn" style={{ flexDirection: "column", gap: 4, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 12, padding: "8px 6px", minWidth: 56 }}>
               <Avatar name={b.name || b.label} size={28} /><span style={{ fontSize: 12, fontWeight: 700 }}>{firstName(b.name || b.label)}</span>
             </button>
           ))}

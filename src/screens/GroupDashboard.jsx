@@ -49,7 +49,13 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   const isOwner = group.ownerId === me.uid;
   const myProfile = players.find((p) => p.uid === me.uid);
   const amIAdmin = isOwner || (myProfile && myProfile.isAdmin);
-  const showToast = (msg, type = "success") => { setToast({ show: true, msg, type }); setTimeout(() => setToast({ show: false, msg: "", type: "success" }), 2400); };
+  // um toast novo substitui o anterior e reinicia o tempo (antes o temporizador antigo fechava o novo cedo demais)
+  const showToast = (msg, type = "success") => setToast({ show: true, msg, type });
+  useEffect(() => {
+    if (!toast.show) return;
+    const t = setTimeout(() => setToast((x) => ({ ...x, show: false })), toast.type === "error" ? 4000 : 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const collectsFixed = settings.paymentModel !== "pergame";
   const fixedFee = settings.paymentModel === "season" ? Number(settings.seasonFee) || 0 : Number(settings.monthlyFee) || 0;
@@ -235,14 +241,14 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
   return (
     <div style={{ minHeight: "100vh", paddingBottom: 96 }}>
       <Toast toast={toast} />
-      <div className="ft-in" style={{ position: "sticky", top: 0, zIndex: 30, background: "rgba(13,20,17,.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="ft-in" style={{ position: "sticky", top: 0, zIndex: 30, background: "rgba(13,20,17,.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <button onClick={onBack} aria-label="Voltar aos grupos" className="ft-btn ft-ghost" style={{ padding: 11, borderRadius: 12 }}><ArrowLeft size={18} /></button>
-          <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 7 }}><Users size={17} style={{ color: "var(--grass-bright)" }} /> {group.name}</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}><Users size={17} style={{ color: "var(--grass-bright)", flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</span></h2>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           {isOwner && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "4px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
-          <button onClick={copyInvite} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "4px 10px" }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copiado" : "Convidar"}</button>
+          <button onClick={copyInvite} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "0 10px", minHeight: 32 }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copiado" : "Convidar"}</button>
         </div>
       </div>
 

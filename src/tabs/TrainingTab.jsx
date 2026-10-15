@@ -27,8 +27,8 @@ export const TrainingTab = ({ trainings, me, amIAdmin, onAdd, onDelete, onToggle
           </div>
           {isFuture && (
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => onToggle(t.id, "going")} className="ft-btn" style={{ fontSize: 12, padding: "6px 10px", background: myResp === "going" ? "var(--grass)" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>Vou</button>
-              <button onClick={() => onToggle(t.id, "not_going")} className="ft-btn" style={{ fontSize: 12, padding: "6px 10px", background: myResp === "not_going" ? "var(--danger)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--dim)", border: "1px solid var(--line)" }}>Não vou</button>
+              <button onClick={() => onToggle(t.id, "going")} aria-pressed={myResp === "going"} className="ft-btn" style={{ fontSize: 12, padding: "0 12px", minHeight: 36, background: myResp === "going" ? "var(--grass)" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--dim)", border: "1px solid var(--line)" }}>Vou</button>
+              <button onClick={() => onToggle(t.id, "not_going")} aria-pressed={myResp === "not_going"} className="ft-btn" style={{ fontSize: 12, padding: "0 12px", minHeight: 36, background: myResp === "not_going" ? "var(--danger)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--dim)", border: "1px solid var(--line)" }}>Não vou</button>
             </div>
           )}
         </div>
@@ -38,17 +38,17 @@ export const TrainingTab = ({ trainings, me, amIAdmin, onAdd, onDelete, onToggle
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {amIAdmin && (
-        <button onClick={() => setOpen((o) => !o)} className="ft-btn ft-grass" style={{ padding: 13, justifyContent: "space-between" }}>
+        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="ft-btn ft-grass" style={{ padding: 13, justifyContent: "space-between" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Plus size={16} /> Marcar treino</span>
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
       )}
       {open && (
         <div className="ft-card ft-in" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Local</label><input className="ft-input" value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Ex: Campo Municipal de Odivelas" /></div>
+          <div><label htmlFor="tr-local" className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Local</label><input id="tr-local" className="ft-input" value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Ex: Campo Municipal de Odivelas" /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Data</label><input type="date" className="ft-input" value={tdate} onChange={(e) => setTdate(e.target.value)} /></div>
-            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Hora</label><input type="time" className="ft-input" value={ttime} onChange={(e) => setTtime(e.target.value)} /></div>
+            <div><label htmlFor="tr-date" className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Data</label><input id="tr-date" type="date" className="ft-input" value={tdate} onChange={(e) => setTdate(e.target.value)} /></div>
+            <div><label htmlFor="tr-time" className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Hora</label><input id="tr-time" type="time" className="ft-input" value={ttime} onChange={(e) => setTtime(e.target.value)} /></div>
           </div>
           <button onClick={submit} disabled={!tdate || !local.trim()} className="ft-btn ft-grass" style={{ padding: 12 }}>Adicionar treino</button>
         </div>
