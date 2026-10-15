@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Trophy, Clock, Share2, ListOrdered } from "lucide-react";
 import { firstName } from "../utils";
 import { Avatar } from "../components/ui";
-import { SoccerBall, PitchLines } from "../components/icons";
+import { SoccerBall } from "../components/icons";
 
 /* ========================= AGENDA MODO LIGA ============================== */
 export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
@@ -50,17 +50,13 @@ export const LeagueScheduleTab = ({ leagueGames, me, players }) => {
         </div>
       )}
       {next && (
-        <div className="pitch" style={{ padding: 22 }}>
-          <PitchLines /><div className="stripe" />
-          <div style={{ position: "relative" }}>
-            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Próximo jogo oficial</span>
-            <div className="num" style={{ fontSize: 36, lineHeight: .95, color: "var(--chalk)", marginTop: 8 }}>vs {next.opponent}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {new Date(next.date).toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })} · {new Date(next.date).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: next.home ? "var(--grass-bright)" : "var(--blue)", background: next.home ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", padding: "3px 10px", borderRadius: 8 }}>{next.home ? "Casa" : "Fora"}</span>
-            </div>
+        <section className="ft-card" style={{ padding: "14px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <h2 className="num" style={{ fontSize: 34, lineHeight: 1.05, margin: 0, color: "var(--chalk)", textTransform: "uppercase", overflowWrap: "anywhere" }}><span className="sr-only">Próximo jogo oficial: </span>vs {next.opponent}</h2>
+            <span style={{ fontSize: 13, fontWeight: 700, color: next.home ? "var(--grass-bright)" : "var(--blue)", background: next.home ? "rgba(34,197,94,.15)" : "rgba(106,169,224,.15)", padding: "3px 10px", borderRadius: 999 }}>{next.home ? "Casa" : "Fora"}</span>
           </div>
-        </div>
+          <p style={{ fontSize: 14, color: "var(--dim)", display: "flex", alignItems: "center", gap: 6 }}><Clock size={14} aria-hidden="true" /> {new Date(next.date).toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })} · {new Date(next.date).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</p>
+        </section>
       )}
       {played.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 }}>

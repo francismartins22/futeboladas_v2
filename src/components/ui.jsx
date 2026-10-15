@@ -1,5 +1,5 @@
 import { Plus, Check, Star, AlertCircle, Minus } from "lucide-react";
-import { avatarHue, initials } from "../utils";
+import { avatarHue, initials, firstName } from "../utils";
 
 export const Avatar = ({ name, photo, size = 36, ring }) => {
   const hue = avatarHue(name);
@@ -15,7 +15,16 @@ export const Avatar = ({ name, photo, size = 36, ring }) => {
   );
 };
 
-export const StarRating = ({ value, onChange, readOnly, size = 16 }) => (
+// Jogador como cromo de caderneta. mvp = cromo dourado; stick = anima a "colagem" (so quando entra de novo)
+export const Cromo = ({ name, photo, mvp, stick, size }) => (
+  <div className={`cromo${mvp ? " cromo-mvp" : ""}${stick ? " cromo-stick" : ""}`} style={size ? { width: size } : undefined} title={mvp ? `${name} · MVP` : name}>
+    <div className="cromo-face" style={{ fontSize: size ? size * 0.32 : 20 }}>{photo ? <img src={photo} alt="" /> : initials(name)}</div>
+    <div className="cromo-name">{firstName(name)}</div>
+  </div>
+);
+export const CromoFalta = () => <div className="cromo-falta">Falta</div>;
+
+export const StarRating =({ value, onChange, readOnly, size = 16 }) => (
   <div style={{ display: "inline-flex", gap: 4 }}>
     {[1, 2, 3, 4, 5].map((s) => (
       <button key={s} onClick={(e) => { e.stopPropagation(); if (!readOnly) onChange(s); }} disabled={readOnly} aria-label={`${s} ${s === 1 ? "estrela" : "estrelas"}`} className="ft-btn" style={{ background: "none", padding: 6, borderRadius: 8 }}>
@@ -38,7 +47,7 @@ export const Toast = ({ toast }) => !toast.show ? null : (
   <div className="ft-pop" role={toast.type === "error" ? "alert" : "status"} style={{
     position: "fixed", top: "calc(16px + env(safe-area-inset-top))", left: "50%", transform: "translateX(-50%)", zIndex: 80, padding: "12px 18px", borderRadius: 14, maxWidth: "calc(100vw - 32px)", width: "max-content",
     fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, boxShadow: "0 12px 30px -8px rgba(0,0,0,.6)",
-    background: toast.type === "error" ? "var(--danger)" : "linear-gradient(135deg,var(--grass-bright),var(--grass-2))",
+    background: toast.type === "error" ? "var(--danger)" : "var(--grass-2)",
     color: toast.type === "error" ? "#fff" : "#04130a",
   }}>{toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}{toast.msg}</div>
 );

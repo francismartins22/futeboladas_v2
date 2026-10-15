@@ -109,8 +109,7 @@ export const GroupSelector = ({ user, onLogout }) => {
     <div style={{ minHeight: "100vh", padding: "20px 16px 110px", maxWidth: 880, margin: "0 auto" }}>
       <header className="ft-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)", marginBottom: 24 }}>
         <div>
-          <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneário</div>
-          <h1 className="num" style={{ fontSize: 30, margin: "2px 0 0", color: "var(--chalk)" }}>OS TEUS GRUPOS</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--chalk)" }}>Os teus grupos</h1>
           <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Olá, <b style={{ color: "var(--text)" }}>{profileName || "Jogador"}</b></p>
         </div>
         <button onClick={() => setView("profile")} aria-label="O meu perfil" className="ft-btn" style={{ background: "none", padding: 0, borderRadius: "50%" }}><Avatar name={profileName || "Eu"} photo={profilePhoto} size={44} /></button>
@@ -127,7 +126,7 @@ export const GroupSelector = ({ user, onLogout }) => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</h3>
-                    {g.ownerId === user.uid && <Crown size={13} aria-label="Dono" style={{ color: "var(--gold)", flexShrink: 0 }} />}
+                    {g.ownerId === user.uid && <Crown size={13} aria-label="Dono" style={{ color: "var(--dim)", flexShrink: 0 }} />}
                   </div>
                   <GroupNextLine group={g} />
                 </div>

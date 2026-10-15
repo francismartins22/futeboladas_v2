@@ -1,8 +1,8 @@
-import { Clock, MapPin, CheckCircle, XCircle } from "lucide-react";
+import { useState } from "react";
+import { MapPin, Check, X } from "lucide-react";
 import { firstName } from "../utils";
 import { MapPreview } from "../components/MapPreview";
-import { Avatar } from "../components/ui";
-import { PitchLines } from "../components/icons";
+import { Cromo, CromoFalta } from "../components/ui";
 import { WeatherWidget } from "../components/WeatherWidget";
 import { rsvpLists } from "../rsvp";
 
@@ -13,49 +13,66 @@ export const ScheduleTab = ({ next, players, me, locationUrl, maxPlayers, onTogg
   const { confirmed, waiting } = rsvpLists(next, maxPlayers);
   const myWaitPos = waiting.indexOf(me.uid) + 1; // 0 = nao estou em espera
   const full = maxPlayers > 0 && confirmed.length >= maxPlayers;
-  const Chip = (uid, pos) => { const p = players.find((pl) => pl.uid === uid); return p ? (<div key={uid} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--raised)", border: "1px solid var(--line)", borderRadius: 999, padding: "5px 12px 5px 5px" }}><Avatar name={p.name} photo={p.photoUrl} size={24} /><span style={{ fontSize: 12, fontWeight: 600 }}>{pos ? `${pos}. ` : ""}{firstName(p.name)}</span></div>) : null; };
+  const byUid = (uid) => players.find((pl) => pl.uid === uid);
+  // so os cromos que entram depois de abrir o ecra se "colam" com animacao
+  const [initial] = useState(() => new Set(confirmed));
   const diffMs = date ? date - new Date() : 0;
   const days = Math.floor(diffMs / 864e5), hrs = Math.floor((diffMs % 864e5) / 36e5), mins = Math.floor((diffMs % 36e5) / 6e4);
   const countdown = days > 0 ? `faltam ${days}d ${hrs}h` : hrs > 0 ? `hoje · faltam ${hrs}h` : `hoje · faltam ${mins} min`;
+  const weekday = date?.toLocaleDateString("pt-PT", { weekday: "long" }).replace("-feira", "");
+  const slots = Math.max(0, maxPlayers - confirmed.length);
   return (
-    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="pitch" style={{ padding: 22 }}>
-        <PitchLines /><div className="stripe" />
-        <div style={{ position: "relative" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-            <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Próxima peladinha</span>
-            {diffMs > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--lime)", border: "1px solid rgba(198,242,74,.3)", background: "rgba(198,242,74,.08)", padding: "4px 10px", borderRadius: 999 }}>{countdown}</span>}
+    // minHeight = ecra menos cabecalho, margens e barra de baixo: a barra de resposta assenta em cima da navegacao
+    <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: "calc(100dvh - 190px)" }}>
+      {date && (
+        <section className="ft-card" style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <h2 className="num" style={{ fontSize: 34, lineHeight: 1.05, margin: 0, color: "var(--chalk)", textTransform: "uppercase" }}>
+              <span className="sr-only">Próxima pelada: </span>{weekday} · {date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--dim)", marginTop: 2 }}>{date.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })}</p>
+            {locationUrl && <a href={locationUrl} target="_blank" rel="noopener noreferrer" className="ft-link" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--grass-bright)", fontSize: 14, fontWeight: 600, margin: "2px -8px -8px" }}><MapPin size={15} aria-hidden="true" /> Ver campo no mapa</a>}
           </div>
-          <div className="num" style={{ fontSize: 40, lineHeight: .95, color: "var(--chalk)", marginTop: 10, textTransform: "capitalize" }}>{date ? date.toLocaleDateString("pt-PT", { weekday: "long" }) : "A definir"}</div>
-          {date && <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}><span className="num" style={{ fontSize: 22, color: "var(--text)" }}>{date.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })}</span><span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 700, color: "var(--grass-bright)" }}><Clock size={14} /> {date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span></div>}
-        </div>
-      </div>
-      {date && <WeatherWidget date={next.date} locationUrl={locationUrl} />}
-      {locationUrl && <MapPreview locationUrl={locationUrl} />}
-      {locationUrl && <a href={locationUrl} target="_blank" rel="noopener noreferrer" className="ft-card ft-btn" style={{ padding: 14, justifyContent: "center", gap: 8, color: "var(--grass-bright)", fontWeight: 700 }}><MapPin size={16} aria-hidden="true" style={{ color: "var(--danger)" }} /> Ver campo no mapa</a>}
+          {diffMs > 0 && <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, color: "var(--bg)", background: "var(--lime)", padding: "4px 10px", borderRadius: 999 }}>{countdown}</span>}
+        </section>
+      )}
+
       {!date ? (
-        <div style={{ textAlign: "center", padding: "28px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--dim)", fontSize: 14 }}>
-          Ainda não há pelada marcada.<br /><span style={{ fontSize: 12, color: "var(--faint)" }}>O admin marca a data em Mais → Definições.</span>
+        <div style={{ textAlign: "center", padding: "28px 20px", border: "1.5px dashed var(--line)", borderRadius: 16, color: "var(--dim)", fontSize: 14 }}>
+          Ainda não há pelada marcada.<br /><span style={{ fontSize: 13, color: "var(--faint)" }}>O admin marca a data em Mais → Definições.</span>
         </div>
       ) : (<>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <button onClick={() => onToggle("going")} aria-pressed={myResp === "going"} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "going" ? "var(--grass-bright)" : "var(--line)", background: myResp === "going" ? "linear-gradient(135deg,var(--grass-2),var(--grass))" : "var(--raised)", color: myResp === "going" ? "#04130a" : "var(--text)" }}><CheckCircle size={24} aria-hidden="true" /><span style={{ fontWeight: 800 }}>{full && myResp !== "going" ? "Lista de espera" : "Vou jogar"}</span></button>
-          <button onClick={() => onToggle("not_going")} aria-pressed={myResp === "not_going"} className="ft-btn" style={{ padding: 18, flexDirection: "column", gap: 4, border: "1px solid", borderColor: myResp === "not_going" ? "var(--danger)" : "var(--line)", background: myResp === "not_going" ? "rgba(240,86,58,.85)" : "var(--raised)", color: myResp === "not_going" ? "#fff" : "var(--text)" }}><XCircle size={24} aria-hidden="true" /><span style={{ fontWeight: 800 }}>Não vou</span></button>
-        </div>
-        {myWaitPos > 0 && <div role="status" style={{ background: "rgba(245,197,66,.1)", border: "1px solid rgba(245,197,66,.3)", color: "var(--gold)", padding: 12, borderRadius: 14, fontSize: 13, fontWeight: 700, textAlign: "center" }}>Estás em {myWaitPos}.º na lista de espera. Avisamos-te se abrir uma vaga.</div>}
-        <div className="ft-card" style={{ padding: 16 }}>
-          <div className="eyebrow" style={{ marginBottom: 12 }}>Convocados - {confirmed.length}{maxPlayers > 0 ? `/${maxPlayers}` : ""}{full ? " · completo" : ""}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {confirmed.map((uid) => Chip(uid))}
-            {confirmed.length === 0 && <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Ainda ninguém confirmou.</span>}
+        <section>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700 }}>Convocados</h3>
+            <span style={{ fontSize: 14, color: "var(--dim)", fontWeight: 600 }}>{confirmed.length}{maxPlayers > 0 ? ` de ${maxPlayers}` : ""}{full ? " · completo" : ""}</span>
           </div>
+          {confirmed.length === 0 && slots === 0
+            ? <p style={{ fontSize: 14, color: "var(--faint)" }}>Ainda ninguém confirmou. Sê o primeiro.</p>
+            : <div className="cromo-grid">
+                {confirmed.map((uid) => { const p = byUid(uid); return p ? <Cromo key={uid} name={p.name} photo={p.photoUrl} stick={!initial.has(uid)} /> : null; })}
+                {Array.from({ length: slots }, (_, i) => <CromoFalta key={`f${i}`} />)}
+              </div>}
+          {waiting.length > 0 && (
+            <p style={{ fontSize: 14, color: "var(--dim)", marginTop: 12 }}>
+              <b style={{ color: "var(--text)" }}>Lista de espera:</b> {waiting.map((uid, i) => `${i + 1}. ${firstName(byUid(uid)?.name || "?")}`).join(", ")}
+            </p>
+          )}
+          {myWaitPos > 0 && <p role="status" style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: "var(--lime)" }}>Estás em {myWaitPos}.º na lista de espera. Avisamos-te se abrir uma vaga.</p>}
+        </section>
+
+        {date && <WeatherWidget date={next.date} locationUrl={locationUrl} />}
+        {locationUrl && <MapPreview locationUrl={locationUrl} />}
+
+        {/* Resposta sempre a mao: cola por cima da barra de baixo quando a pagina e comprida */}
+        <div style={{ position: "sticky", marginTop: "auto", bottom: "calc(84px + env(safe-area-inset-bottom))", display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, paddingTop: 8, background: "linear-gradient(to bottom, transparent, var(--bg) 30%)" }}>
+          <button onClick={() => onToggle("going")} aria-pressed={myResp === "going"} className={`ft-btn ${myResp === "not_going" ? "ft-ghost" : "ft-grass"}`} style={{ height: 52, fontSize: 16 }}>
+            {myResp === "going" && <Check size={18} aria-hidden="true" />}{myResp === "going" ? (myWaitPos ? "Em espera" : "Vais jogar") : full ? "Entrar na lista de espera" : "Vou jogar"}
+          </button>
+          <button onClick={() => onToggle("not_going")} aria-pressed={myResp === "not_going"} className="ft-btn ft-ghost" style={{ height: 52, fontSize: 16, ...(myResp === "not_going" ? { background: "var(--danger)", borderColor: "var(--danger)", color: "#fff" } : {}) }}>
+            {myResp === "not_going" && <X size={18} aria-hidden="true" />}Não vou
+          </button>
         </div>
-        {waiting.length > 0 && (
-          <div className="ft-card" style={{ padding: 16 }}>
-            <div className="eyebrow" style={{ marginBottom: 12, color: "var(--gold)" }}>Lista de espera - {waiting.length}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{waiting.map((uid, i) => Chip(uid, i + 1))}</div>
-          </div>
-        )}
       </>)}
     </div>
   );

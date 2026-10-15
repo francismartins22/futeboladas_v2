@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { Star, Trophy, CheckCircle, Award, Flame, Medal, ShieldCheck } from "lucide-react";
 import { firstName } from "../utils";
-import { Avatar } from "../components/ui";
+import { Avatar, Cromo } from "../components/ui";
 import { SoccerBall } from "../components/icons";
 import { playerStats } from "../stats";
 
 /* ----------------------------- Carreira ---------------------------------- */
-const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 12, padding: 10, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 22, color: color || "var(--text)" }}>{value}</div></div>);
+const Stat = ({ label, value, color }) => (<div style={{ padding: "10px 4px", textAlign: "center", borderTop: "1px solid var(--line)" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 22, color: color || "var(--text)" }}>{value}</div></div>);
 
 export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, matches, leagueGames }) => {
   const memberIds = players.filter((p) => p.type !== "guest").map((p) => p.id);
@@ -28,12 +28,12 @@ export const TrophiesTab = ({ myProfile, amIAdmin, avg, fixedIds, players, match
   ];
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="ft-card" style={{ padding: 22, position: "relative", overflow: "hidden" }}>
-        <Trophy size={120} style={{ position: "absolute", top: -10, right: -10, color: "var(--gold)", opacity: .06 }} />
-        <div style={{ position: "relative", textAlign: "center" }}>
-          <div style={{ margin: "0 auto 10px", width: 84, height: 84 }}><Avatar name={myProfile?.name || "Eu"} photo={myProfile?.photoUrl} size={84} /></div>
-          <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: 0 }}>{(myProfile?.name || "EU").toUpperCase()}</h2>
-          <p className="eyebrow" style={{ marginTop: 4, marginBottom: 18 }}>Estatísticas de carreira</p>
+      <div className="ft-card" style={{ padding: 22 }}>
+        <div style={{ textAlign: "center" }}>
+          {/* o meu cromo: dourado quando ja fui MVP */}
+          <div style={{ margin: "0 auto 12px", width: 104 }}><Cromo name={myProfile?.name || "Eu"} photo={myProfile?.photoUrl} mvp={s.mvps > 0} size={104} /></div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--chalk)" }}>{myProfile?.name || "Eu"}</h2>
+          <p className="eyebrow" style={{ marginTop: 2, marginBottom: 18 }}>Estatísticas de carreira</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
             <Stat label="Jogos" value={s.games} /><Stat label="Vitórias" value={s.wins} color="var(--grass-bright)" /><Stat label="Win %" value={`${Math.round(winRate * 100)}%`} color="var(--blue)" />
             <Stat label="Golos" value={s.goals} color="var(--grass-bright)" /><Stat label="Assist." value={s.assists} color="var(--blue)" /><Stat label="MVPs" value={s.mvps} color="var(--gold)" />

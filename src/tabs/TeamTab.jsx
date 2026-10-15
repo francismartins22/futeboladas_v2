@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Shuffle, Check, ArrowRight, Share2 } from "lucide-react";
 import { firstName } from "../utils";
-import { Avatar, Stepper } from "../components/ui";
+import { Avatar, Stepper, Cromo } from "../components/ui";
 import { SoccerBall } from "../components/icons";
 import { rsvpLists } from "../rsvp";
 import { confirmDialog } from "../confirm";
@@ -70,9 +70,9 @@ export const TeamTab = ({ players, next, maxPlayers, avg, amIAdmin, onSaveMatch,
         <button onClick={share} className="ft-btn" style={{ background: "rgba(106,169,224,.14)", border: "1px solid rgba(106,169,224,.3)", color: "var(--blue)", padding: 11 }}><Share2 size={16} /> Partilhar equipas</button>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[["A", "Branco", "bib-white", teams.A], ["B", "Preto", "bib-black", teams.B]].map(([k, label, bib, listv]) => (
-            <div key={k} className="ft-card" style={{ padding: 12, borderTop: `3px solid ${k === "A" ? "var(--chalk)" : "#1a2620"}` }}>
+            <div key={k} className="ft-card" style={{ padding: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", borderBottom: "1px solid var(--line)", paddingBottom: 8, marginBottom: 8 }}><span className={`bib ${bib}`}>{listv.length}</span><span style={{ fontSize: 13, fontWeight: 800 }}>{label}</span></div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{listv.map((p) => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12 }}><Avatar name={p.name} photo={p.photoUrl} size={20} /> {firstName(p.name)}</div>)}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 5 }}>{listv.map((p) => <Cromo key={p.id} name={p.name} photo={p.photoUrl} />)}</div>
             </div>
           ))}
         </div>

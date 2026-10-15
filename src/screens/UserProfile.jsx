@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { LogOut, Loader2, User, Camera, Save, Trophy, Bell, BellOff, Trash2 } from "lucide-react";
+import { LogOut, Loader2, Camera, Save, Trophy, Bell, BellOff, Trash2 } from "lucide-react";
 import { updateProfile } from "firebase/auth";
 import { collection, doc, serverTimestamp, query, setDoc, getDoc, where, getDocs } from "firebase/firestore";
 import { auth, db, APP_ID, uploadAvatar, enablePushNotifications, disablePushNotifications, deleteAccountFn } from "../firebase";
@@ -8,7 +8,7 @@ import { playerStats } from "../stats";
 import { confirmDialog } from "../confirm";
 
 /* ============================== PROFILE ================================== */
-const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 14, padding: 12, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 24, color: color || "var(--text)", marginTop: 2 }}>{value}</div></div>);
+const Stat = ({ label, value, color }) => (<div style={{ padding: "10px 4px", textAlign: "center", borderTop: "1px solid var(--line)" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 24, color: color || "var(--text)", marginTop: 2 }}>{value}</div></div>);
 
 export const UserProfile = ({ user, onLogout }) => {
   const [deleting, setDeleting] = useState(false);
@@ -114,7 +114,7 @@ export const UserProfile = ({ user, onLogout }) => {
   if (loadingData) return <div style={{ padding: 60, textAlign: "center", color: "var(--grass-bright)" }}><Loader2 size={28} style={{ animation: "ftspin 1s linear infinite" }} /></div>;
   return (
     <div className="ft-in" style={{ padding: "20px 16px 110px", maxWidth: 440, margin: "0 auto" }}>
-      <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: "0 0 18px", display: "flex", alignItems: "center", gap: 10 }}><User size={22} style={{ color: "var(--grass-bright)" }} /> O MEU PERFIL</h2>
+      <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--chalk)", margin: "0 0 18px" }}>O meu perfil</h1>
       <div className="ft-card" style={{ padding: 22, marginBottom: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div role="button" tabIndex={0} aria-label="Alterar foto de perfil" style={{ position: "relative", cursor: "pointer", borderRadius: "50%" }} onClick={() => fileRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }}>

@@ -19,8 +19,8 @@ export const TreasuryTab = ({ players, matches, collectsFixed, fixedIds, payment
         {paymentModel === "season" && <span className="eyebrow" style={{ color: "var(--grass-bright)" }}>Época atual</span>}
       </div>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div className="ft-card" style={{ padding: 16, background: "linear-gradient(135deg,rgba(34,197,94,.12),var(--card))", borderColor: "rgba(34,197,94,.25)" }}><div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Recebido</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{eur(totalRevenue)}</div></div>
-        <div className="ft-card" style={{ padding: 16, background: "linear-gradient(135deg,rgba(240,86,58,.12),var(--card))", borderColor: "rgba(240,86,58,.25)" }}><div className="eyebrow" style={{ color: "var(--danger-ink)" }}>Dívida total</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{eur(totalDebt)}</div></div>
+        <div className="ft-card" style={{ padding: 16, background: "rgba(34,197,94,.08)", borderColor: "rgba(34,197,94,.25)" }}><div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Recebido</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{eur(totalRevenue)}</div></div>
+        <div className="ft-card" style={{ padding: 16, background: "rgba(240,86,58,.08)", borderColor: "rgba(240,86,58,.25)" }}><div className="eyebrow" style={{ color: "var(--danger-ink)" }}>Dívida total</div><div className="num" style={{ fontSize: 28, marginTop: 4 }}>{eur(totalDebt)}</div></div>
       </div>
       <div className="ft-card" style={{ padding: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 14px", alignItems: "center" }}><AlertCircle size={17} style={{ color: "var(--danger-ink)" }} /> Dívidas pendentes</h3>

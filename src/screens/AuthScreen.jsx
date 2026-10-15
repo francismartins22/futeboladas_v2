@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Loader2, Globe } from "lucide-react";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../firebase";
-import { SoccerBall, PitchLines } from "../components/icons";
+import { SoccerBall } from "../components/icons";
 
 /* ============================ AUTH SCREEN ================================ */
 // Erros do Firebase Auth em portugues ("" = nao mostrar nada, ex: o utilizador fechou a janela do Google)
@@ -44,17 +44,21 @@ export const AuthScreen = () => {
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div className="ft-in" style={{ width: "100%", maxWidth: 400 }}>
-        <div className="pitch" style={{ padding: "34px 24px 26px", textAlign: "center", marginBottom: 22 }}>
-          <PitchLines /><div className="stripe" />
-          <div style={{ position: "relative" }}>
-            <div style={{ width: 76, height: 76, margin: "0 auto 16px", borderRadius: 22, transform: "rotate(-6deg)", background: "linear-gradient(135deg,var(--grass-2),#0c7a3a)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 16px 40px -12px rgba(34,197,94,.7)", border: "2px solid rgba(255,255,255,.15)" }}><SoccerBall size={42} color="#fff" /></div>
-            <h1 className="num" style={{ fontSize: 46, lineHeight: .9, margin: 0, color: "var(--chalk)" }}>FUTEBOLADAS</h1>
-            <div style={{ height: 3, width: 64, margin: "10px auto 0", background: "var(--lime)", borderRadius: 2 }} />
-            <p className="eyebrow" style={{ marginTop: 12, color: "var(--grass-bright)" }}>Gestor de peladas</p>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          {/* tres cromos em leque: a caderneta da malta */}
+          <div aria-hidden="true" style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+            {[-10, 0, 10].map((r, i) => (
+              <div key={r} className={`cromo${i === 1 ? " cromo-mvp" : ""}`} style={{ width: 62, margin: "0 -6px", transform: `rotate(${r}deg) translateY(${i === 1 ? -6 : 0}px)`, zIndex: i === 1 ? 2 : 1 }}>
+                <div className="cromo-face"><SoccerBall size={26} color="var(--chalk)" /></div>
+                <div className="cromo-name">{["Pelada", "Craque", "Malta"][i]}</div>
+              </div>
+            ))}
           </div>
+          <h1 className="num" style={{ fontSize: 44, lineHeight: 1, color: "var(--chalk)", textTransform: "uppercase" }}>Futeboladas</h1>
+          <p style={{ marginTop: 4, fontSize: 15, color: "var(--dim)" }}>Gestor de peladas</p>
         </div>
         <div className="ft-card" style={{ padding: 24 }}>
-          <h2 style={{ textAlign: "center", fontSize: 18, fontWeight: 800, margin: "0 0 18px" }}>{isLogin ? "Entrar em campo" : "Criar conta"}</h2>
+          <h2 style={{ textAlign: "center", fontSize: 18, fontWeight: 700, margin: "0 0 18px" }}>{isLogin ? "Entrar em campo" : "Criar conta"}</h2>
           {error && <div role="alert" style={{ background: "rgba(240,86,58,.1)", border: "1px solid rgba(240,86,58,.25)", color: "var(--danger-ink)", padding: 10, borderRadius: 10, fontSize: 12, marginBottom: 14 }}>{error}</div>}
           {info && <div role="status" style={{ background: "rgba(34,197,94,.1)", border: "1px solid rgba(34,197,94,.3)", color: "var(--grass-bright)", padding: 10, borderRadius: 10, fontSize: 12, marginBottom: 14 }}>{info}</div>}
           <button onClick={handleGoogle} className="ft-btn" style={{ width: "100%", background: "#fff", color: "#0b0b0b", padding: 12, marginBottom: 14 }}><Globe size={18} /> Continuar com Google</button>

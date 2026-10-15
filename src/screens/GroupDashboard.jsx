@@ -247,7 +247,7 @@ export const GroupDashboard = ({ group, currentUser, onBack }) => {
           <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}><Users size={17} style={{ color: "var(--grass-bright)", flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</span></h2>
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          {isOwner && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", border: "1px solid rgba(245,197,66,.3)", background: "rgba(245,197,66,.1)", padding: "4px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
+          {isOwner && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--dim)", border: "1px solid var(--line)", padding: "4px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}><Crown size={10} /> Dono</span>}
           <button onClick={copyInvite} className="ft-btn ft-ghost" style={{ fontSize: 12, padding: "0 10px", minHeight: 32 }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copiado" : "Convidar"}</button>
         </div>
       </div>
