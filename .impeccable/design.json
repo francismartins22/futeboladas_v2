@@ -1,0 +1,506 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T09:34:54.187Z",
+  "title": "Design System: Futeboladas",
+  "extensions": {
+    "colorMeta": {
+      "grass": {
+        "role": "primary",
+        "displayName": "Grass",
+        "canonical": "#22c55e",
+        "tonalRamp": [
+          "oklch(15% 0.192 149.6)",
+          "oklch(25% 0.192 149.6)",
+          "oklch(35% 0.192 149.6)",
+          "oklch(48% 0.192 149.6)",
+          "oklch(60% 0.192 149.6)",
+          "oklch(72% 0.192 149.6)",
+          "oklch(84% 0.192 149.6)",
+          "oklch(95% 0.192 149.6)"
+        ]
+      },
+      "grass-deep": {
+        "role": "primary",
+        "displayName": "Deep Grass",
+        "canonical": "#16a34a",
+        "tonalRamp": [
+          "oklch(15% 0.170 149.2)",
+          "oklch(25% 0.170 149.2)",
+          "oklch(35% 0.170 149.2)",
+          "oklch(48% 0.170 149.2)",
+          "oklch(60% 0.170 149.2)",
+          "oklch(72% 0.170 149.2)",
+          "oklch(84% 0.170 149.2)",
+          "oklch(95% 0.170 149.2)"
+        ]
+      },
+      "grass-bright": {
+        "role": "primary",
+        "displayName": "Bright Grass",
+        "canonical": "#4ade80",
+        "tonalRamp": [
+          "oklch(15% 0.182 151.7)",
+          "oklch(25% 0.182 151.7)",
+          "oklch(35% 0.182 151.7)",
+          "oklch(48% 0.182 151.7)",
+          "oklch(60% 0.182 151.7)",
+          "oklch(72% 0.182 151.7)",
+          "oklch(84% 0.182 151.7)",
+          "oklch(95% 0.182 151.7)"
+        ]
+      },
+      "lime": {
+        "role": "secondary",
+        "displayName": "Lime",
+        "canonical": "#c6f24a",
+        "tonalRamp": [
+          "oklch(15% 0.194 123.2)",
+          "oklch(25% 0.194 123.2)",
+          "oklch(35% 0.194 123.2)",
+          "oklch(48% 0.194 123.2)",
+          "oklch(60% 0.194 123.2)",
+          "oklch(72% 0.194 123.2)",
+          "oklch(84% 0.194 123.2)",
+          "oklch(95% 0.194 123.2)"
+        ]
+      },
+      "gold": {
+        "role": "secondary",
+        "displayName": "Trophy Gold",
+        "canonical": "#f5c542",
+        "tonalRamp": [
+          "oklch(15% 0.151 87.9)",
+          "oklch(25% 0.151 87.9)",
+          "oklch(35% 0.151 87.9)",
+          "oklch(48% 0.151 87.9)",
+          "oklch(60% 0.151 87.9)",
+          "oklch(72% 0.151 87.9)",
+          "oklch(84% 0.151 87.9)",
+          "oklch(95% 0.151 87.9)"
+        ]
+      },
+      "blue": {
+        "role": "tertiary",
+        "displayName": "Away Blue",
+        "canonical": "#6aa9e0",
+        "tonalRamp": [
+          "oklch(15% 0.104 246.2)",
+          "oklch(25% 0.104 246.2)",
+          "oklch(35% 0.104 246.2)",
+          "oklch(48% 0.104 246.2)",
+          "oklch(60% 0.104 246.2)",
+          "oklch(72% 0.104 246.2)",
+          "oklch(84% 0.104 246.2)",
+          "oklch(95% 0.104 246.2)"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Red Card",
+        "canonical": "#f0563a",
+        "tonalRamp": [
+          "oklch(15% 0.195 32.5)",
+          "oklch(25% 0.195 32.5)",
+          "oklch(35% 0.195 32.5)",
+          "oklch(48% 0.195 32.5)",
+          "oklch(60% 0.195 32.5)",
+          "oklch(72% 0.195 32.5)",
+          "oklch(84% 0.195 32.5)",
+          "oklch(95% 0.195 32.5)"
+        ]
+      },
+      "danger-ink": {
+        "role": "tertiary",
+        "displayName": "Red Card Ink",
+        "canonical": "#ff9684",
+        "tonalRamp": [
+          "oklch(15% 0.130 30.6)",
+          "oklch(25% 0.130 30.6)",
+          "oklch(35% 0.130 30.6)",
+          "oklch(48% 0.130 30.6)",
+          "oklch(60% 0.130 30.6)",
+          "oklch(72% 0.130 30.6)",
+          "oklch(84% 0.130 30.6)",
+          "oklch(95% 0.130 30.6)"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Night Ground",
+        "canonical": "#0a0f0e",
+        "tonalRamp": [
+          "oklch(15% 0.008 181.7)",
+          "oklch(25% 0.008 181.7)",
+          "oklch(35% 0.008 181.7)",
+          "oklch(48% 0.008 181.7)",
+          "oklch(60% 0.008 181.7)",
+          "oklch(72% 0.008 181.7)",
+          "oklch(84% 0.008 181.7)",
+          "oklch(95% 0.008 181.7)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "canonical": "#0d1411",
+        "tonalRamp": [
+          "oklch(15% 0.012 166.9)",
+          "oklch(25% 0.012 166.9)",
+          "oklch(35% 0.012 166.9)",
+          "oklch(48% 0.012 166.9)",
+          "oklch(60% 0.012 166.9)",
+          "oklch(72% 0.012 166.9)",
+          "oklch(84% 0.012 166.9)",
+          "oklch(95% 0.012 166.9)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card",
+        "canonical": "#111b16",
+        "tonalRamp": [
+          "oklch(15% 0.018 162.7)",
+          "oklch(25% 0.018 162.7)",
+          "oklch(35% 0.018 162.7)",
+          "oklch(48% 0.018 162.7)",
+          "oklch(60% 0.018 162.7)",
+          "oklch(72% 0.018 162.7)",
+          "oklch(84% 0.018 162.7)",
+          "oklch(95% 0.018 162.7)"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised",
+        "canonical": "#16221c",
+        "tonalRamp": [
+          "oklch(15% 0.020 162.6)",
+          "oklch(25% 0.020 162.6)",
+          "oklch(35% 0.020 162.6)",
+          "oklch(48% 0.020 162.6)",
+          "oklch(60% 0.020 162.6)",
+          "oklch(72% 0.020 162.6)",
+          "oklch(84% 0.020 162.6)",
+          "oklch(95% 0.020 162.6)"
+        ]
+      },
+      "field-well": {
+        "role": "neutral",
+        "displayName": "Field Well",
+        "canonical": "#0a120f",
+        "tonalRamp": [
+          "oklch(15% 0.014 169.5)",
+          "oklch(25% 0.014 169.5)",
+          "oklch(35% 0.014 169.5)",
+          "oklch(48% 0.014 169.5)",
+          "oklch(60% 0.014 169.5)",
+          "oklch(72% 0.014 169.5)",
+          "oklch(84% 0.014 169.5)",
+          "oklch(95% 0.014 169.5)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Touchline",
+        "canonical": "#22312b",
+        "tonalRamp": [
+          "oklch(15% 0.023 168.2)",
+          "oklch(25% 0.023 168.2)",
+          "oklch(35% 0.023 168.2)",
+          "oklch(48% 0.023 168.2)",
+          "oklch(60% 0.023 168.2)",
+          "oklch(72% 0.023 168.2)",
+          "oklch(84% 0.023 168.2)",
+          "oklch(95% 0.023 168.2)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#e9f0eb",
+        "tonalRamp": [
+          "oklch(15% 0.010 155.1)",
+          "oklch(25% 0.010 155.1)",
+          "oklch(35% 0.010 155.1)",
+          "oklch(48% 0.010 155.1)",
+          "oklch(60% 0.010 155.1)",
+          "oklch(72% 0.010 155.1)",
+          "oklch(84% 0.010 155.1)",
+          "oklch(95% 0.010 155.1)"
+        ]
+      },
+      "dim": {
+        "role": "neutral",
+        "displayName": "Dim",
+        "canonical": "#90a69b",
+        "tonalRamp": [
+          "oklch(15% 0.029 164.0)",
+          "oklch(25% 0.029 164.0)",
+          "oklch(35% 0.029 164.0)",
+          "oklch(48% 0.029 164.0)",
+          "oklch(60% 0.029 164.0)",
+          "oklch(72% 0.029 164.0)",
+          "oklch(84% 0.029 164.0)",
+          "oklch(95% 0.029 164.0)"
+        ]
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint",
+        "canonical": "#7d958a",
+        "tonalRamp": [
+          "oklch(15% 0.032 165.9)",
+          "oklch(25% 0.032 165.9)",
+          "oklch(35% 0.032 165.9)",
+          "oklch(48% 0.032 165.9)",
+          "oklch(60% 0.032 165.9)",
+          "oklch(72% 0.032 165.9)",
+          "oklch(84% 0.032 165.9)",
+          "oklch(95% 0.032 165.9)"
+        ]
+      },
+      "chalk": {
+        "role": "neutral",
+        "displayName": "Chalk",
+        "canonical": "#f5f8f6",
+        "tonalRamp": [
+          "oklch(15% 0.004 157.2)",
+          "oklch(25% 0.004 157.2)",
+          "oklch(35% 0.004 157.2)",
+          "oklch(48% 0.004 157.2)",
+          "oklch(60% 0.004 157.2)",
+          "oklch(72% 0.004 157.2)",
+          "oklch(84% 0.004 157.2)",
+          "oklch(95% 0.004 157.2)"
+        ]
+      },
+      "cromo-green": {
+        "role": "neutral",
+        "displayName": "Cromo Green",
+        "canonical": "#1d6b3e",
+        "tonalRamp": [
+          "oklch(15% 0.104 153.6)",
+          "oklch(25% 0.104 153.6)",
+          "oklch(35% 0.104 153.6)",
+          "oklch(48% 0.104 153.6)",
+          "oklch(60% 0.104 153.6)",
+          "oklch(72% 0.104 153.6)",
+          "oklch(84% 0.104 153.6)",
+          "oklch(95% 0.104 153.6)"
+        ]
+      },
+      "on-grass": {
+        "role": "neutral",
+        "displayName": "On Grass",
+        "canonical": "#04130a",
+        "tonalRamp": [
+          "oklch(15% 0.030 157.3)",
+          "oklch(25% 0.030 157.3)",
+          "oklch(35% 0.030 157.3)",
+          "oklch(48% 0.030 157.3)",
+          "oklch(60% 0.030 157.3)",
+          "oklch(72% 0.030 157.3)",
+          "oklch(84% 0.030 157.3)",
+          "oklch(95% 0.030 157.3)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Sign-in wordmark only, uppercase."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Next-game date line and next opponent, uppercase chalk."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section and card headings, sentence case."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Copy and list content; 14px for secondary lines."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Sentence-case section labels in dim, no tracking."
+      },
+      "cromo-name": {
+        "displayName": "Cromo Name",
+        "purpose": "First name on a cromo, uppercase, ellipsised."
+      }
+    },
+    "shadows": [
+      {
+        "name": "toast-lift",
+        "value": "0 12px 30px -8px rgba(0,0,0,.6)",
+        "purpose": "Floating toast only; cards are flat."
+      }
+    ],
+    "motion": [
+      {
+        "name": "cromo-stick",
+        "value": "320ms cubic-bezier(.2,.8,.25,1); from opacity 0, translateY(-6px) rotate(-4deg) scale(1.06)",
+        "purpose": "A cromo that joins after the screen opened sticks onto the page. The authored motion; off under prefers-reduced-motion."
+      },
+      {
+        "name": "button-press",
+        "value": "transform .12s ease; :active scale(.96)",
+        "purpose": "Press feedback on buttons; off under reduced motion."
+      },
+      {
+        "name": "state-transition",
+        "value": ".15s ease",
+        "purpose": "Background, border and opacity changes."
+      }
+    ],
+    "focus": [
+      {
+        "name": "focus-ring",
+        "value": "outline:2px solid #c6f24a; outline-offset:2px (:focus-visible only)",
+        "purpose": "Keyboard focus everywhere."
+      },
+      {
+        "name": "input-focus",
+        "value": "border-color:#16a34a; box-shadow:0 0 0 3px rgba(34,197,94,.3)",
+        "purpose": "Text fields."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "cromo-6col",
+        "value": "520px"
+      },
+      {
+        "name": "content-max",
+        "value": "760px"
+      },
+      {
+        "name": "touch-input",
+        "value": "(pointer:coarse): 16px input text"
+      }
+    ],
+    "fonts": {
+      "source": "Google Fonts @import (Barlow 400-700, Barlow Condensed 700-800, display=swap)",
+      "openItem": "Not self-hosted: offline, the PWA falls back to system-ui."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The user's answer: Vou jogar, Entrar em campo. One per screen.",
+      "html": "<button class=\"ds-btn ds-btn-grass\">Vou jogar</button>",
+      "css": ".ds-btn{font-family:'Barlow',system-ui,sans-serif;border:none;cursor:pointer;border-radius:14px;font-weight:700;font-size:15px;padding:13px 20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s ease,background .15s ease;} .ds-btn:active{transform:scale(.96);} .ds-btn:focus-visible{outline:2px solid #c6f24a;outline-offset:2px;} .ds-btn-grass{background:#22c55e;color:#04130a;} .ds-btn-grass:hover{background:#4ade80;}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary actions and the unselected Não vou.",
+      "html": "<button class=\"ds-btn ds-btn-ghost\">Não vou</button>",
+      "css": ".ds-btn{font-family:'Barlow',system-ui,sans-serif;border:none;cursor:pointer;border-radius:14px;font-weight:700;font-size:15px;padding:13px 20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s ease,background .15s ease;} .ds-btn:active{transform:scale(.96);} .ds-btn:focus-visible{outline:2px solid #c6f24a;outline-offset:2px;} .ds-btn-ghost{background:#16221c;color:#e9f0eb;border:1px solid #22312b;} .ds-btn-ghost:hover{border-color:#33473f;}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive actions on a red tint.",
+      "html": "<button class=\"ds-btn ds-btn-danger\">Sair do grupo</button>",
+      "css": ".ds-btn{font-family:'Barlow',system-ui,sans-serif;border:none;cursor:pointer;border-radius:14px;font-weight:700;font-size:15px;padding:13px 20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s ease,background .15s ease;} .ds-btn:active{transform:scale(.96);} .ds-btn:focus-visible{outline:2px solid #c6f24a;outline-offset:2px;} .ds-btn-danger{background:rgba(240,86,58,.12);color:#ff9684;border:1px solid rgba(240,86,58,.3);} .ds-btn-danger:hover{background:rgba(240,86,58,.2);}"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Sunken field with grass focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Código do convite...\" aria-label=\"Código do convite\">",
+      "css": ".ds-input{font-family:'Barlow',system-ui,sans-serif;width:260px;background:#0a120f;border:1px solid #22312b;border-radius:12px;padding:12px 14px;color:#e9f0eb;font-size:14px;outline:none;transition:border-color .15s;} .ds-input::placeholder{color:#7d958a;} .ds-input:focus{border-color:#16a34a;} .ds-input:focus-visible{box-shadow:0 0 0 3px rgba(34,197,94,.3);}"
+    },
+    {
+      "name": "Next-game Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Date in condensed caps, date line, lime countdown pill.",
+      "html": "<section class=\"ds-card\"><div><h2 class=\"ds-date\">Quinta · 21:00</h2><p class=\"ds-sub\">16 de outubro</p></div><span class=\"ds-pill\">faltam 1d 4h</span></section>",
+      "css": ".ds-card{font-family:'Barlow',system-ui,sans-serif;width:340px;background:#111b16;border:1px solid #22312b;border-radius:16px;padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;} .ds-date{font-family:'Barlow Condensed',system-ui,sans-serif;font-weight:800;font-size:34px;line-height:1.05;margin:0;color:#f5f8f6;text-transform:uppercase;font-variant-numeric:tabular-nums;} .ds-sub{font-size:14px;color:#90a69b;margin:2px 0 0;} .ds-pill{flex-shrink:0;font-size:13px;font-weight:700;color:#0a0f0e;background:#c6f24a;padding:4px 10px;border-radius:999px;}"
+    },
+    {
+      "name": "Sub-tabs",
+      "kind": "nav",
+      "refersTo": "subtab-active",
+      "description": "Section sub-navigation in a sunken track.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab ds-on\" role=\"tab\" aria-selected=\"true\">Equipas</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Tática</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Resultados</button></div>",
+      "css": ".ds-tabs{font-family:'Barlow',system-ui,sans-serif;display:flex;gap:6px;width:320px;background:#0a120f;padding:4px;border-radius:12px;border:1px solid #22312b;} .ds-tab{flex:1;border:none;cursor:pointer;font-family:inherit;font-weight:700;font-size:12px;padding:8px 4px;border-radius:14px;background:none;color:#7d958a;} .ds-tab:hover{color:#e9f0eb;} .ds-tab:focus-visible{outline:2px solid #c6f24a;outline-offset:2px;} .ds-on{background:#16a34a;color:#04130a;}"
+    },
+    {
+      "name": "Cromo Grid",
+      "kind": "custom",
+      "refersTo": "cromo",
+      "description": "Signature: players as album stickers. Default, MVP gold, stick entrance and dashed Falta slots.",
+      "html": "<div class=\"ds-wrap\"><div class=\"ds-cromo\"><div class=\"ds-cromo-face\">RM</div><div class=\"ds-cromo-name\">Rui</div></div><div class=\"ds-cromo ds-cromo-mvp\"><div class=\"ds-cromo-face\">TS</div><div class=\"ds-cromo-name\">Tiago</div></div><div class=\"ds-cromo ds-cromo-stick\"><div class=\"ds-cromo-face\">JP</div><div class=\"ds-cromo-name\">João</div></div><div class=\"ds-cromo-falta\">Falta</div><div class=\"ds-cromo-falta\">Falta</div></div>",
+      "css": ".ds-wrap{font-family:'Barlow',system-ui,sans-serif;background:#0a0f0e;padding:16px;display:grid;grid-template-columns:repeat(5,64px);gap:6px;} .ds-cromo{position:relative;aspect-ratio:3/4;border-radius:7px;background:#f5f8f6;padding:3px;display:flex;flex-direction:column;min-width:0;} .ds-cromo-face{flex:1;border-radius:5px;display:flex;align-items:center;justify-content:center;background:#1d6b3e;color:#f5f8f6;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:20px;} .ds-cromo-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;line-height:1.35;color:#0a0f0e;text-align:center;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;} .ds-cromo-mvp{background:#f5c542;} .ds-cromo-falta{aspect-ratio:3/4;border-radius:7px;border:1.5px dashed #3a4d44;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#90a69b;} .ds-cromo-stick{animation:dsstick .32s cubic-bezier(.2,.8,.25,1) both;} @keyframes dsstick{from{opacity:0;transform:translateY(-6px) rotate(-4deg) scale(1.06);}to{opacity:1;transform:none;}} @media (prefers-reduced-motion:reduce){.ds-cromo-stick{animation:none;}}"
+    },
+    {
+      "name": "Countdown Pill",
+      "kind": "chip",
+      "refersTo": "pill-countdown",
+      "description": "Lime: it's on you.",
+      "html": "<span class=\"ds-pill\">hoje · faltam 3h</span>",
+      "css": ".ds-pill{font-family:'Barlow',system-ui,sans-serif;font-size:13px;font-weight:700;color:#0a0f0e;background:#c6f24a;padding:4px 10px;border-radius:999px;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Group's Caderneta",
+    "overview": "A calm, familiar team app on a flat near-black green ground, where the players are cromos: white-framed 3:4 stickers with a photo or initials on green and the name in condensed caps. The chrome stays quiet and conventional (cards, a bottom bar, two answer buttons) so that the one invented object, the cromo, carries the identity. Opening a group shows when the next game is, whose cromo is already stuck in, and which slots still say \"Falta\".\n\nDensity is phone-first and compact: 15px base text, 16px gaps between sections, a 5-column cromo grid. Colour is spent by meaning, not decoration: grass answers, lime points at the user, gold rewards. The system refuses the \"AI sports app\" default of radial glows, glowing gradient buttons, pitch-stripe heroes and tracked uppercase labels.",
+    "keyCharacteristics": [
+      "Flat dark-green ground with bordered cards; no ambient glows.",
+      "The cromo (3:4, white frame, condensed name) is the signature object.",
+      "Barlow for interface text, Barlow Condensed 800 for numbers, dates and cromo names.",
+      "Each accent has one job; rarity keeps lime and gold legible.",
+      "One authored motion: the cromo \"sticks\" onto the page."
+    ],
+    "rules": [
+      {
+        "name": "The One Job Rule",
+        "body": "Lime means \"you need to act\", gold means \"earned\". Neither is used as decoration or as a generic highlight.",
+        "section": "colors"
+      },
+      {
+        "name": "The Grass Answers Rule",
+        "body": "The single filled green button on a screen is the user's answer. Everything else is ghost, link or tinted.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sentence-Case Label Rule",
+        "body": "Section labels are 13px semibold dim text in sentence case. Uppercase belongs only to condensed numerals, dates, opponents and cromo names.",
+        "section": "typography"
+      },
+      {
+        "name": "The Condensed Is For Facts Rule",
+        "body": "Barlow Condensed sets numbers, dates and names, never running copy or buttons.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Pitch Rule",
+        "body": "Cards sit on the ground with a border, never with a glow or drop shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do show players as cromos wherever a squad or call-up is listed, with \"Falta\" slots for missing places.",
+      "Do keep lime for the user's pending action and gold for MVP and achievements.",
+      "Do set dates, scores and counts in Barlow Condensed 800 with tabular figures.",
+      "Do write section labels in sentence case, 13px semibold dim.",
+      "Do keep the lime keyboard focus ring and the reduced-motion fallbacks."
+    ],
+    "donts": [
+      "Don't add radial glows, glowing gradient buttons or pitch-stripe hero backgrounds.",
+      "Don't use tracked uppercase eyebrows on labels.",
+      "Don't add new entrance animations; the cromo stick is the only authored motion.",
+      "Don't put shadows on cards; depth is tone and a 1px border."
+    ]
+  }
+}

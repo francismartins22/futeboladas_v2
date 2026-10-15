@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Trash2, Check, Star, Trophy, Pencil, X } from "lucide-react";
 import { firstName } from "../utils";
-import { Avatar, Stepper } from "../components/ui";
+import { Avatar, Stepper, Cromo } from "../components/ui";
 
 /* ------------------------------ Jogos ------------------------------------ */
 export const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onEdit, onDelete }) => {
@@ -12,7 +12,7 @@ export const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onEdit, on
     if (edit.sa === "" || edit.sb === "") return;
     if (await onEdit(edit.id, { scoreA: parseInt(edit.sa, 10), scoreB: parseInt(edit.sb, 10), goals: edit.goals })) setEdit(null);
   };
-  if (matches.length === 0) return <div style={{ textAlign: "center", color: "var(--faint)", fontStyle: "italic", padding: 40 }}>Sem jogos registados ainda.</div>;
+  if (matches.length === 0) return <div style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed var(--line)", borderRadius: 18, color: "var(--dim)", fontSize: 14 }}>Ainda sem jogos registados.<br /><span style={{ fontSize: 12, color: "var(--faint)" }}>Cria as equipas em Equipas e guarda o resultado no fim do jogo.</span></div>;
   return (
     <div className="ft-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {matches.map((m) => {
@@ -53,7 +53,7 @@ export const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onEdit, on
                   </div>
                 ))}
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={saveEdit} className="ft-btn ft-grass" style={{ flex: 1, padding: 11, fontSize: 13 }}>Guardar correção</button>
+                  <button onClick={saveEdit} disabled={edit.sa === "" || edit.sb === ""} className="ft-btn ft-grass" style={{ flex: 1, padding: 11, fontSize: 13 }}>Guardar correção</button>
                   <button onClick={() => setEdit(null)} className="ft-btn ft-ghost" aria-label="Cancelar" style={{ padding: 11 }}><X size={14} /></button>
                 </div>
               </div>
@@ -64,9 +64,9 @@ export const HistoryTab = ({ matches, matchMVP, amIAdmin, me, onVote, onEdit, on
               </div>
             )}
             <div style={{ background: "rgba(0,0,0,.2)", borderTop: "1px solid var(--line)", padding: 12, minHeight: 52, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {!open ? (mvp ? <div className="ft-pop" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--gold)" }}><Trophy size={15} style={{ fill: "var(--gold)" }} /><span style={{ fontSize: 13, fontWeight: 700 }}>MVP: {firstName(mvp.name)} - {mvp.votes} votos</span></div> : <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Votação encerrada</span>)
+              {!open ? (mvp ? <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Cromo name={mvp.name} photo={mvp.photoUrl} mvp size={40} /><div style={{ textAlign: "left" }}><div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", display: "flex", alignItems: "center", gap: 4 }}><Trophy size={13} aria-hidden="true" /> MVP</div><div style={{ fontSize: 14, fontWeight: 600 }}>{firstName(mvp.name)} · {mvp.votes} {mvp.votes === 1 ? "voto" : "votos"}</div></div></div> : <span style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Votação encerrada</span>)
                 : myVote ? <div style={{ textAlign: "center" }}><div style={{ fontSize: 12, color: "var(--grass-bright)", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Check size={11} /> Voto registado</div><div style={{ fontSize: 12, color: "var(--faint)" }}>Resultado em {left}h</div></div>
-                  : voting === m.id ? <div style={{ display: "flex", gap: 8, width: "100%" }}><select value={pick} onChange={(e) => setPick(e.target.value)} className="ft-input" style={{ padding: 8, fontSize: 12 }}><option value="">Quem foi o craque?</option>{allp.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button onClick={() => { if (pick) { onVote(m.id, pick); setVoting(null); setPick(""); } }} className="ft-btn" style={{ background: "var(--gold)", color: "#1a1300", padding: "0 16px", fontSize: 12 }}>Votar</button></div>
+                  : voting === m.id ? <div style={{ display: "flex", gap: 8, width: "100%" }}><select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="MVP do jogo" autoFocus className="ft-input" style={{ padding: 8, fontSize: 12 }}><option value="">Quem foi o craque?</option>{allp.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button onClick={() => { if (pick) { onVote(m.id, pick); setVoting(null); setPick(""); } }} disabled={!pick} className="ft-btn" style={{ background: "var(--gold)", color: "#1a1300", padding: "0 16px", fontSize: 12 }}>Votar</button><button onClick={() => { setVoting(null); setPick(""); }} aria-label="Cancelar voto" className="ft-btn ft-ghost" style={{ padding: "0 10px" }}><X size={14} /></button></div>
                     : <button onClick={() => setVoting(m.id)} className="ft-btn" style={{ background: "none", color: "var(--gold)", fontSize: 12, fontWeight: 700 }}><Star size={13} /> Votar MVP · faltam {left}h</button>}
             </div>
           </div>

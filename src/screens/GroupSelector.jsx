@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Users, CalendarCheck, UserPlus, ArrowRight, LayoutGrid, User, Crown, Trophy, AlertCircle, PlusCircle, Zap } from "lucide-react";
 import { collection, doc, onSnapshot, serverTimestamp, query, getDoc, getDocs, where, writeBatch } from "firebase/firestore";
 import { db, APP_ID, joinGroupFn } from "../firebase";
-import { newInviteCode } from "../utils";
+import { newInviteCode, errorMessage } from "../utils";
 import { rsvpLists } from "../rsvp";
 import { Avatar } from "../components/ui";
 import { BottomNav } from "../components/BottomNav";
@@ -49,7 +49,8 @@ export const GroupSelector = ({ user, onLogout }) => {
   const [groupMode, setGroupMode] = useState(null);
   const [joinCode, setJoinCode] = useState("");
   const [selected, setSelected] = useState(null);
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState({ text: "", ok: true });
+  const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState("");
   const [profilePhoto, setProfilePhoto] = useState(user.photoURL || "");
   const [profileName, setProfileName] = useState(user.displayName || "");
@@ -67,9 +68,10 @@ export const GroupSelector = ({ user, onLogout }) => {
   }, [user]);
 
   const createGroup = async (e) => {
-    e.preventDefault(); if (!newGroup.trim()) return; setCreateError("");
+    e.preventDefault(); if (!newGroup.trim() || busy) return; setCreateError("");
     const customId = newGroup.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     if (!customId) return setCreateError("Nome inválido para criar ID.");
+    setBusy(true);
     try {
       const groupRef = doc(db, "artifacts", APP_ID, "groups", customId);
       // sem permissao = o grupo existe e nao sou membro (as regras so deixam ler ids livres ou grupos meus)
@@ -81,16 +83,17 @@ export const GroupSelector = ({ user, onLogout }) => {
       batch.set(playerRef, { name: user.displayName || "Eu", uid: user.uid, type: "member", stats: { games: 0, wins: 0, draws: 0, losses: 0 }, isAdmin: true, photoUrl: user.photoURL || null, votes: {}, createdAt: serverTimestamp() });
       await batch.commit();
       setNewGroup("");
-    } catch (err) { console.error(err); setCreateError("Erro ao criar grupo: " + err.message); }
+    } catch (err) { console.error(err); setCreateError(errorMessage(err)); } finally { setBusy(false); }
   };
 
   const joinGroup = async (e) => {
-    e.preventDefault(); if (!joinCode.trim()) return; setMsg("");
+    e.preventDefault(); if (!joinCode.trim() || busy) return; setMsg({ text: "", ok: true }); setBusy(true);
     try {
       // a entrada e validada na Cloud Function joinGroup (as regras nao deixam ninguem acrescentar-se a um grupo)
       const { data } = await joinGroupFn({ code: joinCode.trim().toUpperCase() });
-      setMsg(data.alreadyMember ? "Já pertences a este grupo!" : "Entraste no grupo!"); if (!data.alreadyMember) setJoinCode("");
-    } catch (err) { console.error(err); setMsg(err.code === "functions/not-found" ? "Código inválido. Pede o código atual a um admin do grupo." : "Erro ao entrar."); }
+      setMsg({ text: data.alreadyMember ? "Já pertences a este grupo!" : "Entraste no grupo!", ok: true }); if (!data.alreadyMember) setJoinCode("");
+    } catch (err) { console.error(err); setMsg({ text: err.code === "functions/not-found" ? "Código inválido. Pede o código atual a um admin do grupo." : errorMessage(err), ok: false }); }
+    finally { setBusy(false); }
   };
 
   if (selected) return <GroupDashboard group={selected} currentUser={user} onBack={() => setSelected(null)} />;
@@ -106,11 +109,10 @@ export const GroupSelector = ({ user, onLogout }) => {
     <div style={{ minHeight: "100vh", padding: "20px 16px 110px", maxWidth: 880, margin: "0 auto" }}>
       <header className="ft-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 18, borderBottom: "1px solid var(--line)", marginBottom: 24 }}>
         <div>
-          <div className="eyebrow" style={{ color: "var(--grass-bright)" }}>Balneário</div>
-          <h1 className="num" style={{ fontSize: 30, margin: "2px 0 0", color: "var(--chalk)" }}>OS TEUS GRUPOS</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--chalk)" }}>Os teus grupos</h1>
           <p style={{ fontSize: 13, color: "var(--dim)", margin: "4px 0 0" }}>Olá, <b style={{ color: "var(--text)" }}>{profileName || "Jogador"}</b></p>
         </div>
-        <button onClick={() => setView("profile")} className="ft-btn" style={{ background: "none", padding: 0 }}><Avatar name={profileName || "Eu"} photo={profilePhoto} size={44} /></button>
+        <button onClick={() => setView("profile")} aria-label="O meu perfil" className="ft-btn" style={{ background: "none", padding: 0, borderRadius: "50%" }}><Avatar name={profileName || "Eu"} photo={profilePhoto} size={44} /></button>
       </header>
       {groups.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", border: "2px dashed var(--line)", borderRadius: 18, marginBottom: 16 }}><Users size={40} style={{ color: "var(--faint)", marginBottom: 10 }} /><p style={{ color: "var(--dim)", fontSize: 14, margin: 0 }}>Cria um grupo ou pede um código a um amigo!</p></div>
@@ -124,7 +126,7 @@ export const GroupSelector = ({ user, onLogout }) => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</h3>
-                    {g.ownerId === user.uid && <Crown size={13} aria-label="Dono" style={{ color: "var(--gold)", flexShrink: 0 }} />}
+                    {g.ownerId === user.uid && <Crown size={13} aria-label="Dono" style={{ color: "var(--dim)", flexShrink: 0 }} />}
                   </div>
                   <GroupNextLine group={g} />
                 </div>
@@ -159,16 +161,16 @@ export const GroupSelector = ({ user, onLogout }) => {
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--raised)", borderRadius: 10 }}>
                 <span style={{ fontSize: 12, color: "var(--dim)" }}>Modo:</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: groupMode === "league" ? "var(--gold)" : groupMode === "weekly" ? "var(--grass-bright)" : "var(--blue)" }}>{groupMode === "league" ? "Liga" : groupMode === "weekly" ? "Semanal" : "Casual"}</span>
-                <button onClick={() => { setGroupMode(null); setNewGroup(""); setCreateError(""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--faint)", cursor: "pointer", fontSize: 12 }}>Mudar</button>
+                <button onClick={() => { setGroupMode(null); setNewGroup(""); setCreateError(""); }} className="ft-link" style={{ color: "var(--dim)", fontSize: 12, margin: "-8px -8px -8px auto" }}>Mudar</button>
               </div>
-              <form onSubmit={createGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="Nome do grupo..." autoFocus /><button type="submit" disabled={!newGroup.trim()} className="ft-btn ft-grass" style={{ padding: "0 18px" }}>Criar</button></form>
-              {createError && <div style={{ fontSize: 12, background: "rgba(240,86,58,.12)", color: "#ff9684", border: "1px solid rgba(240,86,58,.3)", borderRadius: 10, padding: 8, display: "flex", gap: 6, alignItems: "center" }}><AlertCircle size={12} /> {createError}</div>}
+              <form onSubmit={createGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="Nome do grupo..." aria-label="Nome do grupo" autoFocus /><button type="submit" disabled={!newGroup.trim() || busy} className="ft-btn ft-grass" style={{ padding: "0 18px" }}>Criar</button></form>
+              {createError && <div role="alert" style={{ fontSize: 12, background: "rgba(240,86,58,.12)", color: "var(--danger-ink)", border: "1px solid rgba(240,86,58,.3)", borderRadius: 10, padding: 8, display: "flex", gap: 6, alignItems: "center" }}><AlertCircle size={12} /> {createError}</div>}
             </div>
           )}
         </div>}
         {panel === "join" && <div className="ft-card" style={{ padding: 18 }}>
-          <form onSubmit={joinGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Código do convite..." /><button type="submit" disabled={!joinCode.trim()} className="ft-btn ft-ghost" style={{ padding: "0 18px", color: "var(--blue)" }}>Entrar</button></form>
-          {msg && <p style={{ fontSize: 12, color: "var(--grass-bright)", marginTop: 8 }}>{msg}</p>}
+          <form onSubmit={joinGroup} style={{ display: "flex", gap: 10 }}><input className="ft-input" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Código do convite..." aria-label="Código do convite" autoCapitalize="characters" autoComplete="off" spellCheck={false} autoFocus style={{ textTransform: "uppercase", letterSpacing: joinCode ? ".12em" : undefined }} /><button type="submit" disabled={!joinCode.trim() || busy} className="ft-btn ft-ghost" style={{ padding: "0 18px", color: "var(--blue)" }}>Entrar</button></form>
+          {msg.text && <p role={msg.ok ? "status" : "alert"} style={{ fontSize: 12, color: msg.ok ? "var(--grass-bright)" : "var(--danger-ink)", marginTop: 8 }}>{msg.text}</p>}
         </div>}
       </div>}
       <BottomNav items={[{ id: "groups", icon: LayoutGrid, label: "Grupos", active: true, onClick: () => setView("groups") }, { id: "profile", icon: User, label: "Perfil", active: false, onClick: () => setView("profile") }]} />

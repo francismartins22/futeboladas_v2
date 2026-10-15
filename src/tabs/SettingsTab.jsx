@@ -2,18 +2,20 @@ import { useState } from "react";
 import { CalendarCheck, Trash2, LogOut, Save, ShieldAlert, Trophy, Clock, Map as MapIcon, Wallet, Zap } from "lucide-react";
 
 /* ----------------------------- Definicoes -------------------------------- */
+const Label = ({ children, htmlFor }) => <label htmlFor={htmlFor} className="eyebrow" style={{ display: "block", marginBottom: 6 }}>{children}</label>;
+
 export const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave, onDelete }) => {
   const isLeague = settings.groupMode === "league";
   const [model, setModel] = useState(isLeague && settings.paymentModel === "pergame" ? "monthly" : (settings.paymentModel || "monthly"));
   const [monthlyFee, setMonthlyFee] = useState(settings.monthlyFee ?? 0);
   const [seasonFee, setSeasonFee] = useState(settings.seasonFee ?? 0);
   const [guestFee, setGuestFee] = useState(settings.guestFee ?? 4.5);
-  const [date, setDate] = useState(next?.date ? new Date(next.date).toISOString().slice(0, 10) : "");
+  // data local (toISOString dava a data em UTC: um jogo as 00:30 aparecia no dia anterior)
+  const [date, setDate] = useState(next?.date ? new Date(next.date).toLocaleDateString("sv-SE") : "");
   const [time, setTime] = useState(next?.date ? new Date(next.date).toTimeString().slice(0, 5) : "21:00");
   const [freq, setFreq] = useState(next?.frequency || "weekly");
   const [maxPlayers, setMaxPlayers] = useState(settings.maxPlayers || "");
   const [locationUrl, setLocationUrl] = useState(settings.locationUrl || "");
-  const Label = ({ children }) => <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>{children}</label>;
   const MODELS = isLeague ? [["monthly", "Mensal"], ["season", "Época/Anual"]] : [["pergame", "Jogo-a-jogo"], ["monthly", "Mensal"], ["season", "Época"]];
   const save = () => onSave({ paymentModel: model, monthlyFee, seasonFee, guestFee, date, time, freq, locationUrl, maxPlayers });
   return (
@@ -22,7 +24,7 @@ export const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave
         <div className="ft-card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Wallet size={17} style={{ color: "var(--blue)" }} /> {isLeague ? "Quota da equipa" : "Modelo de pagamento"}</h3>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${MODELS.length},1fr)`, gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)", marginBottom: 14 }}>
-            {MODELS.map(([v, l]) => <button key={v} onClick={() => setModel(v)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 12, background: model === v ? "var(--grass)" : "none", color: model === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
+            {MODELS.map(([v, l]) => <button key={v} onClick={() => setModel(v)} aria-pressed={model === v} className="ft-btn" style={{ padding: "9px 4px", fontSize: 12, background: model === v ? "var(--grass)" : "none", color: model === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
           </div>
           <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 14px" }}>
             {!isLeague && model === "pergame" && "Todos pagam um valor por cada jogo."}
@@ -31,23 +33,23 @@ export const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave
             {isLeague && model === "monthly" && "Todos os membros pagam uma quota mensal fixa da equipa."}
             {isLeague && model === "season" && "Todos os membros pagam uma quota única para toda a época/temporada."}
           </p>
-          {model === "monthly" && <div style={{ marginBottom: isLeague ? 0 : 14 }}><Label>{isLeague ? "Valor da quota mensal (EUR)" : "Valor da mensalidade (EUR)"}</Label><input type="number" step="0.50" className="ft-input" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} /></div>}
-          {model === "season" && <div style={{ marginBottom: isLeague ? 0 : 14 }}><Label>{isLeague ? "Valor da quota da época (EUR)" : "Valor da época (EUR)"}</Label><input type="number" step="1" className="ft-input" value={seasonFee} onChange={(e) => setSeasonFee(e.target.value)} /></div>}
-          {!isLeague && (<><Label>Preço por jogo ({model === "pergame" ? "todos" : "convidados"}) (EUR)</Label><input type="number" step="0.10" className="ft-input" value={guestFee} onChange={(e) => setGuestFee(e.target.value)} /></>)}
+          {model === "monthly" && <div style={{ marginBottom: isLeague ? 0 : 14 }}><Label htmlFor="st-monthly">{isLeague ? "Valor da quota mensal (EUR)" : "Valor da mensalidade (EUR)"}</Label><input id="st-monthly" type="number" min="0" step="0.50" inputMode="decimal" className="ft-input" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} /></div>}
+          {model === "season" && <div style={{ marginBottom: isLeague ? 0 : 14 }}><Label htmlFor="st-season">{isLeague ? "Valor da quota da época (EUR)" : "Valor da época (EUR)"}</Label><input id="st-season" type="number" min="0" step="1" inputMode="decimal" className="ft-input" value={seasonFee} onChange={(e) => setSeasonFee(e.target.value)} /></div>}
+          {!isLeague && (<><Label htmlFor="st-guest">Preço por jogo ({model === "pergame" ? "todos" : "convidados"}) (EUR)</Label><input id="st-guest" type="number" min="0" step="0.10" inputMode="decimal" className="ft-input" value={guestFee} onChange={(e) => setGuestFee(e.target.value)} /></>)}
         </div>
       )}
       {amIAdmin && !isLeague && (
         <div className="ft-card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 16px", alignItems: "center" }}><Clock size={17} style={{ color: "var(--blue)" }} /> Próximo jogo</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <div><Label>Data</Label><input type="date" className="ft-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-            <div><Label>Hora</Label><input type="time" className="ft-input" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+            <div><Label htmlFor="st-date">Data</Label><input id="st-date" type="date" className="ft-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div><Label htmlFor="st-time">Hora</Label><input id="st-time" type="time" className="ft-input" value={time} onChange={(e) => setTime(e.target.value)} /></div>
           </div>
-          <Label>Periodicidade</Label>
-          <select className="ft-input" value={freq} onChange={(e) => setFreq(e.target.value)}><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select>
+          <Label htmlFor="st-freq">Periodicidade</Label>
+          <select id="st-freq" className="ft-input" value={freq} onChange={(e) => setFreq(e.target.value)}><option value="once">Apenas uma vez</option><option value="weekly">Semanalmente</option><option value="biweekly">Quinzenalmente</option></select>
           <div style={{ marginTop: 12 }}>
-            <label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Limite de vagas</label>
-            <input type="number" min="0" step="1" className="ft-input" value={maxPlayers} onChange={(e) => setMaxPlayers(e.target.value)} placeholder="Sem limite" />
+            <Label htmlFor="st-max">Limite de vagas</Label>
+            <input id="st-max" type="number" min="0" step="1" inputMode="numeric" className="ft-input" value={maxPlayers} onChange={(e) => setMaxPlayers(e.target.value)} placeholder="Sem limite" />
             <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 6 }}>Quem confirmar depois de esgotar fica na lista de espera e sobe sozinho se alguém desistir.</p>
           </div>
         </div>
@@ -55,7 +57,7 @@ export const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave
       {amIAdmin && (
         <div className="ft-card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: "0 0 12px", alignItems: "center" }}><MapIcon size={17} style={{ color: "var(--grass-bright)" }} /> Localização do campo</h3>
-          <input className="ft-input" value={locationUrl} onChange={(e) => setLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." />
+          <input className="ft-input" type="url" inputMode="url" value={locationUrl} onChange={(e) => setLocationUrl(e.target.value)} placeholder="Cola aqui o link do Google Maps..." aria-label="Link do Google Maps" />
           <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 8 }}>A meteorologia é atualizada com base neste link.</p>
         </div>
       )}
@@ -67,7 +69,7 @@ export const SettingsTab = ({ settings, next, isOwner, amIAdmin, onSave, onLeave
       </div>
       {amIAdmin && <button onClick={save} className="ft-btn" style={{ width: "100%", background: "var(--blue)", color: "#04101c", padding: 13 }}><Save size={18} /> Guardar definições</button>}
       <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 20, marginTop: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#ff9684", fontWeight: 800, marginBottom: 10 }}><ShieldAlert size={18} /> Zona de perigo</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--danger-ink)", fontWeight: 800, marginBottom: 10 }}><ShieldAlert size={18} /> Zona de perigo</div>
         <p style={{ fontSize: 13, color: "#ffb3a5", margin: "0 0 14px" }}>{isOwner ? "Como dono, podes apagar este grupo permanentemente. Esta ação é irreversível." : "Se saíres do grupo, deixas de receber convocatórias. O histórico é mantido."}</p>
         <button onClick={isOwner ? onDelete : onLeave} className="ft-btn ft-danger" style={{ width: "100%", padding: 13 }}>{isOwner ? <><Trash2 size={17} /> Apagar grupo</> : <><LogOut size={17} /> Sair do grupo</>}</button>
       </div>

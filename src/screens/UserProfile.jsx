@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { LogOut, Loader2, User, Camera, Save, Trophy, Bell, BellOff, Trash2 } from "lucide-react";
+import { LogOut, Loader2, Camera, Save, Trophy, Bell, BellOff, Trash2 } from "lucide-react";
 import { updateProfile } from "firebase/auth";
 import { collection, doc, serverTimestamp, query, setDoc, getDoc, where, getDocs } from "firebase/firestore";
 import { auth, db, APP_ID, uploadAvatar, enablePushNotifications, disablePushNotifications, deleteAccountFn } from "../firebase";
@@ -8,6 +8,8 @@ import { playerStats } from "../stats";
 import { confirmDialog } from "../confirm";
 
 /* ============================== PROFILE ================================== */
+const Stat = ({ label, value, color }) => (<div style={{ padding: "10px 4px", textAlign: "center", borderTop: "1px solid var(--line)" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 24, color: color || "var(--text)", marginTop: 2 }}>{value}</div></div>);
+
 export const UserProfile = ({ user, onLogout }) => {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -108,23 +110,22 @@ export const UserProfile = ({ user, onLogout }) => {
     catch (e) { console.error(e); setMsg("Erro ao guardar perfil."); } finally { setUploading(false); }
   };
 
-  const Stat = ({ label, value, color }) => (<div className="ft-raised" style={{ borderRadius: 14, padding: 12, textAlign: "center" }}><div className="eyebrow" style={{ color: color || "var(--faint)" }}>{label}</div><div className="num" style={{ fontSize: 24, color: color || "var(--text)", marginTop: 2 }}>{value}</div></div>);
 
   if (loadingData) return <div style={{ padding: 60, textAlign: "center", color: "var(--grass-bright)" }}><Loader2 size={28} style={{ animation: "ftspin 1s linear infinite" }} /></div>;
   return (
     <div className="ft-in" style={{ padding: "20px 16px 110px", maxWidth: 440, margin: "0 auto" }}>
-      <h2 className="num" style={{ fontSize: 24, color: "var(--chalk)", margin: "0 0 18px", display: "flex", alignItems: "center", gap: 10 }}><User size={22} style={{ color: "var(--grass-bright)" }} /> O MEU PERFIL</h2>
+      <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--chalk)", margin: "0 0 18px" }}>O meu perfil</h1>
       <div className="ft-card" style={{ padding: 22, marginBottom: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div role="button" tabIndex={0} aria-label="Alterar foto de perfil" style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }}>
+          <div role="button" tabIndex={0} aria-label="Alterar foto de perfil" style={{ position: "relative", cursor: "pointer", borderRadius: "50%" }} onClick={() => fileRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }}>
             <Avatar name={name || "Eu"} photo={photoUrl} size={92} />
             <div style={{ position: "absolute", bottom: -2, right: -2, background: "var(--grass)", padding: 8, borderRadius: "50%", border: "2px solid var(--card)" }}>{uploading ? <Loader2 size={15} color="#04130a" style={{ animation: "ftspin 1s linear infinite" }} /> : <Camera size={15} color="#04130a" />}</div>
           </div>
-          <input type="file" ref={fileRef} onChange={handleImageUpload} accept="image/*" style={{ display: "none" }} />
+          <input type="file" ref={fileRef} onChange={handleImageUpload} accept="image/*" tabIndex={-1} aria-hidden="true" style={{ display: "none" }} />
           <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 10 }}>Toca para alterar a foto</p>
         </div>
-        <div style={{ marginTop: 16 }}><label className="eyebrow">Nome de jogador</label><input className="ft-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="O teu nome..." style={{ marginTop: 6 }} /></div>
-        {msg && <div style={{ marginTop: 12, textAlign: "center", fontSize: 13, padding: 8, borderRadius: 10, background: msg.includes("sucesso") ? "rgba(34,197,94,.12)" : "rgba(240,86,58,.12)", color: msg.includes("sucesso") ? "var(--grass-bright)" : "#ff9684" }}>{msg}</div>}
+        <div style={{ marginTop: 16 }}><label htmlFor="pf-name" className="eyebrow">Nome de jogador</label><input id="pf-name" className="ft-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="O teu nome..." style={{ marginTop: 6 }} /></div>
+        {msg && <div role={msg.includes("sucesso") ? "status" : "alert"} style={{ marginTop: 12, textAlign: "center", fontSize: 13, padding: 8, borderRadius: 10, background: msg.includes("sucesso") ? "rgba(34,197,94,.12)" : "rgba(240,86,58,.12)", color: msg.includes("sucesso") ? "var(--grass-bright)" : "var(--danger-ink)" }}>{msg}</div>}
         <button onClick={save} disabled={uploading} className="ft-btn ft-grass" style={{ width: "100%", padding: 13, marginTop: 16 }}><Save size={18} /> Guardar alterações</button>
       </div>
       <div className="ft-card" style={{ padding: 22 }}>
@@ -140,16 +141,16 @@ export const UserProfile = ({ user, onLogout }) => {
         <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 14px" }}>Recebe um aviso quando o jogo e confirmado, 24h antes de jogar, e quando chegam mensagens novas no chat.</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a120f", border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
           <div><div style={{ fontSize: 13, fontWeight: 700 }}>Notificações push</div><div style={{ fontSize: 12, color: notifEnabled ? "var(--grass-bright)" : "var(--faint)" }}>{notifEnabled ? "Ativas" : "Inativas"}</div></div>
-          <button onClick={toggleNotifications} disabled={notifLoading} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: notifEnabled ? "var(--grass)" : "var(--raised)", color: notifEnabled ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>
+          <button onClick={toggleNotifications} disabled={notifLoading} aria-pressed={notifEnabled} className="ft-btn" style={{ fontSize: 12, padding: "7px 14px", background: notifEnabled ? "var(--grass)" : "var(--raised)", color: notifEnabled ? "#04130a" : "var(--faint)", border: "1px solid var(--line)" }}>
             {notifLoading ? <Loader2 size={14} style={{ animation: "ftspin 1s linear infinite" }} /> : (notifEnabled ? "Ativas" : "Ativar")}
           </button>
         </div>
-        {notifBlocked && <p style={{ fontSize: 12, color: "#ff9684", marginTop: 10 }}>As notificações estão bloqueadas no browser. Ativa-as nas definições do site (ícone de cadeado junto ao URL) e tenta novamente.</p>}
+        {notifBlocked && <p role="alert" style={{ fontSize: 12, color: "var(--danger-ink)", marginTop: 10 }}>As notificações estão bloqueadas no browser. Ativa-as nas definições do site (ícone de cadeado junto ao URL) e tenta novamente.</p>}
       </div>
-      <button onClick={onLogout} className="ft-btn" style={{ width: "100%", background: "none", color: "#ff9684", padding: 14, marginTop: 18 }}><LogOut size={16} /> Terminar sessão</button>
+      <button onClick={onLogout} className="ft-btn" style={{ width: "100%", background: "none", color: "var(--danger-ink)", padding: 14, marginTop: 18 }}><LogOut size={16} /> Terminar sessão</button>
       <div style={{ border: "1px solid rgba(240,86,58,.3)", background: "rgba(240,86,58,.05)", borderRadius: 18, padding: 18, marginTop: 8 }}>
         <p style={{ fontSize: 12, color: "#ffb3a5", margin: "0 0 12px" }}>Apagar a conta remove os teus dados pessoais de todos os grupos. Os resultados dos jogos ficam, com o nome "Ex-jogador".</p>
-        {deleteError && <p role="alert" style={{ fontSize: 12, color: "#ff9684", margin: "0 0 12px" }}>{deleteError}</p>}
+        {deleteError && <p role="alert" style={{ fontSize: 12, color: "var(--danger-ink)", margin: "0 0 12px" }}>{deleteError}</p>}
         <button onClick={deleteAccount} disabled={deleting} className="ft-btn ft-danger" style={{ width: "100%", padding: 12 }}>{deleting ? <Loader2 size={16} style={{ animation: "ftspin 1s linear infinite" }} /> : <Trash2 size={16} />} Apagar conta</button>
       </div>
     </div>

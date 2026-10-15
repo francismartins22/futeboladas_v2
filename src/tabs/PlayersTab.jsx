@@ -12,15 +12,15 @@ export const PlayersTab = ({ members, guests, players, me, amIAdmin, isOwner, ow
   const Card = (p) => {
     const open = expanded === p.id; const myVote = p.votes?.[me.uid] || 0;
     return (
-      <div key={p.id} onClick={() => { if (open) setExpanded(null); else { setExpanded(p.id); setStars(myVote || 3); } }} className="ft-card" style={{ padding: 12, cursor: "pointer", borderColor: open ? "rgba(34,197,94,.4)" : "var(--line)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div key={p.id} className="ft-card" style={{ padding: 12, borderColor: open ? "rgba(34,197,94,.4)" : "var(--line)" }}>
+        <button onClick={() => { if (open) setExpanded(null); else { setExpanded(p.id); setStars(myVote || 3); } }} aria-expanded={open} className="ft-btn" style={{ display: "flex", width: "100%", alignItems: "center", gap: 12, background: "none", padding: 0, color: "inherit", textAlign: "left", fontWeight: "inherit", borderRadius: 12 }}>
           <Avatar name={p.name} photo={p.photoUrl} size={36} ring={p.isAdmin} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>{p.name}{p.isAdmin && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", background: "rgba(245,197,66,.15)", padding: "1px 6px", borderRadius: 6 }}>Admin</span>}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>{p.isAdmin && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", background: "rgba(245,197,66,.15)", padding: "1px 6px", borderRadius: 6 }}>Admin</span>}</div>
             <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 2 }}>{amIAdmin ? <span style={{ color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 700 }}><Star size={11} style={{ fill: "var(--gold)" }} /> {avg(p)}</span> : myVote ? <span style={{ color: "var(--grass-bright)" }}>Avaliado</span> : <span>Toca para avaliar</span>}</div>
           </div>
-          <ArrowRight size={16} style={{ color: "var(--faint)", transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
-        </div>
+          <ArrowRight size={16} aria-hidden="true" style={{ color: "var(--faint)", transform: open ? "rotate(90deg)" : "none", transition: "transform .2s", flexShrink: 0 }} />
+        </button>
         {open && (
           <div className="ft-in" style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
             {p.uid !== me.uid && (
@@ -54,12 +54,12 @@ export const PlayersTab = ({ members, guests, players, me, amIAdmin, isOwner, ow
         <div className="ft-card ft-in" style={{ padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <h3 style={{ fontSize: 13, fontWeight: 800, display: "flex", gap: 8, margin: 0, alignItems: "center" }}><UserPlus size={16} style={{ color: "var(--grass-bright)" }} /> Novo jogador</h3>
-            <div style={{ display: "flex", background: "#0a120f", borderRadius: 10, padding: 3, border: "1px solid var(--line)" }}>{["guest", "member"].map((t) => <button key={t} onClick={() => setType(t)} className="ft-btn" style={{ fontSize: 12, fontWeight: 700, padding: "5px 10px", background: type === t ? "var(--raised)" : "none", color: type === t ? "var(--text)" : "var(--faint)" }}>{t === "guest" ? "Convidado" : "Membro"}</button>)}</div>
+            <div style={{ display: "flex", background: "#0a120f", borderRadius: 10, padding: 3, border: "1px solid var(--line)" }}>{["guest", "member"].map((t) => <button key={t} onClick={() => setType(t)} aria-pressed={type === t} className="ft-btn" style={{ fontSize: 12, fontWeight: 700, padding: "5px 10px", background: type === t ? "var(--raised)" : "none", color: type === t ? "var(--text)" : "var(--faint)" }}>{t === "guest" ? "Convidado" : "Membro"}</button>)}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <input className="ft-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome..." />
-            {type === "guest" && <select className="ft-input" value={host} onChange={(e) => setHost(e.target.value)}><option value="">Quem convidou?</option>{members.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
-            <button onClick={submitAdd} className="ft-btn ft-grass" style={{ padding: 11 }}><Plus size={16} /> Adicionar</button>
+            <input className="ft-input" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitAdd(); }} placeholder="Nome..." aria-label="Nome do jogador" autoFocus />
+            {type === "guest" && <select className="ft-input" value={host} onChange={(e) => setHost(e.target.value)} aria-label="Quem convidou"><option value="">Quem convidou?</option>{members.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
+            <button onClick={submitAdd} disabled={!name.trim() || (type === "guest" && !host)} className="ft-btn ft-grass" style={{ padding: 11 }}><Plus size={16} /> Adicionar</button>
           </div>
         </div>
       )}

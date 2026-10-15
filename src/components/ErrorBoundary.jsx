@@ -14,7 +14,7 @@ export class ErrorBoundary extends React.Component {
         <div className="ft" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <style>{STYLES}</style>
           <div className="ft-card" style={{ padding: 28, maxWidth: 360, textAlign: "center" }}>
-            <div style={{ width: 60, height: 60, margin: "0 auto 14px", borderRadius: "50%", background: "rgba(240,86,58,.12)", border: "1px solid rgba(240,86,58,.3)", display: "flex", alignItems: "center", justifyContent: "center" }}><Activity size={28} style={{ color: "#ff9684" }} /></div>
+            <div style={{ width: 60, height: 60, margin: "0 auto 14px", borderRadius: "50%", background: "rgba(240,86,58,.12)", border: "1px solid rgba(240,86,58,.3)", display: "flex", alignItems: "center", justifyContent: "center" }}><Activity size={28} style={{ color: "var(--danger-ink)" }} /></div>
             <h1 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 6px" }}>Jogo interrompido</h1>
             <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 18px" }}>Atualização detetada ou erro de rede.</p>
             <button onClick={this.handleReset} className="ft-btn ft-grass" style={{ width: "100%", padding: 13 }}><RotateCcw size={18} /> Recarregar app</button>

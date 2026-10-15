@@ -35,12 +35,13 @@ export const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
     setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
-  const PlayerRow = ({ p, role }) => (
+  // funcao normal (nao componente): um componente criado dentro do render remontava as linhas e o select de posicao perdia o foco
+  const playerRow = (p, role) => (
     <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderTop: "1px solid var(--line-soft)" }}>
       <Avatar name={p.name} photo={p.photoUrl} size={30} />
       <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{firstName(p.name)}</span>
       {role === "titular" && (
-        <select value={lineup[p.id]?.pos || ""} onChange={(e) => setPos(p.id, e.target.value)}
+        <select value={lineup[p.id]?.pos || ""} onChange={(e) => setPos(p.id, e.target.value)} aria-label={`Posição de ${firstName(p.name)}`}
           className="ft-input" style={{ width: 72, padding: "4px 6px", fontSize: 12 }}>
           <option value="">Pos.</option>
           {POSITION_OPTS.map((po) => <option key={po} value={po}>{po}</option>)}
@@ -62,7 +63,7 @@ export const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
         <h3 style={{ fontSize: 13, fontWeight: 800, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}><Swords size={16} style={{ color: "var(--gold)" }} /> Jogo oficial</h3>
         {upcoming.length === 0
           ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", margin: 0 }}>Adiciona um jogo no Calendário para poder fazer a convocatória.</p>
-          : <select className="ft-input" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)}>
+          : <select className="ft-input" aria-label="Jogo oficial" value={selectedGame?.id || ""} onChange={(e) => setSelectedGame(upcoming.find((g) => g.id === e.target.value) || null)}>
               <option value="">Seleciona o jogo...</option>
               {upcoming.map((g) => <option key={g.id} value={g.id}>{new Date(g.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} · vs {g.opponent} {g.home ? "(Casa)" : "(Fora)"}</option>)}
             </select>}
@@ -70,22 +71,22 @@ export const LineupTab = ({ members, amIAdmin, leagueGames, onSaveLineup }) => {
       {selectedGame && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
-            {[5, 7, 11].map((n) => <button key={n} onClick={() => setSize(n)} className="ft-btn" style={{ padding: "8px 4px", fontSize: 12, background: size === n ? "var(--grass)" : "none", color: size === n ? "#04130a" : "var(--faint)" }}>{n}x{n}</button>)}
+            {[5, 7, 11].map((n) => <button key={n} onClick={() => setSize(n)} aria-pressed={size === n} className="ft-btn" style={{ padding: "8px 4px", fontSize: 12, background: size === n ? "var(--grass)" : "none", color: size === n ? "#04130a" : "var(--faint)" }}>{n}x{n}</button>)}
           </div>
           <div className="ft-card" style={{ padding: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span className="eyebrow">Titulares <span style={{ color: titulares.length === size ? "var(--grass-bright)" : "var(--faint)" }}>({titulares.length}/{size})</span></span>
               <span style={{ fontSize: 12, color: "var(--faint)" }}>Posição recomendada: {defaultPositions.join("-").replace("GR-", "GR · ")}</span>
             </div>
-            {titulares.length === 0 ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Nenhum titular selecionado.</p> : titulares.map((p) => <PlayerRow key={p.id} p={p} role="titular" />)}
+            {titulares.length === 0 ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Nenhum titular selecionado.</p> : titulares.map((p) => playerRow(p, "titular"))}
           </div>
           <div className="ft-card" style={{ padding: 14 }}>
             <div className="eyebrow" style={{ marginBottom: 10 }}>Suplentes ({suplentes.length})</div>
-            {suplentes.length === 0 ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Nenhum suplente selecionado.</p> : suplentes.map((p) => <PlayerRow key={p.id} p={p} role="suplente" />)}
+            {suplentes.length === 0 ? <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic" }}>Nenhum suplente selecionado.</p> : suplentes.map((p) => playerRow(p, "suplente"))}
           </div>
           <div className="ft-card" style={{ padding: 14 }}>
             <div className="eyebrow" style={{ marginBottom: 10 }}>Não convocados ({notCalled.length})</div>
-            {notCalled.length === 0 ? <p style={{ fontSize: 12, color: "var(--grass-bright)", fontSize: 12 }}>Toda a gente convocada!</p> : notCalled.map((p) => <PlayerRow key={p.id} p={p} role={null} />)}
+            {notCalled.length === 0 ? <p style={{ fontSize: 12, color: "var(--grass-bright)" }}>Toda a gente convocada!</p> : notCalled.map((p) => playerRow(p, null))}
           </div>
           {amIAdmin && (
             <button onClick={save} className="ft-btn ft-grass" style={{ width: "100%", padding: 14 }}>

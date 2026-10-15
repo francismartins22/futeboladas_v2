@@ -86,15 +86,15 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
         {editResult?.id === g.id && (
           <div className="ft-in" style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nós" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+              <input type="number" min="0" value={sa} onChange={(e) => setSa(e.target.value)} placeholder="Nós" aria-label="Golos nossos" inputMode="numeric" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
               <span style={{ color: "var(--faint)" }}>-</span>
-              <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
+              <input type="number" min="0" value={sb} onChange={(e) => setSb(e.target.value)} placeholder="Adv" aria-label="Golos do adversário" inputMode="numeric" className="num ft-input" style={{ width: 60, textAlign: "center", fontSize: 22, padding: "8px 4px" }} />
             </div>
-            <select className="ft-input" value={mvp} onChange={(e) => setMvp(e.target.value)} style={{ fontSize: 13 }}>
+            <select className="ft-input" aria-label="MVP do jogo" value={mvp} onChange={(e) => setMvp(e.target.value)} style={{ fontSize: 13 }}>
               <option value="">MVP do jogo (opcional)</option>
               {calledPlayers(g).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button onClick={() => setShowStats((s) => !s)} className="ft-btn ft-ghost" style={{ padding: 10, justifyContent: "space-between", fontSize: 12 }}>
+            <button onClick={() => setShowStats((s) => !s)} aria-expanded={showStats} className="ft-btn ft-ghost" style={{ padding: 10, justifyContent: "space-between", fontSize: 12 }}>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}><SoccerBall size={14} color="var(--grass-bright)" /> Golos & assistências (opcional)</span>
               <span style={{ transform: showStats ? "rotate(90deg)" : "none", transition: "transform .2s" }}><ArrowRight size={14} /></span>
             </button>
@@ -111,7 +111,7 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
               </div>
             )}
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => saveResult(g)} className="ft-btn ft-grass" style={{ flex: 1, padding: 11, fontSize: 13 }}>Guardar resultado</button>
+              <button onClick={() => saveResult(g)} disabled={sa === "" || sb === ""} className="ft-btn ft-grass" style={{ flex: 1, padding: 11, fontSize: 13 }}>Guardar resultado</button>
               <button onClick={() => setEditResult(null)} aria-label="Cancelar" className="ft-btn ft-ghost" style={{ padding: 11 }}><X size={14} /></button>
             </div>
           </div>
@@ -133,20 +133,20 @@ export const LeagueCalendarTab = ({ leagueGames, members, amIAdmin, onAdd, onDel
         </div>
       )}
       {amIAdmin && (
-        <button onClick={() => setOpen((o) => !o)} className="ft-btn ft-grass" style={{ padding: 13, justifyContent: "space-between" }}>
+        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="ft-btn ft-grass" style={{ padding: 13, justifyContent: "space-between" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Plus size={16} /> Adicionar jogo oficial</span>
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
       )}
       {open && (
         <div className="ft-card ft-in" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Adversário</label><input className="ft-input" value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Nome da equipa adversária..." /></div>
+          <div><label htmlFor="lc-opp" className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Adversário</label><input id="lc-opp" className="ft-input" value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Nome da equipa adversária..." /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Data</label><input type="date" className="ft-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-            <div><label className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Hora</label><input type="time" className="ft-input" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+            <div><label htmlFor="lc-date" className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Data</label><input id="lc-date" type="date" className="ft-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div><label htmlFor="lc-time" className="eyebrow" style={{ display: "block", marginBottom: 6 }}>Hora</label><input id="lc-time" type="time" className="ft-input" value={time} onChange={(e) => setTime(e.target.value)} /></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "#0a120f", padding: 4, borderRadius: 12, border: "1px solid var(--line)" }}>
-            {[[true, "Casa"], [false, "Fora"]].map(([v, l]) => <button key={l} onClick={() => setHome(v)} className="ft-btn" style={{ padding: "9px 4px", fontSize: 13, background: home === v ? "var(--grass)" : "none", color: home === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
+            {[[true, "Casa"], [false, "Fora"]].map(([v, l]) => <button key={l} onClick={() => setHome(v)} aria-pressed={home === v} className="ft-btn" style={{ padding: "9px 4px", fontSize: 13, background: home === v ? "var(--grass)" : "none", color: home === v ? "#04130a" : "var(--faint)" }}>{l}</button>)}
           </div>
           <button onClick={submit} disabled={!opponent.trim() || !date} className="ft-btn ft-grass" style={{ padding: 12 }}>Adicionar ao calendário</button>
         </div>
